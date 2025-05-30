@@ -2,6 +2,9 @@
 #include <net/exception.h>
 #include <net/listener.h>
 #include <ostream>
+#include <print>
+#include <sstream>
+#include <vector>
 
 int main() {
   try {
@@ -12,13 +15,27 @@ int main() {
     std::cout << "Listening on " << address.to_string() << std::endl;
 
     while (true) {
-      const auto [client_socket, client_address] = listener.accept();
+      const auto [client_stream, client_address] = listener.accept();
 
       std::cout << "Accepted connection from " << client_address->to_string()
                 << std::endl;
+
+      std::vector<std::byte> buffer(128);
+      const auto bytes_read = client_stream.read(std::span(buffer));
+      buffer.resize(bytes_read);
+
+      std::stringstream ss;
+      for (const auto &byte : buffer)
+        ss << std::hex << static_cast<int>(byte);
+
+      std::println(
+          "Received {} bytes: {}", bytes_read, ss.str()
+
+      );
     }
   } catch (const net::IoException &e) {
     std::cerr << e.what() << std::endl;
+    return 1;
   }
 
   return 0;

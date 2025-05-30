@@ -1,4 +1,5 @@
 #include "net/exception.h"
+#include <algorithm>
 #include <fcntl.h>
 #include <net/listener.h>
 #include <sys/socket.h>
@@ -18,15 +19,16 @@ TcpListener::TcpListener(const Address &addr)
   }
 }
 
-std::tuple<Socket, std::unique_ptr<Address>> TcpListener::accept() {
+std::tuple<TcpStream, std::unique_ptr<Address>> TcpListener::accept() {
   sockaddr_storage storage;
   auto len = static_cast<socklen_t>(sizeof(storage));
 
-  const auto sock =
-      this->sock.accept(reinterpret_cast<sockaddr *>(&storage), &len);
+  auto sock = this->sock.accept(reinterpret_cast<sockaddr *>(&storage), &len);
   const auto addr = IPv4Address::from_sockaddr(storage, len);
 
-  return std::make_tuple(std::move(sock), std::make_unique<IPv4Address>(addr));
+  return std::make_tuple(
+      TcpStream(std::move(sock)), std::make_unique<IPv4Address>(addr)
+  );
 }
 
 } // namespace net

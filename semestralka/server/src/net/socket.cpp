@@ -37,4 +37,12 @@ Socket Socket::accept(sockaddr *storage, socklen_t *len) {
   return Socket(FileDescriptor{fd});
 }
 
+int Socket::read(void *buf, const size_t len) const {
+  return recv(fd.fd, buf, len, 0);
+}
+
+int Socket::write(const void *buf, const size_t len) const {
+  return send(fd.fd, buf, len, MSG_NOSIGNAL);
+}
+
 } // namespace net
