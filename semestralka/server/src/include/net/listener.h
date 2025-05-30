@@ -3,7 +3,6 @@
 #include "net/address.h"
 #include "net/socket.h"
 #include "net/stream.h"
-#include <memory>
 
 namespace net {
 
@@ -16,7 +15,7 @@ public:
 
   inline Socket &socket() { return sock; }
 
-  std::tuple<TcpStream, std::unique_ptr<Address>> accept();
+  std::tuple<TcpStream, Address> accept() const;
 };
 
 } // namespace net

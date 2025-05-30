@@ -17,7 +17,7 @@ int main() {
     while (true) {
       const auto [client_stream, client_address] = listener.accept();
 
-      std::println("Accepted connection from {}", *client_address);
+      std::println("Accepted connection from {}", client_address);
 
       std::vector<std::byte> buffer(128);
       const auto bytes_read = client_stream.read(std::span(buffer));

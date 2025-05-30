@@ -17,18 +17,20 @@ Socket::Socket(int family, int type) {
 }
 
 void Socket::bind_to(const Address &addr) {
-  const auto sockaddr_in = addr.to_sockaddr();
-  const auto sockaddr = reinterpret_cast<const struct sockaddr *>(&sockaddr_in);
+  const auto [sockaddr_union, len] = addr.to_sockaddr();
 
-  if (bind(fd.fd, sockaddr, sizeof(sockaddr_in)) < 0) {
+  const auto sockaddr =
+      reinterpret_cast<const struct sockaddr *>(&sockaddr_union);
+
+  if (bind(fd.fd, sockaddr, len) < 0) {
     throw IoException("failed to bind socket");
   }
 
   std::println("Socket bound to {} with fd {}", addr, fd.fd);
 }
 
-Socket Socket::accept(sockaddr *storage, socklen_t *len) {
-  const auto fd = accept4(this->fd.fd, storage, len, SOCK_CLOEXEC);
+Socket Socket::accept(sockaddr &storage, socklen_t &len) const {
+  const auto fd = accept4(this->fd.fd, &storage, &len, SOCK_CLOEXEC);
 
   if (fd < 0) {
     throw IoException("failed to accept connection");

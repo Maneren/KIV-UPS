@@ -44,7 +44,7 @@ struct Socket {
 
   void bind_to(const Address &addr);
 
-  Socket accept(sockaddr *storage, socklen_t *len);
+  Socket accept(sockaddr &storage, socklen_t &len) const;
 
   int read(void *buf, const size_t len) const;
   int write(const void *buf, const size_t len) const;

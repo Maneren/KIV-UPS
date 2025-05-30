@@ -20,6 +20,9 @@ public:
 
   int read(std::span<std::byte> buf) const;
   int write(const std::span<std::byte> buf) const;
+
+  // int recv(std::span<std::byte> buf) const { return read(buf); }
+  // int send(const std::span<std::byte> buf) const { return write(buf); }
 };
 
 } // namespace net
