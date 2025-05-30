@@ -1,6 +1,6 @@
 root := justfile_directory()
 builddir := root / "build"
-executable := "divider"
+executable := "blackjack_server"
 export CMAKE_EXPORT_COMPILE_COMMANDS := "1"
 
 [private]
