@@ -1,36 +1,25 @@
-#include <division/division.h>
 #include <iostream>
+#include <net/exception.h>
+#include <net/listener.h>
+#include <ostream>
 
-static const char *const HEADER = "\nDivider © 2018 Monkey Claps Inc.\n\n";
-static const char *const USAGE =
-    "Usage:\n\tdivider <numerator> <denominator>\n\nDescription:\n\tComputes "
-    "the result of a fractional division,\n\tand reports both the result and "
-    "the remainder.\n";
-
-int main(int argc, const char *argv[]) {
-  division::Fraction f;
-
-  std::cout << HEADER;
-
-  // ensure the correct number of parameters are used.
-  if (argc < 3) {
-    std::cout << USAGE;
-    return 1;
-  }
-
-  f.numerator = atoll(argv[1]);
-  f.denominator = atoll(argv[2]);
-
-  const auto d = division::Division(f);
+int main() {
   try {
-    const auto r = d.divide();
+    const auto address = net::IPv4Address({127, 0, 0, 1}, 8080);
 
-    std::cout << "Division : " << f.numerator << " / " << f.denominator << " = "
-              << r.division << "\n";
-    std::cout << "Remainder: " << f.numerator << " % " << f.denominator << " = "
-              << r.remainder << "\n";
-  } catch (division::DivisionByZero) {
-    std::cout << "Can not divide by zero, Homer. Sober up!\n";
+    net::TcpListener listener(address);
+
+    std::cout << "Listening on " << address.to_string() << std::endl;
+
+    while (true) {
+      const auto [client_socket, client_address] = listener.accept();
+
+      std::cout << "Accepted connection from " << client_address->to_string()
+                << std::endl;
+    }
+  } catch (const net::IoException &e) {
+    std::cerr << e.what() << std::endl;
   }
+
   return 0;
 }

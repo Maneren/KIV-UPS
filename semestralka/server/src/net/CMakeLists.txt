@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-set(LIBRARY division)
+set(LIBRARY net)
 project(${LIBRARY} LANGUAGES CXX)
 
 file(GLOB_RECURSE SOURCE_FILES *.cpp *.h)

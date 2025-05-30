@@ -13,7 +13,7 @@ add_executable(${TEST_EXECUTABLE} EXCLUDE_FROM_ALL ${TEST_FILES})
 
 target_link_libraries(${TEST_EXECUTABLE}
   PRIVATE
-    division
+    net
 )
 
 find_package(GTest QUIET)
