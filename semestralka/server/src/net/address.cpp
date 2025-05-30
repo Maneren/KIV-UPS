@@ -35,10 +35,4 @@ IPv4Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   return addr;
 }
 
-std::string IPv4Address::to_string() const {
-  return std::to_string(octets[0]) + "." + std::to_string(octets[1]) + "." +
-         std::to_string(octets[2]) + "." + std::to_string(octets[3]) + ":" +
-         std::to_string(port);
-}
-
 } // namespace net

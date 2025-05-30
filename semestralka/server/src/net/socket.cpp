@@ -1,8 +1,8 @@
 #include "net/socket.h"
 #include "net/address.h"
 #include "net/exception.h"
-#include <print>
 #include <sys/socket.h>
+#include <utils/print.h>
 
 namespace net {
 
@@ -24,7 +24,7 @@ void Socket::bind_to(const Address &addr) {
     throw IoException("failed to bind socket");
   }
 
-  std::println("Socket bound to {} with fd {}", addr.to_string(), fd.fd);
+  std::println("Socket bound to {} with fd {}", addr, fd.fd);
 }
 
 Socket Socket::accept(sockaddr *storage, socklen_t *len) {

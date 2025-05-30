@@ -2,8 +2,8 @@
 #include <net/exception.h>
 #include <net/listener.h>
 #include <ostream>
-#include <print>
 #include <sstream>
+#include <utils/print.h>
 #include <vector>
 
 int main() {
@@ -12,13 +12,12 @@ int main() {
 
     net::TcpListener listener(address);
 
-    std::cout << "Listening on " << address.to_string() << std::endl;
+    std::println("Listening on {}", address);
 
     while (true) {
       const auto [client_stream, client_address] = listener.accept();
 
-      std::cout << "Accepted connection from " << client_address->to_string()
-                << std::endl;
+      std::println("Accepted connection from {}", *client_address);
 
       std::vector<std::byte> buffer(128);
       const auto bytes_read = client_stream.read(std::span(buffer));

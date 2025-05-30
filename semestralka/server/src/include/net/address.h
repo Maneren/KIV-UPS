@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstring>
+#include <format>
 #include <netinet/in.h>
 #include <string>
 
@@ -12,8 +13,6 @@ struct Address {
   virtual ~Address() {}
   virtual int family() const = 0;
   virtual sockaddr_in to_sockaddr() const = 0;
-
-  virtual std::string to_string() const = 0;
 };
 
 struct IPv4Address : public Address {
@@ -34,8 +33,31 @@ struct IPv4Address : public Address {
 
   static IPv4Address
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
-
-  std::string to_string() const override;
 };
 
 } // namespace net
+
+template <> struct std::formatter<net::IPv4Address> {
+  constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  auto format(const net::IPv4Address &obj, std::format_context &ctx) const {
+    return std::format_to(ctx.out(), "{}.{}.{}.{}:{}", obj.octets[0], obj.octets[1], obj.octets[2], obj.octets[3], obj.port);
+  }
+};
+
+template <> struct std::formatter<net::Address> {
+  constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  auto format(const net::Address &obj, std::format_context &ctx) const {
+    if (dynamic_cast<const net::IPv4Address *>(&obj)) {
+      return std::format_to(ctx.out(), "{}", dynamic_cast<const net::IPv4Address &>(obj));
+    }
+    return std::format_to(ctx.out(), "unknown address");
+  }
+};
+  
+
