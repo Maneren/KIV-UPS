@@ -10,7 +10,7 @@ Socket::Socket(int family, int type) {
   int fd = socket(family, type | SOCK_CLOEXEC, 0);
 
   if (fd < 0) {
-    throw IoException("failed to create socket");
+    throw io_exception("failed to create socket");
   }
 
   this->fd = fd;
@@ -23,7 +23,7 @@ void Socket::bind_to(const Address &addr) {
       reinterpret_cast<const struct sockaddr *>(&sockaddr_union);
 
   if (bind(fd.fd, sockaddr, len) < 0) {
-    throw IoException("failed to bind socket");
+    throw io_exception("failed to bind socket");
   }
 
   std::println("Socket bound to {} with fd {}", addr, fd.fd);
@@ -33,7 +33,7 @@ Socket Socket::accept(sockaddr &storage, socklen_t &len) const {
   const auto fd = accept4(this->fd.fd, &storage, &len, SOCK_CLOEXEC);
 
   if (fd < 0) {
-    throw IoException("failed to accept connection");
+    throw io_exception("failed to accept connection");
   }
 
   return Socket(FileDescriptor{fd});

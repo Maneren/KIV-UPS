@@ -9,7 +9,7 @@ void FileDescriptor::duplicate_fd(int source_fd) {
   const auto fd = fcntl(source_fd, cmd, 3);
 
   if (fd < 0) {
-    throw IoException("failed to duplicate file descriptor");
+    throw io_exception("failed to duplicate file descriptor");
   }
 
   this->fd = fd;

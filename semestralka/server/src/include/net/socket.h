@@ -29,7 +29,7 @@ struct Socket {
     if (setsockopt(
             fd.fd, level, optname, &optval, static_cast<socklen_t>(sizeof(T))
         ) < 0) {
-      throw IoException("failed to set socket options");
+      throw io_exception("failed to set socket options");
     }
   };
 
@@ -37,7 +37,7 @@ struct Socket {
     T optval;
     auto len = static_cast<socklen_t>(sizeof(T));
     if (getsockopt(fd.fd, level, optname, &optval, &len) < 0) {
-      throw IoException("failed to get socket options");
+      throw io_exception("failed to get socket options");
     }
     return optval;
   };

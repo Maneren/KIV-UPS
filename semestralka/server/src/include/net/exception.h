@@ -6,17 +6,15 @@
 
 namespace net {
 
-class IoException : public std::exception {
-  std::string msg;
+class io_exception : public std::runtime_error {
 
 public:
-  IoException(std::string_view msg) : msg(msg) {}
+  io_exception(std::string_view msg) : std::runtime_error(std::string(msg)) {}
+  io_exception(std::string &msg) : std::runtime_error(msg) {}
 
   template <typename... Args>
-  IoException(std::format_string<Args...> msg, Args &&...args)
-      : msg(std::format(msg, std::forward<Args>(args)...)) {}
-
-  const char *what() const noexcept override { return msg.c_str(); }
+  io_exception(std::format_string<Args...> msg, Args &&...args)
+      : std::runtime_error(std::format(msg, std::forward<Args>(args)...)) {}
 };
 
 } // namespace net

@@ -32,7 +32,7 @@ int main() {
 
       );
     }
-  } catch (const net::IoException &e) {
+  } catch (const net::io_exception &e) {
     std::cerr << e.what() << std::endl;
     return 1;
   }

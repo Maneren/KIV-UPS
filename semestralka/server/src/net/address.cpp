@@ -19,7 +19,7 @@ sockaddr_in net::IPv4Address::to_sockaddr() const {
 IPv4Address
 IPv4Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   if (len < sizeof(sockaddr_in)) {
-    throw IoException(
+    throw io_exception(
         "Invalid address length: {} < {}", len, sizeof(sockaddr_in)
     );
   }
@@ -52,7 +52,7 @@ sockaddr_in6 net::IPv6Address::to_sockaddr() const {
 IPv6Address
 IPv6Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   if (len < sizeof(sockaddr_in6)) {
-    throw IoException(
+    throw io_exception(
         "Invalid address length: {} < {}", len, sizeof(sockaddr_in6)
     );
   }
@@ -77,7 +77,7 @@ Address Address::from_sockaddr(sockaddr_storage &storage, size_t len) {
   case IPv6Address::FAMILY:
     return Address(IPv6Address::from_sockaddr(storage, len));
   default:
-    throw IoException("unrecognized socket family");
+    throw io_exception("unrecognized socket family");
   }
 }
 

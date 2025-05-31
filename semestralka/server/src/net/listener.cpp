@@ -14,7 +14,7 @@ TcpListener::TcpListener(const Address &addr)
   sock.bind_to(addr);
 
   if (listen(sock.fd.fd, BACKLOG) < 0) {
-    throw IoException("failed to start listening to socket");
+    throw io_exception("failed to start listening to socket");
   }
 }
 
