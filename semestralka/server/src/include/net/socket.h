@@ -48,6 +48,9 @@ struct Socket {
 
   int read(void *buf, const size_t len) const;
   int write(const void *buf, const size_t len) const;
+
+  int recv(void *buf, const size_t len, int flags) const;
+  int send(const void *buf, const size_t len, int flags) const;
 };
 
 } // namespace net

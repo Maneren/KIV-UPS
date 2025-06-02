@@ -40,11 +40,19 @@ Socket Socket::accept(sockaddr &storage, socklen_t &len) const {
 }
 
 int Socket::read(void *buf, const size_t len) const {
-  return recv(fd.fd, buf, len, 0);
+  return ::read(fd.fd, buf, len);
 }
 
 int Socket::write(const void *buf, const size_t len) const {
-  return send(fd.fd, buf, len, MSG_NOSIGNAL);
+  return ::write(fd.fd, buf, len);
+}
+
+int Socket::recv(void *buf, const size_t len, int flags) const {
+  return ::recv(fd.fd, buf, len, flags);
+}
+
+int Socket::send(const void *buf, const size_t len, int flags) const {
+  return ::send(fd.fd, buf, len, flags);
 }
 
 } // namespace net
