@@ -1,9 +1,11 @@
 #pragma once
 
+#include "net/exception.h"
 #include "utils/match.h"
 #include <arpa/inet.h>
 #include <array>
 #include <cassert>
+#include <cerrno>
 #include <cstring>
 #include <format>
 #include <netinet/in.h>
@@ -122,7 +124,7 @@ template <> struct std::formatter<net::IPv6Address> {
         inet_ntop(obj.family(), &cp.sin6_addr, buffer, sizeof(buffer));
 
     if (result == nullptr) {
-      throw std::runtime_error("inet_ntop failed to stringify address");
+      throw net::io_exception("inet_ntop failed to stringify address", errno);
     }
 
     return std::format_to(ctx.out(), "[{}]:{}", buffer, obj.port);

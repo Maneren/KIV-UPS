@@ -26,7 +26,14 @@ IPv4Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
 
   const auto addr_in = reinterpret_cast<const sockaddr_in *>(&storage);
 
+  if (addr_in->sin_family != FAMILY) {
+    throw io_exception(
+        "Invalid address family for IPv4: {}", addr_in->sin_family
+    );
+  }
+
   IPv4Address addr;
+
   addr.port = ntohs(addr_in->sin_port);
 
   static_assert(sizeof(addr_in->sin_addr.s_addr) == BYTES);
@@ -58,6 +65,12 @@ IPv6Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   }
 
   const auto addr_in6 = reinterpret_cast<const sockaddr_in6 *>(&storage);
+
+  if (addr_in6->sin6_family != FAMILY) {
+    throw io_exception(
+        "Invalid address family for IPv6: {}", addr_in6->sin6_family
+    );
+  }
 
   IPv6Address addr;
   addr.port = ntohs(addr_in6->sin6_port);
