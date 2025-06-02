@@ -6,6 +6,7 @@
 #include <array>
 #include <cassert>
 #include <cerrno>
+#include <cstdio>
 #include <cstring>
 #include <format>
 #include <netinet/in.h>
@@ -30,6 +31,10 @@ struct IPv4Address {
       : octets(octets), port(port) {}
 
   ~IPv4Address() = default;
+
+  constexpr bool operator==(const IPv4Address &other) const {
+    return octets == other.octets && port == other.port;
+  }
 
   constexpr int family() const { return FAMILY; }
 
@@ -58,6 +63,11 @@ struct IPv6Address {
       : octets(octets), port(port), flowinfo(flowinfo), scopeid(scopeid) {}
 
   ~IPv6Address() = default;
+
+  constexpr bool operator==(const IPv6Address &other) const {
+    return octets == other.octets && port == other.port &&
+           flowinfo == other.flowinfo && scopeid == other.scopeid;
+  }
 
   constexpr int family() const { return FAMILY; }
 
