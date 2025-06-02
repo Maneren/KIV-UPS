@@ -7,7 +7,6 @@
 #include <cstring>
 #include <format>
 #include <netinet/in.h>
-#include <string>
 #include <tuple>
 #include <variant>
 
@@ -115,20 +114,16 @@ template <> struct std::formatter<net::IPv6Address> {
   constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
 
   auto format(auto &obj, std::format_context &ctx) const {
-    constexpr std::string_view longest_addr =
-        "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff";
+    char buffer[INET6_ADDRSTRLEN];
 
-    std::string buffer('\0', longest_addr.size());
+    const auto cp = obj.to_sockaddr();
 
-    const auto result = inet_ntop(
-        obj.family(), obj.octets.data(), buffer.data(), buffer.size()
-    );
+    const auto result =
+        inet_ntop(obj.family(), &cp.sin6_addr, buffer, sizeof(buffer));
 
     if (result == nullptr) {
       throw std::runtime_error("inet_ntop failed to stringify address");
     }
-
-    buffer.resize(strlen(buffer.data()));
 
     return std::format_to(ctx.out(), "[{}]:{}", buffer, obj.port);
   }
