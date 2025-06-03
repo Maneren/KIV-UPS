@@ -5,7 +5,6 @@
 #include <limits>
 #include <poll.h>
 #include <sys/socket.h>
-#include <utils/print.h>
 
 namespace net {
 
@@ -28,8 +27,6 @@ void Socket::bind_to(const Address &addr) {
   if (bind(fd.fd, sockaddr, len) < 0) {
     throw io_exception("failed to bind socket");
   }
-
-  std::println("Socket bound to {} with fd {}", addr, fd.fd);
 }
 
 Socket Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {

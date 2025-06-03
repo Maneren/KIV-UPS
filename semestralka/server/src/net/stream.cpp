@@ -2,7 +2,7 @@
 
 namespace net {
 
-TcpStream::TcpStream(Socket &&sock) : sock(sock) {}
+TcpStream::TcpStream(Socket &&sock) : sock(std::move(sock)) {}
 
 TcpStream::TcpStream(const Address &addr) : sock(addr, SOCK_STREAM) {
   sock.connect(addr);
@@ -10,6 +10,15 @@ TcpStream::TcpStream(const Address &addr) : sock(addr, SOCK_STREAM) {
 TcpStream::TcpStream(const Address &addr, std::chrono::microseconds timeout)
     : sock(addr, SOCK_STREAM) {
   sock.connect_timeout(addr, timeout);
+}
+
+TcpStream::~TcpStream() {}
+
+TcpStream::TcpStream(TcpStream &&other) : sock(std::move(other.sock)) {}
+
+TcpStream &TcpStream::operator=(TcpStream &&other) {
+  this->sock = std::move(other.sock);
+  return *this;
 }
 
 int TcpStream::read(std::span<std::byte> buf) const {
@@ -34,7 +43,7 @@ int TcpStream::recv(const std::span<std::byte> buf, int flags) const {
   const auto len = buf.size();
   const auto result = sock.recv(buf.data(), len, flags);
   if (result < 0) {
-    throw io_exception("failed to recv from socket");
+    throw io_exception("failed to recv from socket", errno);
   }
   return result;
 }

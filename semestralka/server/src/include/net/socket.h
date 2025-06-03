@@ -20,11 +20,13 @@ struct Socket {
     return *this;
   }
 
-  Socket(Socket &&other) : fd(other.fd) {}
+  Socket(Socket &&other) : fd(std::move(other.fd)) {}
   Socket &operator=(Socket &&other) {
     this->fd = std::move(other.fd);
     return *this;
   }
+
+  ~Socket() = default;
 
   template <typename T> void setopts(int level, int optname, const T &optval) {
     if (setsockopt(

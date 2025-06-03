@@ -7,9 +7,9 @@ namespace net {
 struct FileDescriptor {
   int fd;
 
-  FileDescriptor() : fd(-1) {}
-  FileDescriptor(int fd) : fd(fd) {}
-  ~FileDescriptor() { close(fd); }
+  FileDescriptor();
+  FileDescriptor(int fd);
+  ~FileDescriptor();
 
   inline FileDescriptor(const FileDescriptor &other) { duplicate_fd(other.fd); }
   inline FileDescriptor &operator=(const FileDescriptor &other) {

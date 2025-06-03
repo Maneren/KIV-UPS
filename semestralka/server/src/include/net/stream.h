@@ -12,12 +12,12 @@ class TcpStream {
 public:
   TcpStream(Socket &&sock);
 
-  ~TcpStream() = default;
+  ~TcpStream();
 
   TcpStream(const TcpStream &) = delete;
-  TcpStream(TcpStream &&) = default;
+  TcpStream(TcpStream &&other);
   TcpStream &operator=(const TcpStream &) = delete;
-  TcpStream &operator=(TcpStream &&) = default;
+  TcpStream &operator=(TcpStream &&other);
 
   TcpStream(const Address &addr);
   TcpStream(const Address &addr, std::chrono::microseconds timeout);
@@ -27,6 +27,8 @@ public:
 
   int recv(const std::span<std::byte> buf, int flags = 0) const;
   int send(const std::span<const std::byte> buf, int flags = 0) const;
+
+  const Socket &socket() const { return sock; }
 };
 
 } // namespace net
