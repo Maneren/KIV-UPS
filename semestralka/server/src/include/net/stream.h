@@ -1,7 +1,7 @@
 #pragma once
 
-#include "net/socket.h"
 #include <chrono>
+#include <net/socket.h>
 #include <span>
 
 namespace net {
