@@ -3,6 +3,7 @@
 #include "net/address.h"
 #include "net/exception.h"
 #include "net/file_descriptor.h"
+#include <chrono>
 
 namespace net {
 
@@ -33,7 +34,7 @@ struct Socket {
     }
   };
 
-  template <typename T> T getopts(int level, int optname) {
+  template <typename T> T getopts(int level, int optname) const {
     T optval;
     auto len = static_cast<socklen_t>(sizeof(T));
     if (getsockopt(fd.fd, level, optname, &optval, &len) < 0) {
@@ -44,7 +45,14 @@ struct Socket {
 
   void bind_to(const Address &addr);
 
-  Socket accept(sockaddr &storage, socklen_t &len) const;
+  Socket accept(sockaddr &storage, socklen_t &len, int flags = 0) const;
+
+  void connect(const Address &addr);
+  void connect_timeout(const Address &addr, std::chrono::microseconds timeout);
+
+  int error_state() const;
+
+  void set_nonblocking(bool blocking);
 
   int read(void *buf, const size_t len) const;
   int write(const void *buf, const size_t len) const;

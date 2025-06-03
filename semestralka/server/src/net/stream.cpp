@@ -2,6 +2,16 @@
 
 namespace net {
 
+TcpStream::TcpStream(Socket &&sock) : sock(sock) {}
+
+TcpStream::TcpStream(const Address &addr) : sock(addr, SOCK_STREAM) {
+  sock.connect(addr);
+}
+TcpStream::TcpStream(const Address &addr, std::chrono::microseconds timeout)
+    : sock(addr, SOCK_STREAM) {
+  sock.connect_timeout(addr, timeout);
+}
+
 int TcpStream::read(std::span<std::byte> buf) const {
   const auto len = buf.size();
   const auto result = sock.read(buf.data(), len);
