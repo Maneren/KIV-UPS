@@ -8,7 +8,8 @@
 
 int main() {
   try {
-    const auto address = net::IPv4Address({127, 0, 0, 1}, 8080);
+    const auto address = net::IPv4Address::from_string("0.0.0.0:8080");
+    // const auto address = net::IPv6Address::from_string("[::]:8080");
 
     net::TcpListener listener(address);
 
@@ -27,10 +28,7 @@ int main() {
       for (const auto &byte : buffer)
         ss << std::hex << static_cast<int>(byte);
 
-      std::println(
-          "Received {} bytes: {}", bytes_read, ss.str()
-
-      );
+      std::println("Received {} bytes: {}", bytes_read, ss.str());
     }
   } catch (const net::io_exception &e) {
     std::cerr << e.what() << std::endl;

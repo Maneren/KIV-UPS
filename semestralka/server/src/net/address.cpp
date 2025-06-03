@@ -1,6 +1,7 @@
 #include "net/address.h"
 #include "net/exception.h"
 #include <netinet/in.h>
+#include <string>
 
 namespace net {
 
@@ -42,6 +43,34 @@ IPv4Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   return addr;
 }
 
+IPv4Address IPv4Address::from_string(const std::string &str) {
+  if (str.empty()) {
+    throw io_exception("Invalid IPv4 address: {}", str);
+  }
+
+  const size_t colon_pos = str.find(':');
+  const std::string ip_part =
+      (colon_pos == std::string::npos) ? str : str.substr(0, colon_pos);
+  const std::string port_part =
+      (colon_pos == std::string::npos) ? "" : str.substr(colon_pos + 1);
+
+  struct in_addr addr;
+  if (inet_pton(AF_INET, ip_part.c_str(), &addr) != 1) {
+    throw io_exception("Invalid IPv4 address: {}", str);
+  }
+
+  uint16_t port = 0;
+  if (!port_part.empty()) {
+    try {
+      port = static_cast<uint16_t>(std::stoi(port_part));
+    } catch (const std::exception &) {
+      throw io_exception("Invalid port number: {}", port_part);
+    }
+  }
+
+  return IPv4Address(ntohl(addr.s_addr), port);
+}
+
 sockaddr_in6 net::IPv6Address::to_sockaddr() const {
   sockaddr_in6 addr_in6;
   std::memset(&addr_in6, 0, sizeof(addr_in6));
@@ -81,6 +110,45 @@ IPv6Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   std::memcpy(addr.octets.data(), &addr_in6->sin6_addr.s6_addr, BYTES);
 
   return addr;
+}
+
+IPv6Address IPv6Address::from_string(const std::string &str) {
+  if (str.empty()) {
+    throw io_exception("Invalid IPv6 address: {}", str);
+  }
+
+  size_t colon_pos = std::string::npos;
+
+  if (str.starts_with("[")) {
+    const size_t bracket_pos = str.find(']');
+
+    if (bracket_pos == std::string::npos) {
+      throw io_exception("Invalid IPv6 address: {}", str);
+    }
+
+    colon_pos = str.rfind(':');
+  }
+
+  const std::string ip_part =
+      (colon_pos == std::string::npos) ? str : str.substr(1, colon_pos - 2);
+  const std::string port_part =
+      (colon_pos == std::string::npos) ? "" : str.substr(colon_pos + 1);
+
+  struct in6_addr addr;
+  if (inet_pton(AF_INET6, ip_part.c_str(), &addr) != 1) {
+    throw io_exception("Invalid IPv6 address: {}", str);
+  }
+
+  uint16_t port = 0;
+  if (!port_part.empty()) {
+    try {
+      port = static_cast<uint16_t>(std::stoi(port_part));
+    } catch (const std::exception &) {
+      throw io_exception("Invalid port number: {}", port_part);
+    }
+  }
+
+  return IPv6Address(addr.s6_addr, port);
 }
 
 Address Address::from_sockaddr(sockaddr_storage &storage, size_t len) {

@@ -42,6 +42,8 @@ struct IPv4Address {
 
   static IPv4Address
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
+
+  static IPv4Address from_string(const std::string &str);
 };
 
 struct IPv6Address {
@@ -61,6 +63,15 @@ struct IPv6Address {
       uint32_t scopeid = 0
   )
       : octets(octets), port(port), flowinfo(flowinfo), scopeid(scopeid) {}
+  IPv6Address(
+      uint8_t octets[BYTES],
+      uint16_t port = 0,
+      uint32_t flowinfo = 0,
+      uint32_t scopeid = 0
+  )
+      : port(port), flowinfo(flowinfo), scopeid(scopeid) {
+    std::memcpy(this->octets.data(), octets, BYTES);
+  }
 
   ~IPv6Address() = default;
 
@@ -75,6 +86,8 @@ struct IPv6Address {
 
   static IPv6Address
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
+
+  static IPv6Address from_string(const std::string &str);
 };
 
 struct Address {
@@ -134,7 +147,7 @@ template <> struct std::formatter<net::IPv6Address> {
         inet_ntop(obj.family(), &cp.sin6_addr, buffer, sizeof(buffer));
 
     if (result == nullptr) {
-      throw net::io_exception("inet_ntop failed to stringify address", errno);
+      throw net::io_exception("inet_ntop failed to stringify address");
     }
 
     return std::format_to(ctx.out(), "[{}]:{}", buffer, obj.port);
