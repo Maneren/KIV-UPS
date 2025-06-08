@@ -13,7 +13,7 @@ public:
   TcpListener(const Address &addr);
   ~TcpListener() = default;
 
-  inline Socket &socket() { return sock; }
+  Socket &socket() { return sock; }
 
   std::tuple<TcpStream, Address> accept() const;
 };

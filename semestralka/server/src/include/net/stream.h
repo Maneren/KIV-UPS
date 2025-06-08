@@ -15,9 +15,9 @@ public:
   ~TcpStream();
 
   TcpStream(const TcpStream &) = delete;
-  TcpStream(TcpStream &&other);
+  TcpStream(TcpStream &&other) noexcept;
   TcpStream &operator=(const TcpStream &) = delete;
-  TcpStream &operator=(TcpStream &&other);
+  TcpStream &operator=(TcpStream &&other) noexcept;
 
   TcpStream(const Address &addr);
   TcpStream(const Address &addr, std::chrono::microseconds timeout);

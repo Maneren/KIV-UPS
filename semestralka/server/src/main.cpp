@@ -41,8 +41,9 @@ int main() {
           const auto received_bytes = std::span(buffer.data(), bytes_read);
 
           std::stringstream ss;
-          for (const auto &byte : received_bytes)
+          for (const auto &byte : received_bytes) {
             ss << std::format("{:02x}", static_cast<int>(byte));
+          }
 
           std::println(
               "Received {} bytes from address {}: {}",

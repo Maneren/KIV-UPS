@@ -5,6 +5,7 @@
 #include <net/socket.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 
 namespace net {
 
@@ -18,7 +19,7 @@ Socket::Socket(int family, int type) {
   this->fd = fd;
 }
 
-void Socket::bind_to(const Address &addr) {
+void Socket::bind_to(const Address &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
   const auto sockaddr =
@@ -36,10 +37,10 @@ Socket Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
     throw io_exception("failed to accept connection");
   }
 
-  return Socket(FileDescriptor{fd});
+  return {FileDescriptor{fd}};
 }
 
-void Socket::connect(const Address &addr) {
+void Socket::connect(const Address &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
   while (true) {
@@ -61,7 +62,7 @@ void Socket::connect(const Address &addr) {
 
 void Socket::connect_timeout(
     const Address &addr, std::chrono::microseconds timeout
-) {
+) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
   set_nonblocking(true);
@@ -116,7 +117,7 @@ void Socket::connect_timeout(
     }
 
     if (poll_result > 0) {
-      if (pfd.revents & (POLLHUP | POLLERR)) {
+      if ((pfd.revents & (POLLHUP | POLLERR)) != 0) {
         const auto error = error_state();
         if (error != 0) {
           throw io_exception("connection failed", error);
@@ -132,25 +133,25 @@ void Socket::connect_timeout(
 
 int Socket::error_state() const { return getopts<int>(SOL_SOCKET, SO_ERROR); }
 
-void Socket::set_nonblocking(bool nonblocking) {
-  if (fcntl(fd.fd, F_SETFL, nonblocking ? O_NONBLOCK : 0) < 0) {
+void Socket::set_nonblocking(bool nonblocking) const {
+  if (::fcntl(fd.fd, F_SETFL, nonblocking ? O_NONBLOCK : 0) < 0) {
     throw io_exception("failed to set socket non-blocking");
   }
 }
 
-int Socket::read(void *buf, const size_t len) const {
+ssize_t Socket::read(void *buf, const size_t len) const {
   return ::read(fd.fd, buf, len);
 }
 
-int Socket::write(const void *buf, const size_t len) const {
+ssize_t Socket::write(const void *buf, const size_t len) const {
   return ::write(fd.fd, buf, len);
 }
 
-int Socket::recv(void *buf, const size_t len, int flags) const {
+ssize_t Socket::recv(void *buf, const size_t len, int flags) const {
   return ::recv(fd.fd, buf, len, flags);
 }
 
-int Socket::send(const void *buf, const size_t len, int flags) const {
+ssize_t Socket::send(const void *buf, const size_t len, int flags) const {
   return ::send(fd.fd, buf, len, flags);
 }
 

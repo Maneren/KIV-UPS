@@ -19,7 +19,7 @@ TcpListener::TcpListener(const Address &addr)
 }
 
 std::tuple<TcpStream, Address> TcpListener::accept() const {
-  sockaddr_storage storage;
+  sockaddr_storage storage{};
   auto len = static_cast<socklen_t>(sizeof(storage));
 
   auto sock = this->sock.accept(reinterpret_cast<sockaddr &>(storage), len);

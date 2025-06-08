@@ -12,16 +12,16 @@ struct Socket {
 
   Socket(const Address &addr, int type) : Socket(addr.family(), type) {}
   Socket(int family, int type);
-  Socket(FileDescriptor fd) : fd(fd) {}
+  Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
 
-  Socket(const Socket &other) : fd(other.fd) {}
+  Socket(const Socket &other) = default;
   Socket &operator=(const Socket &other) {
     this->fd = other.fd;
     return *this;
   }
 
-  Socket(Socket &&other) : fd(std::move(other.fd)) {}
-  Socket &operator=(Socket &&other) {
+  Socket(Socket &&other) noexcept : fd(std::move(other.fd)) {}
+  Socket &operator=(Socket &&other) noexcept {
     this->fd = std::move(other.fd);
     return *this;
   }
@@ -45,22 +45,23 @@ struct Socket {
     return optval;
   };
 
-  void bind_to(const Address &addr);
+  void bind_to(const Address &addr) const;
 
   Socket accept(sockaddr &storage, socklen_t &len, int flags = 0) const;
 
-  void connect(const Address &addr);
-  void connect_timeout(const Address &addr, std::chrono::microseconds timeout);
+  void connect(const Address &addr) const;
+  void
+  connect_timeout(const Address &addr, std::chrono::microseconds timeout) const;
 
-  int error_state() const;
+  [[nodiscard]] int error_state() const;
 
-  void set_nonblocking(bool blocking);
+  void set_nonblocking(bool blocking) const;
 
-  int read(void *buf, const size_t len) const;
-  int write(const void *buf, const size_t len) const;
+  ssize_t read(void *buf, size_t len) const;
+  ssize_t write(const void *buf, size_t len) const;
 
-  int recv(void *buf, const size_t len, int flags) const;
-  int send(const void *buf, const size_t len, int flags) const;
+  ssize_t recv(void *buf, size_t len, int flags) const;
+  ssize_t send(const void *buf, size_t len, int flags) const;
 };
 
 } // namespace net

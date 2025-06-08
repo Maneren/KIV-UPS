@@ -3,7 +3,6 @@
 #include <arpa/inet.h>
 #include <array>
 #include <cassert>
-#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <format>
@@ -19,10 +18,9 @@ struct IPv4Address {
   constexpr static size_t BYTES = 4;
   constexpr static int FAMILY = AF_INET;
 
-  std::array<uint8_t, BYTES> octets;
+  std::array<uint8_t, BYTES> octets{};
   uint16_t port;
 
-  IPv4Address() {}
   IPv4Address(uint32_t addr, uint16_t port = 0) : port(port) {
     auto in_net_endian = htonl(addr);
     std::memcpy(octets.data(), &in_net_endian, BYTES);
@@ -30,15 +28,13 @@ struct IPv4Address {
   IPv4Address(std::array<uint8_t, BYTES> octets, uint16_t port)
       : octets(octets), port(port) {}
 
-  ~IPv4Address() = default;
-
   constexpr bool operator==(const IPv4Address &other) const {
     return octets == other.octets && port == other.port;
   }
 
-  constexpr int family() const { return FAMILY; }
+  [[nodiscard]] static constexpr int family() { return FAMILY; }
 
-  sockaddr_in to_sockaddr() const;
+  [[nodiscard]] sockaddr_in to_sockaddr() const;
 
   static IPv4Address
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
@@ -50,12 +46,11 @@ struct IPv6Address {
   constexpr static size_t BYTES = 16;
   constexpr static int FAMILY = AF_INET6;
 
-  std::array<uint8_t, BYTES> octets;
+  std::array<uint8_t, BYTES> octets{};
   uint16_t port;
   uint32_t flowinfo;
   uint32_t scopeid;
 
-  IPv6Address() {}
   IPv6Address(
       std::array<uint8_t, BYTES> octets,
       uint16_t port = 0,
@@ -64,7 +59,7 @@ struct IPv6Address {
   )
       : octets(octets), port(port), flowinfo(flowinfo), scopeid(scopeid) {}
   IPv6Address(
-      uint8_t octets[BYTES],
+      const uint8_t octets[BYTES],
       uint16_t port = 0,
       uint32_t flowinfo = 0,
       uint32_t scopeid = 0
@@ -73,16 +68,14 @@ struct IPv6Address {
     std::memcpy(this->octets.data(), octets, BYTES);
   }
 
-  ~IPv6Address() = default;
-
   constexpr bool operator==(const IPv6Address &other) const {
     return octets == other.octets && port == other.port &&
            flowinfo == other.flowinfo && scopeid == other.scopeid;
   }
 
-  constexpr int family() const { return FAMILY; }
+  [[nodiscard]] static constexpr int family() { return FAMILY; }
 
-  sockaddr_in6 to_sockaddr() const;
+  [[nodiscard]] sockaddr_in6 to_sockaddr() const;
 
   static IPv6Address
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
@@ -96,7 +89,7 @@ struct Address {
 
   std::variant<IPv4Address, IPv6Address> inner;
 
-  constexpr int family() const {
+  [[nodiscard]] constexpr int family() const {
     return match::match(
         inner,
         [](const IPv4Address &) { return IPv4Address::FAMILY; },
@@ -111,16 +104,18 @@ struct Address {
     sockaddr_in6 ipv6;
   };
 
-  std::tuple<sockaddr_union, int> to_sockaddr() const;
+  [[nodiscard]] std::tuple<sockaddr_union, int> to_sockaddr() const;
 
-  uint16_t port() const;
+  [[nodiscard]] uint16_t port() const;
   void set_port(uint16_t port);
 };
 
 } // namespace net
 
 template <> struct std::formatter<net::IPv4Address> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
 
   auto format(auto &obj, std::format_context &ctx) const {
     return std::format_to(
@@ -136,15 +131,17 @@ template <> struct std::formatter<net::IPv4Address> {
 };
 
 template <> struct std::formatter<net::IPv6Address> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
 
   auto format(auto &obj, std::format_context &ctx) const {
-    char buffer[INET6_ADDRSTRLEN];
+    std::string buffer(INET6_ADDRSTRLEN, '\0');
 
     const auto cp = obj.to_sockaddr();
 
     const auto result =
-        inet_ntop(obj.family(), &cp.sin6_addr, buffer, sizeof(buffer));
+        inet_ntop(obj.family(), &cp.sin6_addr, buffer.data(), buffer.size());
 
     if (result == nullptr) {
       throw net::io_exception("inet_ntop failed to stringify address");
@@ -155,7 +152,9 @@ template <> struct std::formatter<net::IPv6Address> {
 };
 
 template <> struct std::formatter<net::Address> {
-  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
 
   auto format(auto &obj, std::format_context &ctx) const {
     return match::match(

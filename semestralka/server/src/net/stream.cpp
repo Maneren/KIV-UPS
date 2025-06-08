@@ -12,11 +12,12 @@ TcpStream::TcpStream(const Address &addr, std::chrono::microseconds timeout)
   sock.connect_timeout(addr, timeout);
 }
 
-TcpStream::~TcpStream() {}
+TcpStream::~TcpStream() = default;
 
-TcpStream::TcpStream(TcpStream &&other) : sock(std::move(other.sock)) {}
+TcpStream::TcpStream(TcpStream &&other) noexcept
+    : sock(std::move(other.sock)) {}
 
-TcpStream &TcpStream::operator=(TcpStream &&other) {
+TcpStream &TcpStream::operator=(TcpStream &&other) noexcept {
   this->sock = std::move(other.sock);
   return *this;
 }

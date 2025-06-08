@@ -6,7 +6,7 @@
 namespace net {
 
 sockaddr_in net::IPv4Address::to_sockaddr() const {
-  sockaddr_in addr_in;
+  sockaddr_in addr_in{};
   std::memset(&addr_in, 0, sizeof(addr_in));
   addr_in.sin_family = AF_INET;
   addr_in.sin_port = htons(port);
@@ -33,14 +33,11 @@ IPv4Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
     );
   }
 
-  IPv4Address addr;
-
-  addr.port = ntohs(addr_in->sin_port);
-
   static_assert(sizeof(addr_in->sin_addr.s_addr) == BYTES);
-  std::memcpy(addr.octets.data(), &addr_in->sin_addr.s_addr, BYTES);
+  return {
+      addr_in->sin_addr.s_addr, ntohs(addr_in->sin_port)
 
-  return addr;
+  };
 }
 
 IPv4Address IPv4Address::from_string(const std::string &str) {
@@ -54,7 +51,7 @@ IPv4Address IPv4Address::from_string(const std::string &str) {
   const std::string port_part =
       (colon_pos == std::string::npos) ? "" : str.substr(colon_pos + 1);
 
-  struct in_addr addr;
+  struct in_addr addr{};
   if (inet_pton(AF_INET, ip_part.c_str(), &addr) != 1) {
     throw io_exception("Invalid IPv4 address: {}", str);
   }
@@ -68,11 +65,11 @@ IPv4Address IPv4Address::from_string(const std::string &str) {
     }
   }
 
-  return IPv4Address(ntohl(addr.s_addr), port);
+  return {ntohl(addr.s_addr), port};
 }
 
 sockaddr_in6 net::IPv6Address::to_sockaddr() const {
-  sockaddr_in6 addr_in6;
+  sockaddr_in6 addr_in6{};
   std::memset(&addr_in6, 0, sizeof(addr_in6));
   addr_in6.sin6_family = AF_INET6;
   addr_in6.sin6_port = htons(port);
@@ -101,15 +98,13 @@ IPv6Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
     );
   }
 
-  IPv6Address addr;
-  addr.port = ntohs(addr_in6->sin6_port);
-  addr.flowinfo = ntohl(addr_in6->sin6_flowinfo);
-  addr.scopeid = ntohl(addr_in6->sin6_scope_id);
-
   static_assert(sizeof(addr_in6->sin6_addr.s6_addr) == BYTES);
-  std::memcpy(addr.octets.data(), &addr_in6->sin6_addr.s6_addr, BYTES);
-
-  return addr;
+  return {
+      static_cast<const uint8_t *>(addr_in6->sin6_addr.s6_addr),
+      ntohs(addr_in6->sin6_port),
+      ntohl(addr_in6->sin6_flowinfo),
+      ntohl(addr_in6->sin6_scope_id)
+  };
 }
 
 IPv6Address IPv6Address::from_string(const std::string &str) {
@@ -134,7 +129,7 @@ IPv6Address IPv6Address::from_string(const std::string &str) {
   const std::string port_part =
       (colon_pos == std::string::npos) ? "" : str.substr(colon_pos + 1);
 
-  struct in6_addr addr;
+  struct in6_addr addr{};
   if (inet_pton(AF_INET6, ip_part.c_str(), &addr) != 1) {
     throw io_exception("Invalid IPv6 address: {}", str);
   }
@@ -148,15 +143,15 @@ IPv6Address IPv6Address::from_string(const std::string &str) {
     }
   }
 
-  return IPv6Address(addr.s6_addr, port);
+  return {static_cast<uint8_t *>(addr.s6_addr), port};
 }
 
 Address Address::from_sockaddr(sockaddr_storage &storage, size_t len) {
   switch (storage.ss_family) {
   case IPv4Address::FAMILY:
-    return Address(IPv4Address::from_sockaddr(storage, len));
+    return {IPv4Address::from_sockaddr(storage, len)};
   case IPv6Address::FAMILY:
-    return Address(IPv6Address::from_sockaddr(storage, len));
+    return {IPv6Address::from_sockaddr(storage, len)};
   default:
     throw io_exception("unrecognized socket family");
   }
