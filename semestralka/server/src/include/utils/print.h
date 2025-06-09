@@ -8,8 +8,6 @@
  * Requires C++20 for std::format and std::format_to.
  */
 
-#include <ostream>
-
 #ifdef __cpp_lib_print // C++ >= 23
 
 #include <print>
@@ -18,6 +16,7 @@
 
 #include <format>
 #include <iostream>
+#include <ostream>
 #include <utility>
 
 namespace std {
