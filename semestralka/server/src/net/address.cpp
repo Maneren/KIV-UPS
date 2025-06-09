@@ -34,10 +34,7 @@ IPv4Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   }
 
   static_assert(sizeof(addr_in->sin_addr.s_addr) == BYTES);
-  return {
-      addr_in->sin_addr.s_addr, ntohs(addr_in->sin_port)
-
-  };
+  return IPv4Address{ntohl(addr_in->sin_addr.s_addr), ntohs(addr_in->sin_port)};
 }
 
 IPv4Address IPv4Address::from_string(const std::string &str) {
