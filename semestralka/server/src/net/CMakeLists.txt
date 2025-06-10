@@ -4,7 +4,7 @@ project(${LIBRARY} LANGUAGES CXX)
 
 file(GLOB_RECURSE SOURCE_FILES *.cpp *.h)
 
-add_library(${LIBRARY} SHARED STATIC ${SOURCE_FILES})
+add_library(${LIBRARY} STATIC ${SOURCE_FILES})
 
 install(TARGETS ${LIBRARY} DESTINATION ${PROJECT_LIB_DIR})
 
@@ -19,4 +19,6 @@ target_compile_options(
   "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_WARNINGS}>"
 )
 
-include_directories(../include/)
+target_link_libraries(${LIBRARY} PUBLIC expected)
+
+target_include_directories(${LIBRARY} PUBLIC ../include/)

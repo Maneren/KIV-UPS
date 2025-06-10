@@ -1,5 +1,6 @@
+#include "utils/functional.h"
+#include <format>
 #include <net/address.h>
-#include <net/exception.h>
 #include <netinet/in.h>
 #include <string>
 
@@ -17,29 +18,37 @@ sockaddr_in net::IPv4Address::to_sockaddr() const {
   return addr_in;
 }
 
-IPv4Address
+error::result<IPv4Address>
 IPv4Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   if (len < sizeof(sockaddr_in)) {
-    throw io_exception(
-        "Invalid address length: {} < {}", len, sizeof(sockaddr_in)
-    );
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput,
+        "Invalid address length: {} < {}",
+        len,
+        sizeof(sockaddr_in)
+    ));
   }
 
-  const auto addr_in = reinterpret_cast<const sockaddr_in *>(&storage);
+  const auto *const addr_in =
+      reinterpret_cast<const sockaddr_in *const>(&storage);
 
   if (addr_in->sin_family != FAMILY) {
-    throw io_exception(
-        "Invalid address family for IPv4: {}", addr_in->sin_family
-    );
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput,
+        "Invalid address family for IPv4: {}",
+        addr_in->sin_family
+    ));
   }
 
   static_assert(sizeof(addr_in->sin_addr.s_addr) == BYTES);
   return IPv4Address{ntohl(addr_in->sin_addr.s_addr), ntohs(addr_in->sin_port)};
 }
 
-IPv4Address IPv4Address::from_string(const std::string &str) {
+error::result<IPv4Address> IPv4Address::from_string(const std::string &str) {
   if (str.empty()) {
-    throw io_exception("Invalid IPv4 address: {}", str);
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput, "Invalid IPv4 address: {}", str
+    ));
   }
 
   const size_t colon_pos = str.find(':');
@@ -50,7 +59,9 @@ IPv4Address IPv4Address::from_string(const std::string &str) {
 
   struct in_addr addr{};
   if (inet_pton(AF_INET, ip_part.c_str(), &addr) != 1) {
-    throw io_exception("Invalid IPv4 address: {}", str);
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput, "Invalid IPv4 address: {}", str
+    ));
   }
 
   uint16_t port = 0;
@@ -58,11 +69,13 @@ IPv4Address IPv4Address::from_string(const std::string &str) {
     try {
       port = static_cast<uint16_t>(std::stoi(port_part));
     } catch (const std::exception &) {
-      throw io_exception("Invalid port number: {}", port_part);
+      return tl::make_unexpected(error::SimpleMessage(
+          error::ErrorKind::InvalidInput, "Invalid port: {}", port_part
+      ));
     }
   }
 
-  return {ntohl(addr.s_addr), port};
+  return IPv4Address{ntohl(addr.s_addr), port};
 }
 
 sockaddr_in6 net::IPv6Address::to_sockaddr() const {
@@ -79,24 +92,30 @@ sockaddr_in6 net::IPv6Address::to_sockaddr() const {
   return addr_in6;
 }
 
-IPv6Address
+error::result<IPv6Address>
 IPv6Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   if (len < sizeof(sockaddr_in6)) {
-    throw io_exception(
-        "Invalid address length: {} < {}", len, sizeof(sockaddr_in6)
-    );
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput,
+        "Invalid IPv6 address length: {} < {}",
+        len,
+        sizeof(sockaddr_in6)
+    ));
   }
 
-  const auto addr_in6 = reinterpret_cast<const sockaddr_in6 *>(&storage);
+  const auto *const addr_in6 =
+      reinterpret_cast<const sockaddr_in6 *const>(&storage);
 
   if (addr_in6->sin6_family != FAMILY) {
-    throw io_exception(
-        "Invalid address family for IPv6: {}", addr_in6->sin6_family
-    );
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput,
+        "Invalid address family for IPv6: {}",
+        addr_in6->sin6_family
+    ));
   }
 
   static_assert(sizeof(addr_in6->sin6_addr.s6_addr) == BYTES);
-  return {
+  return IPv6Address{
       static_cast<const uint8_t *>(addr_in6->sin6_addr.s6_addr),
       ntohs(addr_in6->sin6_port),
       ntohl(addr_in6->sin6_flowinfo),
@@ -104,9 +123,11 @@ IPv6Address::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
   };
 }
 
-IPv6Address IPv6Address::from_string(const std::string &str) {
+error::result<IPv6Address> IPv6Address::from_string(const std::string &str) {
   if (str.empty()) {
-    throw io_exception("Invalid IPv6 address: {}", str);
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
+    ));
   }
 
   size_t colon_pos = std::string::npos;
@@ -115,7 +136,9 @@ IPv6Address IPv6Address::from_string(const std::string &str) {
     const size_t bracket_pos = str.find(']');
 
     if (bracket_pos == std::string::npos) {
-      throw io_exception("Invalid IPv6 address: {}", str);
+      return tl::make_unexpected(error::SimpleMessage(
+          error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
+      ));
     }
 
     colon_pos = str.rfind(':');
@@ -128,7 +151,9 @@ IPv6Address IPv6Address::from_string(const std::string &str) {
 
   struct in6_addr addr{};
   if (inet_pton(AF_INET6, ip_part.c_str(), &addr) != 1) {
-    throw io_exception("Invalid IPv6 address: {}", str);
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
+    ));
   }
 
   uint16_t port = 0;
@@ -136,21 +161,30 @@ IPv6Address IPv6Address::from_string(const std::string &str) {
     try {
       port = static_cast<uint16_t>(std::stoi(port_part));
     } catch (const std::exception &) {
-      throw io_exception("Invalid port number: {}", port_part);
+      return tl::make_unexpected(error::SimpleMessage(
+          error::ErrorKind::InvalidInput, "Invalid port number: {}", port_part
+      ));
     }
   }
 
-  return {static_cast<uint8_t *>(addr.s6_addr), port};
+  return IPv6Address{static_cast<uint8_t *>(addr.s6_addr), port};
 }
 
-Address Address::from_sockaddr(sockaddr_storage &storage, size_t len) {
+error::result<Address>
+Address::from_sockaddr(sockaddr_storage &storage, size_t len) {
   switch (storage.ss_family) {
   case IPv4Address::FAMILY:
-    return {IPv4Address::from_sockaddr(storage, len)};
+    return IPv4Address::from_sockaddr(storage, len)
+        .map(functional::BindConstructor<Address>());
   case IPv6Address::FAMILY:
-    return {IPv6Address::from_sockaddr(storage, len)};
+    return IPv6Address::from_sockaddr(storage, len)
+        .map(functional::BindConstructor<Address>());
   default:
-    throw io_exception("unrecognized socket family");
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput,
+        "Unrecognized socket family: {}",
+        storage.ss_family
+    ));
   }
 }
 

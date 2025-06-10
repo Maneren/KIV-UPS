@@ -19,16 +19,20 @@ public:
   TcpStream &operator=(const TcpStream &) = delete;
   TcpStream &operator=(TcpStream &&other) noexcept;
 
-  TcpStream(const Address &addr);
-  TcpStream(const Address &addr, std::chrono::microseconds timeout);
+  static error::result<TcpStream> connect(const Address &addr);
+  static error::result<TcpStream>
+  connect_timeout(const Address &addr, std::chrono::microseconds timeout);
 
-  int read(const std::span<std::byte> buf) const;
-  int write(const std::span<const std::byte> buf) const;
+  [[nodiscard]] error::result<ssize_t> read(std::span<std::byte> buf) const;
+  [[nodiscard]] error::result<ssize_t> write(std::span<const std::byte> buf
+  ) const;
 
-  int recv(const std::span<std::byte> buf, int flags = 0) const;
-  int send(const std::span<const std::byte> buf, int flags = 0) const;
+  [[nodiscard]] error::result<ssize_t>
+  recv(std::span<std::byte> buf, int flags = 0) const;
+  [[nodiscard]] error::result<ssize_t>
+  send(std::span<const std::byte> buf, int flags = 0) const;
 
-  const Socket &socket() const { return sock; }
+  [[nodiscard]] const Socket &socket() const { return sock; }
 };
 
 } // namespace net

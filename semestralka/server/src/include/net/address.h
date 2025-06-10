@@ -1,12 +1,12 @@
 #pragma once
 
+#include "net/error.h"
 #include <arpa/inet.h>
 #include <array>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <format>
-#include <net/exception.h>
 #include <netinet/in.h>
 #include <tuple>
 #include <utils/match.h>
@@ -36,10 +36,10 @@ struct IPv4Address {
 
   [[nodiscard]] sockaddr_in to_sockaddr() const;
 
-  static IPv4Address
+  static error::result<IPv4Address>
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
 
-  static IPv4Address from_string(const std::string &str);
+  static error::result<IPv4Address> from_string(const std::string &str);
 };
 
 struct IPv6Address {
@@ -59,6 +59,7 @@ struct IPv6Address {
   )
       : octets(octets), port(port), flowinfo(flowinfo), scopeid(scopeid) {}
   IPv6Address(
+      // NOLINTNEXTLINE(modernize-avoid-c-arrays)
       const uint8_t octets[BYTES],
       uint16_t port = 0,
       uint32_t flowinfo = 0,
@@ -77,10 +78,10 @@ struct IPv6Address {
 
   [[nodiscard]] sockaddr_in6 to_sockaddr() const;
 
-  static IPv6Address
+  static error::result<IPv6Address>
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
 
-  static IPv6Address from_string(const std::string &str);
+  static error::result<IPv6Address> from_string(const std::string &str);
 };
 
 struct Address {
@@ -97,7 +98,8 @@ struct Address {
     );
   }
 
-  static Address from_sockaddr(sockaddr_storage &storage, size_t len);
+  static error::result<Address>
+  from_sockaddr(sockaddr_storage &storage, size_t len);
 
   union sockaddr_union {
     sockaddr_in ipv4;
@@ -144,10 +146,10 @@ template <> struct std::formatter<net::IPv6Address> {
         inet_ntop(obj.family(), &cp.sin6_addr, buffer.data(), buffer.size());
 
     if (result == nullptr) {
-      throw net::io_exception("inet_ntop failed to stringify address");
+      throw std::runtime_error("inet_ntop failed to stringify address");
     }
 
-    return std::format_to(ctx.out(), "[{}]:{}", buffer, obj.port);
+    return std::format_to(ctx.out(), "[{}]:{}", buffer.c_str(), obj.port);
   }
 };
 

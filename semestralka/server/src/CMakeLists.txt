@@ -31,6 +31,19 @@ foreach(DIR ${DIRS})
   endif()
 endforeach()
 
+set(EXPECTED_BUILD_TESTS OFF)
+set(EXPECTED_BUILD_PACKAGE OFF)
+
+file(GLOB EXTERNAL LIST_DIRECTORIES TRUE ./external/*)
+foreach(DIR ${EXTERNAL})
+  if(EXISTS ${DIR}/CMakeLists.txt)
+    add_subdirectory(${DIR})
+    if (EXISTS ${DIR}/include)
+      include_directories(${DIR}/include)
+    endif()
+  endif()
+endforeach()
+
 file(GLOB INCLUDE_DIRS LIST_DIRECTORIES TRUE include/*)
 install(DIRECTORY ${INCLUDE_DIRS} DESTINATION ${PROJECT_INCLUDE_DIR})
 

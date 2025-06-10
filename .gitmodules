@@ -1,3 +1,6 @@
 [submodule "semestralka/server/test/external/googletest"]
 	path = semestralka/server/test/external/googletest
 	url = https://github.com/google/googletest
+[submodule "semestralka/server/external/expected"]
+	path = semestralka/server/src/external/expected
+	url = https://github.com/TartanLlama/expected.git

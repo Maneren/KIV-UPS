@@ -2,27 +2,29 @@
 #include <format>
 #include <gtest/gtest.h>
 #include <net/address.h>
-#include <net/exception.h>
-
-namespace net {
 
 class AddressTest : public ::testing::Test {
 
 protected:
-  virtual void SetUp() {};
+  void SetUp() override {};
 
-  virtual void TearDown() {};
+  void TearDown() override {};
 };
 
+namespace net {
+
+namespace {
 template <typename T, typename U>
 constexpr bool
 bytes_equals(T a, const std::array<U, sizeof(T) / sizeof(U)> &b) {
   for (size_t i = 0; i < sizeof(T); i++) {
-    if (static_cast<U>(a >> (i * 8)) != b[i])
+    if (static_cast<U>(a >> (i * 8)) != b[i]) {
       return false;
+    }
   }
   return true;
 }
+} // namespace
 
 const IPv4Address addr4({127, 0, 0, 1}, 80);
 
@@ -48,11 +50,7 @@ TEST_F(AddressTest, IPv4Sockaddr) {
   const auto sockaddr = addr4.to_sockaddr();
   ASSERT_EQ(sockaddr.sin_family, AF_INET);
   ASSERT_EQ(sockaddr.sin_port, htons(addr4.port));
-  ASSERT_TRUE(
-      std::memcmp(
-          &sockaddr.sin_addr, addr4.octets.data(), IPv4Address::BYTES
-      ) == 0
-  );
+  ASSERT_TRUE(sockaddr.sin_addr.s_addr == htonl(0x7F000001));
 }
 
 TEST_F(AddressTest, IPv4FromSockaddr) {
@@ -60,29 +58,29 @@ TEST_F(AddressTest, IPv4FromSockaddr) {
   const auto addr = IPv4Address::from_sockaddr(
       reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
   );
-  ASSERT_EQ(addr, addr4);
+  ASSERT_TRUE(addr.has_value());
+  ASSERT_EQ(addr.value(), addr4);
 }
 
 TEST_F(AddressTest, IPv4FromSockaddrWrongFamily) {
   auto sockaddr = addr4.to_sockaddr();
   sockaddr.sin_family = AF_INET6;
-  ASSERT_THROW(
-      IPv4Address::from_sockaddr(
-          reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
-      ),
-      io_exception
+
+  const auto addr = IPv4Address::from_sockaddr(
+      reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
   );
+
+  ASSERT_FALSE(addr.has_value());
 }
 
 TEST_F(AddressTest, IPv4FromSockaddrWrongLen) {
   auto sockaddr = addr4.to_sockaddr();
-  ASSERT_THROW(
-      IPv4Address::from_sockaddr(
-          reinterpret_cast<const sockaddr_storage &>(sockaddr),
-          sizeof(sockaddr) - 1
-      ),
-      io_exception
+
+  const auto addr = IPv4Address::from_sockaddr(
+      reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr) - 1
   );
+
+  ASSERT_FALSE(addr.has_value());
 }
 
 const IPv6Address addr6({1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1}, 80);

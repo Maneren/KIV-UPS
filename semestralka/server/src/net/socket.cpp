@@ -1,7 +1,8 @@
+#include "net/error.h"
+#include "utils/functional.h"
 #include <fcntl.h>
 #include <limits>
 #include <net/address.h>
-#include <net/exception.h>
 #include <net/socket.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -9,83 +10,83 @@
 
 namespace net {
 
-Socket::Socket(int family, int type) {
+error::result<Socket> Socket::create(int family, int type) {
   int fd = socket(family, type | SOCK_CLOEXEC, 0);
 
-  if (fd < 0) {
-    throw io_exception("failed to create socket");
-  }
-
-  this->fd = fd;
+  return error::from_os(fd).map(functional::BindConstructor<Socket>());
 }
 
-void Socket::bind_to(const Address &addr) const {
+error::result<void> Socket::bind_to(const Address &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
-  const auto sockaddr =
-      reinterpret_cast<const struct sockaddr *>(&sockaddr_union);
+  const auto *const sockaddr =
+      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
 
-  if (bind(fd.fd, sockaddr, len) < 0) {
-    throw io_exception("failed to bind socket");
-  }
+  return error::from_os(bind(fd.fd, sockaddr, len)).map(functional::drop);
 }
 
-Socket Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
-  const auto fd = accept4(this->fd.fd, &storage, &len, SOCK_CLOEXEC | flags);
-
-  if (fd < 0) {
-    throw io_exception("failed to accept connection");
-  }
-
-  return {FileDescriptor{fd}};
+error::result<Socket>
+Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
+  return error::from_os(accept4(fd.fd, &storage, &len, SOCK_CLOEXEC | flags))
+      .map(functional::BindConstructor<Socket>());
 }
 
-void Socket::connect(const Address &addr) const {
+error::result<void> Socket::connect(const Address &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
   while (true) {
     const auto result = ::connect(
-        fd.fd, reinterpret_cast<const struct sockaddr *>(&sockaddr_union), len
+        fd.fd,
+        reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
+        len
     );
 
     if (result != -1 || errno == EISCONN) {
-      return;
+      return {};
     }
 
     if (errno == EINTR) {
       continue;
     }
 
-    throw io_exception("failed to connect socket", errno);
+    return error::from_os(result).map(functional::drop);
   }
 }
 
-void Socket::connect_timeout(
+error::result<void> Socket::connect_timeout(
     const Address &addr, std::chrono::microseconds timeout
 ) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
-  set_nonblocking(true);
-  const auto result = ::connect(
-      fd.fd, reinterpret_cast<const struct sockaddr *>(&sockaddr_union), len
-  );
-  set_nonblocking(false);
+  if (const auto error = set_nonblocking(true); !error) {
+    return error;
+  }
+  const auto result = error::from_os(::connect(
+      fd.fd,
+      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
+      len
+  ));
+  if (const auto error = set_nonblocking(false); !error) {
+    return error;
+  }
 
-  if (result == 0) {
+  if (result.has_value()) {
     // Connection succeeded immediately
-    return;
+    return {};
   }
 
-  if (errno != EINPROGRESS) {
+  if (result.error().os_code().value_or(0) != EINPROGRESS) {
     // Connection failed immediately
-    throw io_exception("failed to connect socket", errno);
+    return result.map(functional::drop);
   }
 
-  struct pollfd pfd{fd.fd, POLLOUT, 0};
+  struct pollfd pfd{.fd = fd.fd, .events = POLLOUT, .revents = 0};
 
   if (timeout.count() == 0) {
     // No timeout
-    throw io_exception("timeout can't be zero");
+    return tl::make_unexpected(error::SimpleMessage(
+        error::ErrorKind::InvalidInput, "Timeout can't be zero"
+    ));
   }
 
   const auto start_time = std::chrono::steady_clock::now();
@@ -93,7 +94,9 @@ void Socket::connect_timeout(
   while (true) {
     const auto elapsed = std::chrono::steady_clock::now() - start_time;
     if (elapsed >= timeout) {
-      throw io_exception("connection timed out");
+      return tl::make_unexpected(error::SimpleMessage(
+          error::ErrorKind::TimedOut, "Connection timed out"
+      ));
     }
 
     const auto remaining_time =
@@ -113,30 +116,51 @@ void Socket::connect_timeout(
       if (errno == EINTR) {
         continue;
       }
-      throw io_exception("poll failed", errno);
+      return tl::make_unexpected(error::last_os_error());
     }
 
     if (poll_result > 0) {
       if ((pfd.revents & (POLLHUP | POLLERR)) != 0) {
-        const auto error = error_state();
-        if (error != 0) {
-          throw io_exception("connection failed", error);
+        const auto error_result = error_state();
+        if (!error_result) {
+          return tl::make_unexpected(error_result.error());
         }
-        throw io_exception("connection failed", errno);
+
+        const auto &error = error_result.value();
+        if (error) {
+          return tl::make_unexpected(error.value());
+        }
+
+        return tl::make_unexpected(error::SimpleMessage(
+            error::ErrorKind::Uncategorized, "No error set after POLLHUP"
+        ));
       }
 
       // Connection succeeded
-      return;
+      return {};
     }
   }
 }
 
-int Socket::error_state() const { return getopts<int>(SOL_SOCKET, SO_ERROR); }
+error::result<std::optional<error::IoError>> Socket::error_state() const {
+  const auto result = getopts<int>(SOL_SOCKET, SO_ERROR);
 
-void Socket::set_nonblocking(bool nonblocking) const {
-  if (::fcntl(fd.fd, F_SETFL, nonblocking ? O_NONBLOCK : 0) < 0) {
-    throw io_exception("failed to set socket non-blocking");
+  if (!result) {
+    return tl::make_unexpected(result.error());
   }
+
+  if (*result == 0) {
+    return std::nullopt;
+  }
+
+  return error::Os{*result};
+}
+
+error::result<void> Socket::set_nonblocking(bool nonblocking) const {
+  // There is no other way to do this
+  // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
+  const auto code = ::fcntl(fd.fd, F_SETFL, nonblocking ? O_NONBLOCK : 0);
+  return error::from_os(code).map(functional::drop);
 }
 
 ssize_t Socket::read(void *buf, const size_t len) const {

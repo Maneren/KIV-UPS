@@ -1,5 +1,6 @@
 #pragma once
 
+#include "net/error.h"
 #include <unistd.h>
 
 namespace net {
@@ -11,23 +12,26 @@ struct FileDescriptor {
   FileDescriptor(int fd);
   ~FileDescriptor();
 
-  inline FileDescriptor(const FileDescriptor &other) { duplicate_fd(other.fd); }
-  inline FileDescriptor &operator=(const FileDescriptor &other) {
+  FileDescriptor(const FileDescriptor &other) : fd(-1) {
+    duplicate_fd(other.fd);
+  }
+  FileDescriptor &operator=(const FileDescriptor &other) {
     duplicate_fd(other.fd);
     return *this;
   }
 
-  inline FileDescriptor(FileDescriptor &&other) : fd(other.fd) {
+  FileDescriptor(FileDescriptor &&other) noexcept : fd(other.fd) {
     other.fd = -1;
   }
-  inline FileDescriptor &operator=(FileDescriptor &&other) {
+  FileDescriptor &operator=(FileDescriptor &&other) noexcept {
     this->fd = other.fd;
     other.fd = -1;
     return *this;
   }
 
 private:
-  void duplicate_fd(const int source_fd);
+  [[nodiscard]]
+  error::result<void> duplicate_fd(int source_fd);
 };
 
 } // namespace net

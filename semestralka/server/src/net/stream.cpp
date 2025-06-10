@@ -2,14 +2,27 @@
 
 namespace net {
 
-TcpStream::TcpStream(Socket &&sock) : sock(std::move(sock)) {}
+TcpStream::TcpStream(Socket &&sock) : sock(std::move(sock)) {};
 
-TcpStream::TcpStream(const Address &addr) : sock(addr, SOCK_STREAM) {
-  sock.connect(addr);
+error::result<TcpStream> TcpStream::connect(const Address &addr) {
+  return Socket::create(addr, SOCK_STREAM)
+      .and_then([&addr](auto &&sock) {
+        return sock.connect(addr).map([&]() {
+          return std::forward<Socket>(sock);
+        });
+      })
+      .map(functional::BindConstructor<TcpStream>());
 }
-TcpStream::TcpStream(const Address &addr, std::chrono::microseconds timeout)
-    : sock(addr, SOCK_STREAM) {
-  sock.connect_timeout(addr, timeout);
+error::result<TcpStream> TcpStream::connect_timeout(
+    const Address &addr, std::chrono::microseconds timeout
+) {
+  return Socket::create(addr, SOCK_STREAM)
+      .and_then([&addr, timeout](auto &&sock) {
+        return sock.connect_timeout(addr, timeout).map([&]() {
+          return std::forward<Socket>(sock);
+        });
+      })
+      .map(functional::BindConstructor<TcpStream>());
 }
 
 TcpStream::~TcpStream() = default;
@@ -22,40 +35,23 @@ TcpStream &TcpStream::operator=(TcpStream &&other) noexcept {
   return *this;
 }
 
-int TcpStream::read(std::span<std::byte> buf) const {
-  const auto len = buf.size();
-  const auto result = sock.read(buf.data(), len);
-  if (result < 0) {
-    throw io_exception("failed to read from socket");
-  }
-  return result;
+error::result<ssize_t> TcpStream::read(std::span<std::byte> buf) const {
+  return error::from_os(sock.read(buf.data(), buf.size()));
 }
 
-int TcpStream::write(const std::span<const std::byte> buf) const {
-  const auto len = buf.size();
-  const auto result = sock.write(buf.data(), len);
-  if (result < 0) {
-    throw io_exception("failed to write to socket");
-  }
-  return result;
+error::result<ssize_t> TcpStream::write(const std::span<const std::byte> buf
+) const {
+  return error::from_os(sock.write(buf.data(), buf.size()));
 }
 
-int TcpStream::recv(const std::span<std::byte> buf, int flags) const {
-  const auto len = buf.size();
-  const auto result = sock.recv(buf.data(), len, flags);
-  if (result < 0) {
-    throw io_exception("failed to recv from socket", errno);
-  }
-  return result;
+error::result<ssize_t>
+TcpStream::recv(const std::span<std::byte> buf, int flags) const {
+  return error::from_os(sock.recv(buf.data(), buf.size(), flags));
 }
 
-int TcpStream::send(const std::span<const std::byte> buf, int flags) const {
-  const auto len = buf.size();
-  const auto result = sock.send(buf.data(), len, flags);
-  if (result < 0) {
-    throw io_exception("failed to send to socket");
-  }
-  return result;
+error::result<ssize_t>
+TcpStream::send(const std::span<const std::byte> buf, int flags) const {
+  return error::from_os(sock.send(buf.data(), buf.size(), flags));
 }
 
 } // namespace net

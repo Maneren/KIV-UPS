@@ -1,24 +1,27 @@
 #pragma once
 
+#include "net/error.h"
+#include "utils/functional.h"
 #include <chrono>
 #include <net/address.h>
-#include <net/exception.h>
 #include <net/file_descriptor.h>
+#include <utils/print.h>
 
 namespace net {
 
-struct Socket {
+class Socket {
+public:
   FileDescriptor fd;
 
-  Socket(const Address &addr, int type) : Socket(addr.family(), type) {}
-  Socket(int family, int type);
   Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
 
+  static error::result<Socket> create(int family, int type);
+  static error::result<Socket> create(const Address &addr, int type) {
+    return create(addr.family(), type);
+  };
+
   Socket(const Socket &other) = default;
-  Socket &operator=(const Socket &other) {
-    this->fd = other.fd;
-    return *this;
-  }
+  Socket &operator=(const Socket &other) = default;
 
   Socket(Socket &&other) noexcept : fd(std::move(other.fd)) {}
   Socket &operator=(Socket &&other) noexcept {
@@ -28,34 +31,36 @@ struct Socket {
 
   ~Socket() = default;
 
-  template <typename T> void setopts(int level, int optname, const T &optval) {
-    if (setsockopt(
-            fd.fd, level, optname, &optval, static_cast<socklen_t>(sizeof(T))
-        ) < 0) {
-      throw io_exception("failed to set socket options");
-    }
+  template <typename T>
+  error::result<void> setopts(int level, int optname, const T &optval) {
+    const auto code = setsockopt(
+        fd.fd, level, optname, &optval, static_cast<socklen_t>(sizeof(T))
+    );
+
+    return error::from_os(code).map(functional::drop);
   };
 
-  template <typename T> T getopts(int level, int optname) const {
+  template <typename T> error::result<T> getopts(int level, int optname) const {
     T optval;
     auto len = static_cast<socklen_t>(sizeof(T));
-    if (getsockopt(fd.fd, level, optname, &optval, &len) < 0) {
-      throw io_exception("failed to get socket options");
-    }
-    return optval;
+
+    return error::from_os(getsockopt(fd.fd, level, optname, &optval, &len))
+        .map([&](auto) { return optval; });
   };
 
-  void bind_to(const Address &addr) const;
+  [[nodiscard]] error::result<void> bind_to(const Address &addr) const;
 
-  Socket accept(sockaddr &storage, socklen_t &len, int flags = 0) const;
+  error::result<Socket>
+  accept(sockaddr &storage, socklen_t &len, int flags = 0) const;
 
-  void connect(const Address &addr) const;
-  void
+  [[nodiscard]] error::result<void> connect(const Address &addr) const;
+  [[nodiscard]] error::result<void>
   connect_timeout(const Address &addr, std::chrono::microseconds timeout) const;
 
-  [[nodiscard]] int error_state() const;
+  [[nodiscard]] error::result<std::optional<error::IoError>>
+  error_state() const;
 
-  void set_nonblocking(bool blocking) const;
+  [[nodiscard]] error::result<void> set_nonblocking(bool blocking) const;
 
   ssize_t read(void *buf, size_t len) const;
   ssize_t write(const void *buf, size_t len) const;

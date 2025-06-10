@@ -1,5 +1,4 @@
 #include <iostream>
-#include <net/exception.h>
 #include <net/listener.h>
 #include <ostream>
 #include <sstream>
@@ -11,15 +10,20 @@ int main() {
   threadpool::Threadpool pool;
 
   try {
-    const auto address = net::IPv4Address::from_string("0.0.0.0:8080");
+    const auto address = net::IPv4Address::from_string("0.0.0.0:8080").value();
     // const auto address = net::IPv6Address::from_string("[::]:8080");
 
-    const net::TcpListener listener(address);
+    const auto listener = net::TcpListener::bind(address).value();
 
     std::println("Listening on {}", address);
 
-    while (true) {
-      auto [client_stream, client_address] = listener.accept();
+    for (auto &&connection : listener.incoming()) {
+      if (!connection) {
+        std::println("Failed to accept connection: {}", connection.error());
+        break;
+      }
+
+      auto &[client_stream, client_address] = connection.value();
 
       pool.spawn([client_stream = std::move(client_stream), client_address] {
         std::println(
@@ -31,7 +35,14 @@ int main() {
         std::vector<std::byte> buffer(128);
 
         while (true) {
-          const auto bytes_read = client_stream.recv(buffer);
+          const auto read_result = client_stream.recv(buffer);
+
+          if (!read_result) {
+            std::println("Failed to read from client: {}", read_result.error());
+            break;
+          }
+
+          const auto bytes_read = read_result.value();
 
           if (bytes_read == 0) {
             std::println("Connection closed from {}", client_address);
@@ -54,9 +65,6 @@ int main() {
         }
       });
     }
-  } catch (const net::io_exception &e) {
-    std::cerr << e.what() << std::endl;
-    return 1;
   } catch (const std::exception &e) {
     std::cerr << "Unexpected error: " << e.what() << std::endl;
     return 1;
