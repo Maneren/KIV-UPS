@@ -129,7 +129,7 @@ template <> struct std::formatter<net::error::IoError> {
     return ctx.begin();
   }
 
-  auto format(const auto &kind, std::format_context &ctx) const {
+  static auto format(const auto &kind, std::format_context &ctx) {
     return match::match(
         kind.data,
         [&ctx](const net::error::Os &os) {

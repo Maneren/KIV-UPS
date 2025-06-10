@@ -119,7 +119,7 @@ template <> struct std::formatter<net::IPv4Address> {
     return ctx.begin();
   }
 
-  auto format(auto &obj, std::format_context &ctx) const {
+  static auto format(auto &obj, std::format_context &ctx) {
     return std::format_to(
         ctx.out(),
         "{}.{}.{}.{}:{}",
@@ -137,7 +137,7 @@ template <> struct std::formatter<net::IPv6Address> {
     return ctx.begin();
   }
 
-  auto format(auto &obj, std::format_context &ctx) const {
+  static auto format(auto &obj, std::format_context &ctx) {
     std::string buffer(INET6_ADDRSTRLEN, '\0');
 
     const auto cp = obj.to_sockaddr();
@@ -158,7 +158,7 @@ template <> struct std::formatter<net::Address> {
     return ctx.begin();
   }
 
-  auto format(auto &obj, std::format_context &ctx) const {
+  static auto format(auto &obj, std::format_context &ctx) {
     return match::match(
         obj.inner,
         [&ctx](const net::IPv4Address &addr) {
