@@ -29,7 +29,7 @@ int main() {
         std::println(
             "Accepted connection from {} on socket {}",
             client_address,
-            client_stream.socket().fd.fd
+            client_stream.socket().raw_fd()
         );
 
         std::vector<std::byte> buffer(128);

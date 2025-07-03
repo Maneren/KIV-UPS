@@ -22,12 +22,12 @@ error::result<void> Socket::bind_to(const Address &addr) const {
   const auto *const sockaddr =
       reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
 
-  return error::from_os(bind(fd.fd, sockaddr, len)).map(functional::drop);
+  return error::from_os(bind(raw_fd(), sockaddr, len)).map(functional::drop);
 }
 
 error::result<Socket>
 Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
-  return error::from_os(accept4(fd.fd, &storage, &len, SOCK_CLOEXEC | flags))
+  return error::from_os(accept4(raw_fd(), &storage, &len, SOCK_CLOEXEC | flags))
       .map(functional::BindConstructor<Socket>());
 }
 
@@ -36,7 +36,7 @@ error::result<void> Socket::connect(const Address &addr) const {
 
   while (true) {
     const auto result = ::connect(
-        fd.fd,
+        raw_fd(),
         reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
         len
     );
@@ -62,7 +62,7 @@ error::result<void> Socket::connect_timeout(
     return error;
   }
   const auto result = error::from_os(::connect(
-      fd.fd,
+      raw_fd(),
       reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
       len
   ));
@@ -80,7 +80,7 @@ error::result<void> Socket::connect_timeout(
     return result.map(functional::drop);
   }
 
-  struct pollfd pfd{.fd = fd.fd, .events = POLLOUT, .revents = 0};
+  struct pollfd pfd{.fd = raw_fd(), .events = POLLOUT, .revents = 0};
 
   if (timeout.count() == 0) {
     // No timeout
@@ -159,24 +159,24 @@ error::result<std::optional<error::IoError>> Socket::error_state() const {
 error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   // There is no other way to do this
   // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
-  const auto code = ::fcntl(fd.fd, F_SETFL, nonblocking ? O_NONBLOCK : 0);
+  const auto code = ::fcntl(raw_fd(), F_SETFL, nonblocking ? O_NONBLOCK : 0);
   return error::from_os(code).map(functional::drop);
 }
 
 ssize_t Socket::read(void *buf, const size_t len) const {
-  return ::read(fd.fd, buf, len);
+  return ::read(raw_fd(), buf, len);
 }
 
 ssize_t Socket::write(const void *buf, const size_t len) const {
-  return ::write(fd.fd, buf, len);
+  return ::write(raw_fd(), buf, len);
 }
 
 ssize_t Socket::recv(void *buf, const size_t len, int flags) const {
-  return ::recv(fd.fd, buf, len, flags);
+  return ::recv(raw_fd(), buf, len, flags);
 }
 
 ssize_t Socket::send(const void *buf, const size_t len, int flags) const {
-  return ::send(fd.fd, buf, len, flags);
+  return ::send(raw_fd(), buf, len, flags);
 }
 
 } // namespace net

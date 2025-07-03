@@ -13,7 +13,11 @@ FileDescriptor::~FileDescriptor() {
   }
 }
 
-error::result<void> FileDescriptor::duplicate_fd(int source_fd) {
+error::result<FileDescriptor> FileDescriptor::duplicate() const {
+  return duplicate_fd(fd).map(functional::BindConstructor<FileDescriptor>());
+}
+
+error::result<int> FileDescriptor::duplicate_fd(int source_fd) {
   constexpr auto cmd = F_DUPFD_CLOEXEC;
 
   // There is no other way to do this
@@ -24,9 +28,7 @@ error::result<void> FileDescriptor::duplicate_fd(int source_fd) {
     return tl::make_unexpected(error::Os{errno});
   }
 
-  this->fd = fd;
-
-  return {};
+  return fd;
 }
 
 } // namespace net

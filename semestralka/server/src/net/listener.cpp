@@ -14,7 +14,7 @@ error::result<TcpListener> TcpListener::bind(const Address &addr) {
     return tl::make_unexpected(result.error());
   }
 
-  return error::from_os(listen(sock.fd.fd, BACKLOG)).map([&](auto) {
+  return error::from_os(listen(sock.raw_fd(), BACKLOG)).map([&](auto) {
     return TcpListener(std::move(sock));
   });
 }
