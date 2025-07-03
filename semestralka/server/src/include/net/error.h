@@ -89,25 +89,27 @@ struct SimpleMessage {
 struct IoError {
 private:
   using Variant = std::variant<Os, Simple, SimpleMessage>;
+  Variant inner;
 
 public:
-  Variant data;
+  IoError(Variant data) : inner{std::move(data)} {}
+  IoError(Variant &&data) : inner{std::move(data)} {}
 
-  IoError(Variant data) : data{std::move(data)} {}
-  IoError(Variant &&data) : data{std::move(data)} {}
-
-  IoError(const Os &os) : data{os} {}
-  IoError(const Simple &simple) : data{simple} {}
-  IoError(const SimpleMessage &simple) : data{simple} {}
-  IoError(SimpleMessage &&simple) : data{std::move(simple)} {}
+  IoError(const Os &os) : inner{os} {}
+  IoError(const Simple &simple) : inner{simple} {}
+  IoError(const SimpleMessage &simple) : inner{simple} {}
+  IoError(SimpleMessage &&simple) : inner{std::move(simple)} {}
 
   [[nodiscard]] std::optional<int> os_code() const {
     return match::match(
-        data,
-        [](const Os &os) { return std::optional(os.code); },
+        inner,
+        [](const Os &os) -> std::optional<int> { return os.code; },
         [](const auto &) -> std::optional<int> { return std::nullopt; }
     );
   }
+
+  [[nodiscard]] const Variant &data() const { return inner; }
+  [[nodiscard]] Variant &data() { return inner; }
 };
 
 template <typename T> using result = tl::expected<T, IoError>;
@@ -131,7 +133,7 @@ template <> struct std::formatter<net::error::IoError> {
 
   static auto format(const auto &kind, std::format_context &ctx) {
     return match::match(
-        kind.data,
+        kind.data(),
         [&ctx](const net::error::Os &os) {
           return std::format_to(
               ctx.out(), "{} - {}", os.code, std::strerror(os.code)
