@@ -48,11 +48,9 @@ public:
    * @brief Move construct a new Threadpool object.
    * @param other The other Threadpool to move from.
    */
-  Threadpool(Threadpool &&other) {
-    mWorkers = std::move(other.mWorkers);
-    mTasks = std::move(other.mTasks);
-    mRunning = std::move(other.mRunning);
-  }
+  Threadpool(Threadpool &&other) noexcept
+      : mWorkers(std::move(other.mWorkers)), mTasks(std::move(other.mTasks)),
+        mRunning(other.mRunning) {}
 
   /**
    * @brief Move assign a Threadpool object.
@@ -61,10 +59,10 @@ public:
    *
    * @return Threadpool& Reference to this Threadpool.
    */
-  Threadpool &operator=(Threadpool &&other) {
+  Threadpool &operator=(Threadpool &&other) noexcept {
     mWorkers = std::move(other.mWorkers);
     mTasks = std::move(other.mTasks);
-    mRunning = std::move(other.mRunning);
+    mRunning = other.mRunning;
     return *this;
   }
 
@@ -85,7 +83,7 @@ public:
       typename Functor,
       typename... Args,
       typename Result = std::invoke_result_t<Functor, Args...>>
-  inline std::future<Result> spawn_with_future(Functor &&f, Args &&...args) {
+  std::future<Result> spawn_with_future(Functor &&f, Args &&...args) {
     auto task = std::make_shared<std::packaged_task<Result()>>(
         [f = std::forward<Functor>(f), &args...] {
           return f(std::forward<Args>(args)...);
@@ -100,7 +98,7 @@ public:
    *
    * @param task A callable object representing the task to execute.
    */
-  inline void spawn(std::function<void()> &&task) {
+  void spawn(std::function<void()> &&task) {
     {
       std::unique_lock<std::mutex> lock(mMutex);
       mTasks.emplace(std::move(task));
@@ -118,12 +116,10 @@ public:
    * @param f The function to execute.
    * @param args The arguments to pass to the function.
    */
-  template <
-      typename Functor,
-      typename... Args,
-      typename = std::enable_if_t<
-          !std::is_same_v<std::decay_t<Functor>, std::function<void()>>>>
-  inline void spawn(Functor &&f, Args &&...args) {
+  template <typename Functor, typename... Args>
+  void spawn(Functor &&f, Args &&...args)
+    requires(!std::is_same_v<std::decay_t<Functor>, std::function<void()>>)
+  {
     static_assert(
         std::is_same_v<std::invoke_result_t<Functor, Args...>, void>,
         "The function must not return any value."
