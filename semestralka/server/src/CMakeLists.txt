@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-set(EXECUTABLE blackjack_server)
+set(EXECUTABLE hive_server)
 project(${EXECUTABLE} LANGUAGES CXX)
 
 file(GLOB SOURCE_FILES *.cpp)

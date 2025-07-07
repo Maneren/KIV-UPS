@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-set(PROJECT "cmake-project-template")
+set(PROJECT "hive-server")
 project(${PROJECT})
 
 set(CMAKE_CXX_STANDARD 20)

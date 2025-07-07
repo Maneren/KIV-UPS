@@ -1,5 +1,5 @@
 builddir := "build"
-executable := "blackjack_server"
+executable := "hive_server"
 export CMAKE_EXPORT_COMPILE_COMMANDS := "1"
 export CTEST_OUTPUT_ON_FAILURE := "1"
 export CTEST_PARALLEL_LEVEL := "0"
