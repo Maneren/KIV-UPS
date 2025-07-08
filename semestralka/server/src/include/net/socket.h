@@ -10,9 +10,9 @@
 namespace net {
 
 class Socket {
-public:
   FileDescriptor fd;
 
+public:
   Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
 
   static error::result<Socket> create(int family, int type);
@@ -31,10 +31,13 @@ public:
 
   ~Socket() = default;
 
+  [[nodiscard]] const FileDescriptor &file_descriptor() const { return fd; }
+  [[nodiscard]] constexpr int raw_fd() const { return fd.raw(); };
+
   template <typename T>
   error::result<void> setopts(int level, int optname, const T &optval) {
     const auto code = setsockopt(
-        fd.raw(), level, optname, &optval, static_cast<socklen_t>(sizeof(T))
+        raw_fd(), level, optname, &optval, static_cast<socklen_t>(sizeof(T))
     );
 
     return error::from_os(code).map(functional::drop);
@@ -44,12 +47,13 @@ public:
     T optval;
     auto len = static_cast<socklen_t>(sizeof(T));
 
-    return error::from_os(getsockopt(fd.raw(), level, optname, &optval, &len))
+    return error::from_os(getsockopt(raw_fd(), level, optname, &optval, &len))
         .map([&](auto) { return optval; });
   };
 
   [[nodiscard]] error::result<void> bind_to(const Address &addr) const;
 
+  [[nodiscard]]
   error::result<Socket>
   accept(sockaddr &storage, socklen_t &len, int flags = 0) const;
 
@@ -71,8 +75,6 @@ public:
   [[nodiscard]] error::result<Socket> duplicate() const {
     return fd.duplicate().map(functional::BindConstructor<Socket>());
   }
-
-  [[nodiscard]] constexpr int raw_fd() const { return fd.raw(); };
 };
 
 } // namespace net

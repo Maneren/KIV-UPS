@@ -32,10 +32,6 @@ public:
   constexpr int raw() const {
     return this->fd;
   }
-
-private:
-  [[nodiscard]]
-  static error::result<int> duplicate_fd(int source_fd);
 };
 
 } // namespace net
