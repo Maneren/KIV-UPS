@@ -9,7 +9,7 @@ enum class Player : std::uint8_t { Black, White };
 enum class PieceKind : std::uint8_t { Queen, Spider, Beetle, Grasshopper, Ant };
 constexpr std::size_t NUMBER_OF_PIECES = 5;
 struct Piece {
-  PieceKind piece;
+  PieceKind kind;
   Player owner;
 };
 

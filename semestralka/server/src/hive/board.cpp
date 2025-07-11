@@ -79,11 +79,13 @@ std::string Board::to_fen_string() const {
   return result;
 }
 
+namespace {
 std::generator<TilePointer> neighboring_cells(TilePointer ptr) {
   for (const auto &[p, q] : DIRECTIONS) {
     co_yield {.p = ptr.p + p, .q = ptr.q + q};
   }
 }
+} // namespace
 
 std::generator<TilePointer> Board::empty_neighbors(TilePointer ptr) const {
   for (const auto ptr : neighboring_cells(ptr)) {
@@ -113,16 +115,15 @@ bool Board::neighbors_only_players(TilePointer ptr, Player player) const {
   );
 }
 
-std::unordered_set<TilePointer, TilePointerHasher>
-Board::tiles_around_hive() const {
-  std::unordered_set<TilePointer, TilePointerHasher> tiles;
+std::unordered_set<TilePointer> Board::tiles_around_hive() const {
+  std::unordered_set<TilePointer> tiles;
 
   for (const auto &[pos, tile] : data) {
     if (tile.empty()) {
       continue;
     }
 
-    for (auto neighbor_ptr : neighbors(pos)) {
+    for (auto neighbor_ptr : empty_neighbors(pos)) {
       tiles.insert(neighbor_ptr);
     }
   }
@@ -140,6 +141,15 @@ std::generator<TilePointer> Board::valid_placements(Player player) const {
 
 std::generator<Move>
 Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
+  if (data.empty()) {
+    co_yield {
+        .from = {.p = 0, .q = 0},
+        .to = {.p = 0, .q = 0},
+        .piece = PieceKind::Queen,
+    };
+    co_return;
+  }
+
   for (const auto placement_ptr : valid_placements(player)) {
     for (std::size_t i = 0; i < NUMBER_OF_PIECES; ++i) {
       if (pieces.at(i) == 0) {
@@ -163,7 +173,8 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
       };
 
   for (const auto [pos, piece] : moveable_pieces_for(player)) {
-    auto handler = PIECE_HANDLERS.at(static_cast<std::size_t>(piece.piece));
+    const auto &handler =
+        PIECE_HANDLERS.at(static_cast<std::uint8_t>(piece.kind));
 
     for (const auto piece_move : (this->*handler)(pos)) {
       co_yield piece_move;
@@ -174,28 +185,28 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
 std::generator<std::pair<TilePointer, Piece>>
 Board::players_tiles(Player player) const {
   for (const auto &[pos, tile] : data) {
-    if (tile.back().owner == player) {
-      co_yield {pos, tile.back()};
+    if (tile.back().owner != player) {
+      continue;
     }
+
+    co_yield {pos, tile.back()};
   }
 }
 
 void Board::add_piece(TilePointer ptr, Piece piece) {
-  try {
-    data.at(ptr).push_back(piece);
-  } catch (const std::out_of_range &) {
-    data[ptr] = {piece};
-  }
+  const auto [it, _] = data.emplace(ptr, std::vector<Piece>{});
+  it->second.push_back(piece);
 }
 
 Piece Board::remove_piece(TilePointer ptr) {
-  auto &pieces = data.at(ptr);
-  auto piece = pieces.back();
-  pieces.pop_back();
-
-  if (pieces.empty()) {
-    data.erase(ptr);
+  const auto it = data.find(ptr);
+  if (it == data.end() || it->second.empty()) {
+    throw std::runtime_error("Tried to remove piece from empty tile");
   }
+
+  auto &pieces = it->second;
+  const auto piece = pieces.back();
+  pieces.pop_back();
 
   return piece;
 }
@@ -209,9 +220,8 @@ bool Board::moving_breaks_hive(TilePointer ptr) {
 
   const LiftPiece _(ptr, this);
 
-  std::unordered_set<TilePointer, TilePointerHasher> visited{};
-  std::stack<TilePointer> stack{};
-  stack.push(ptr);
+  std::unordered_set<TilePointer> visited{};
+  std::stack<TilePointer> stack{{ptr}};
 
   while (!stack.empty()) {
     const auto current = stack.top();
@@ -227,9 +237,13 @@ bool Board::moving_breaks_hive(TilePointer ptr) {
     }
   }
 
-  return std::ranges::all_of(
-      data | std::ranges::views::keys,
-      [&visited](const auto ptr) { return visited.contains(ptr); }
+  auto occupied_tiles = std::views::filter(data, [](const auto &pair) {
+    return !pair.second.empty();
+  });
+
+  return std::ranges::any_of(
+      occupied_tiles | std::ranges::views::keys,
+      [&visited](const auto ptr) { return !visited.contains(ptr); }
   );
 }
 
