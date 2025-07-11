@@ -13,7 +13,7 @@ namespace net {
 error::result<Socket> Socket::create(int family, int type) {
   int fd = socket(family, type | SOCK_CLOEXEC, 0);
 
-  return error::from_os(fd).map(functional::BindConstructor<Socket>());
+  return error::from_os(fd).map(functional::Constructor<Socket>());
 }
 
 error::result<void> Socket::bind_to(const Address &addr) const {
@@ -28,7 +28,7 @@ error::result<void> Socket::bind_to(const Address &addr) const {
 error::result<Socket>
 Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
   return error::from_os(accept4(raw_fd(), &storage, &len, SOCK_CLOEXEC | flags))
-      .map(functional::BindConstructor<Socket>());
+      .map(functional::Constructor<Socket>());
 }
 
 error::result<void> Socket::connect(const Address &addr) const {
@@ -61,11 +61,13 @@ error::result<void> Socket::connect_timeout(
   if (const auto error = set_nonblocking(true); !error) {
     return error;
   }
-  const auto result = error::from_os(::connect(
-      raw_fd(),
-      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
-      len
-  ));
+  const auto result = error::from_os(
+      ::connect(
+          raw_fd(),
+          reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
+          len
+      )
+  );
   if (const auto error = set_nonblocking(false); !error) {
     return error;
   }
@@ -84,9 +86,11 @@ error::result<void> Socket::connect_timeout(
 
   if (timeout.count() == 0) {
     // No timeout
-    return tl::make_unexpected(error::SimpleMessage(
-        error::ErrorKind::InvalidInput, "Timeout can't be zero"
-    ));
+    return tl::make_unexpected(
+        error::SimpleMessage(
+            error::ErrorKind::InvalidInput, "Timeout can't be zero"
+        )
+    );
   }
 
   const auto start_time = std::chrono::steady_clock::now();
@@ -94,9 +98,11 @@ error::result<void> Socket::connect_timeout(
   while (true) {
     const auto elapsed = std::chrono::steady_clock::now() - start_time;
     if (elapsed >= timeout) {
-      return tl::make_unexpected(error::SimpleMessage(
-          error::ErrorKind::TimedOut, "Connection timed out"
-      ));
+      return tl::make_unexpected(
+          error::SimpleMessage(
+              error::ErrorKind::TimedOut, "Connection timed out"
+          )
+      );
     }
 
     const auto remaining_time =
@@ -131,9 +137,11 @@ error::result<void> Socket::connect_timeout(
           return tl::make_unexpected(error.value());
         }
 
-        return tl::make_unexpected(error::SimpleMessage(
-            error::ErrorKind::Uncategorized, "No error set after POLLHUP"
-        ));
+        return tl::make_unexpected(
+            error::SimpleMessage(
+                error::ErrorKind::Uncategorized, "No error set after POLLHUP"
+            )
+        );
       }
 
       // Connection succeeded

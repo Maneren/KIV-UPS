@@ -73,7 +73,7 @@ public:
   ssize_t send(const void *buf, size_t len, int flags) const;
 
   [[nodiscard]] error::result<Socket> duplicate() const {
-    return fd.duplicate().map(functional::BindConstructor<Socket>());
+    return fd.duplicate().map(functional::Constructor<Socket>());
   }
 };
 

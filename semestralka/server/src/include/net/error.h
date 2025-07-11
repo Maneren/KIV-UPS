@@ -1,6 +1,5 @@
 #pragma once
 
-#include "utils/functional.h"
 #include "utils/match.h"
 #include <cerrno>
 #include <cstring>

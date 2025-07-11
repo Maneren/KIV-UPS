@@ -11,7 +11,7 @@ error::result<TcpStream> TcpStream::connect(const Address &addr) {
           return std::forward<Socket>(sock);
         });
       })
-      .map(functional::BindConstructor<TcpStream>());
+      .map(functional::Constructor<TcpStream>());
 }
 error::result<TcpStream> TcpStream::connect_timeout(
     const Address &addr, std::chrono::microseconds timeout
@@ -22,7 +22,7 @@ error::result<TcpStream> TcpStream::connect_timeout(
           return std::forward<Socket>(sock);
         });
       })
-      .map(functional::BindConstructor<TcpStream>());
+      .map(functional::Constructor<TcpStream>());
 }
 
 TcpStream::~TcpStream() = default;
@@ -39,8 +39,8 @@ error::result<ssize_t> TcpStream::read(std::span<std::byte> buf) const {
   return error::from_os(sock.read(buf.data(), buf.size()));
 }
 
-error::result<ssize_t> TcpStream::write(const std::span<const std::byte> buf
-) const {
+error::result<ssize_t>
+TcpStream::write(const std::span<const std::byte> buf) const {
   return error::from_os(sock.write(buf.data(), buf.size()));
 }
 
