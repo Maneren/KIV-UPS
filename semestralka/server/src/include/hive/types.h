@@ -43,6 +43,44 @@ constexpr std::array<Direction, 6> DIRECTIONS{
 
 } // namespace hive
 
+template <> struct std::formatter<hive::PieceKind> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  static auto format(auto &obj, std::format_context &ctx) {
+    switch (obj) {
+    case hive::PieceKind::Queen:
+      return std::format_to(ctx.out(), "Queen");
+    case hive::PieceKind::Spider:
+      return std::format_to(ctx.out(), "Spider");
+    case hive::PieceKind::Beetle:
+      return std::format_to(ctx.out(), "Beetle");
+    case hive::PieceKind::Grasshopper:
+      return std::format_to(ctx.out(), "Grasshopper");
+    case hive::PieceKind::Ant:
+      return std::format_to(ctx.out(), "Ant");
+    default:
+      return std::format_to(ctx.out(), "Unknown Piece");
+    }
+  }
+};
+
+template <> struct std::formatter<hive::Piece> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+  static auto format(auto &obj, std::format_context &ctx) {
+    if (obj.owner == hive::Player::White) {
+      auto str = std::format("{}", obj.kind);
+      std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+      return std::format_to(ctx.out(), "{}", str);
+    }
+
+    return std::format_to(ctx.out(), "{}", obj.kind);
+  }
+};
+
 template <> struct std::hash<hive::TilePointer> {
   std::size_t operator()(auto p) const {
     return std::hash<int>()(p.p) ^ std::hash<int>()(p.q);
@@ -56,5 +94,21 @@ template <> struct std::formatter<hive::TilePointer> {
 
   static auto format(auto &obj, std::format_context &ctx) {
     return std::format_to(ctx.out(), "({}, {})", obj.p, obj.q);
+  }
+};
+
+template <> struct std::formatter<hive::Move> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  static auto format(auto &obj, std::format_context &ctx) {
+    if (obj.from != obj.to) {
+      return std::format_to(
+          ctx.out(), "{}: {} -> {}", obj.piece, obj.from, obj.to
+      );
+    }
+
+    return std::format_to(ctx.out(), "{}: {}", obj.piece, obj.to);
   }
 };

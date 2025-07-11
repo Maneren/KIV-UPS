@@ -1,10 +1,14 @@
 #include "types.h"
+#include <format>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_set>
 #include <utility>
+#include <utils/format.h>
 #include <utils/generator.h>
+#include <utils/print.h>
+#include <vector>
 
 namespace hive {
 
@@ -110,6 +114,18 @@ public:
 
 private:
   std::unordered_map<TilePointer, std::vector<Piece>> data;
+
+  friend std::formatter<Board>;
 };
 
 } // namespace hive
+
+template <> struct std::formatter<hive::Board> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  static auto format(const hive::Board &obj, std::format_context &ctx) {
+    return std::format_to(ctx.out(), "{}", obj.data);
+  }
+};
