@@ -352,7 +352,7 @@ std::generator<Move> Board::beetle_moves(TilePointer beetle) {
 std::generator<Move> Board::spider_moves(TilePointer spider) {
   const LiftPiece _(spider, this);
 
-  std::unordered_set<TilePointer, TilePointerHasher> visited;
+  std::unordered_set<TilePointer> visited;
   std::vector<TilePointer> stack;
   stack.push_back(spider);
 
@@ -383,7 +383,7 @@ std::generator<Move> Board::spider_moves(TilePointer spider) {
 std::generator<Move> Board::ant_moves(TilePointer ant) {
   const LiftPiece _(ant, this);
 
-  std::unordered_set<TilePointer, TilePointerHasher> visited{ant};
+  std::unordered_set<TilePointer> visited{ant};
   std::queue<TilePointer> queue;
 
   // Add initial neighbors to queue

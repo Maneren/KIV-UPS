@@ -77,8 +77,7 @@ public:
   [[nodiscard]] bool
   neighbors_only_players(TilePointer ptr, Player player) const;
 
-  [[nodiscard]] std::unordered_set<TilePointer, TilePointerHasher>
-  tiles_around_hive() const;
+  [[nodiscard]] std::unordered_set<TilePointer> tiles_around_hive() const;
 
   [[nodiscard]] std::generator<TilePointer>
   valid_placements(Player player) const;
@@ -110,7 +109,7 @@ public:
   [[nodiscard]] std::generator<Move> ant_moves(TilePointer ant);
 
 private:
-  std::unordered_map<TilePointer, std::vector<Piece>, TilePointerHasher> data;
+  std::unordered_map<TilePointer, std::vector<Piece>> data;
 };
 
 } // namespace hive

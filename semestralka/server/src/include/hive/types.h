@@ -28,12 +28,6 @@ struct Move {
   PieceKind piece;
 };
 
-struct TilePointerHasher {
-  std::size_t operator()(TilePointer p) const {
-    return std::hash<int>()(p.p) ^ std::hash<int>()(p.q);
-  }
-};
-
 using PlayerPiecesMap = std::array<std::uint8_t, NUMBER_OF_PIECES>;
 
 using Direction = std::pair<Coordinate, Coordinate>;
@@ -48,6 +42,12 @@ constexpr std::array<Direction, 6> DIRECTIONS{
 };
 
 } // namespace hive
+
+template <> struct std::hash<hive::TilePointer> {
+  std::size_t operator()(auto p) const {
+    return std::hash<int>()(p.p) ^ std::hash<int>()(p.q);
+  }
+};
 
 template <> struct std::formatter<hive::TilePointer> {
   static constexpr auto parse(std::format_parse_context &ctx) {
