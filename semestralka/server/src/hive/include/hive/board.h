@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hive/types.h"
+#include <hive/types.h>
 #include <stdexcept>
 #include <string>
 #include <string_view>
