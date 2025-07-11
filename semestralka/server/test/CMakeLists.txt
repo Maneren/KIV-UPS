@@ -15,19 +15,16 @@ target_compile_options(
   ${TEST_EXECUTABLE}
   PRIVATE
   "$<$<NOT:$<CONFIG:RELEASE>>:-fsanitize=address>"
+  "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_WARNINGS}>"
 )
 target_link_options(
   ${TEST_EXECUTABLE}
   PRIVATE
   "$<$<NOT:$<CONFIG:RELEASE>>:-fsanitize=address>"
 )
-target_compile_options(
-  ${TEST_EXECUTABLE}
-  PRIVATE
-  "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_WARNINGS}>"
-)
 
-target_link_libraries(${TEST_EXECUTABLE}
+target_link_libraries(
+  ${TEST_EXECUTABLE}
   PRIVATE
     net
 )

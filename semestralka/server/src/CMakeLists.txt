@@ -10,16 +10,13 @@ target_compile_options(
   ${EXECUTABLE}
   PRIVATE
   "$<$<NOT:$<CONFIG:RELEASE>>:-fsanitize=address>"
+  "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_DEBUGINFO}>"
+  "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_WARNINGS}>"
 )
 target_link_options(
   ${EXECUTABLE}
   PRIVATE
   "$<$<NOT:$<CONFIG:RELEASE>>:-fsanitize=address>"
-)
-target_compile_options(
-  ${EXECUTABLE}
-  PRIVATE
-  "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_WARNINGS}>"
 )
 
 file(GLOB DIRS LIST_DIRECTORIES TRUE ./*)
