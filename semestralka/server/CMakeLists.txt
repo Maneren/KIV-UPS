@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 
 set(PROJECT "hive-server")
 project(${PROJECT})
@@ -7,19 +7,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Set compiler flags for Debug and RelWithDebInfo builds
-set(PROJECT_CXX_FLAGS_DEBUGINFO "-g3 -gdwarf-5 -fno-omit-frame-pointer")
-set(PROJECT_CXX_FLAGS_WARNINGS "-Wall -Wextra -pedantic")
-
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
-set(PROJECT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
-set(PROJECT_BIN_DIR ${PROJECT_SOURCE_DIR}/bin)
-set(PROJECT_LIB_DIR ${PROJECT_SOURCE_DIR}/lib)
-set(PROJECT_HEADERS_DIR ${PROJECT_SOURCE_DIR}/src/include)
-
 add_subdirectory(src)
+add_subdirectory(apps)
 
-enable_testing()
-add_subdirectory(test)
+option(BUILD_TESTS "Build test executables" ON)
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()

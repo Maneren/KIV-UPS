@@ -19,8 +19,9 @@ Threadpool::Threadpool(size_t thread_count) {
               [this] { return !mRunning || !mTasks.empty(); }
           );
 
-          if (!mRunning && mTasks.empty())
+          if (!mRunning && mTasks.empty()) {
             return;
+          }
 
           task = std::move(mTasks.front());
           mTasks.pop();

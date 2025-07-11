@@ -1,47 +1,51 @@
-cmake_minimum_required(VERSION 3.10)
-set(EXECUTABLE hive_server)
-project(${EXECUTABLE} LANGUAGES CXX)
+# Include the library template
+include(${CMAKE_SOURCE_DIR}/cmake/LibraryTemplate.cmake)
 
-file(GLOB SOURCE_FILES *.cpp)
-add_executable(${EXECUTABLE} ${SOURCE_FILES})
-install(TARGETS ${EXECUTABLE} DESTINATION ${PROJECT_BIN_DIR})
-
-target_compile_options(
-  ${EXECUTABLE}
-  PRIVATE
-  "$<$<NOT:$<CONFIG:RELEASE>>:-fsanitize=address>"
-  "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_DEBUGINFO}>"
-  "$<$<CONFIG:DEBUG,RELWITHDEBINFO>:SHELL:${PROJECT_CXX_FLAGS_WARNINGS}>"
-)
-target_link_options(
-  ${EXECUTABLE}
-  PRIVATE
-  "$<$<NOT:$<CONFIG:RELEASE>>:-fsanitize=address>"
-)
-
-file(GLOB DIRS LIST_DIRECTORIES TRUE ./*)
-foreach(DIR ${DIRS})
-  if(EXISTS ${DIR}/CMakeLists.txt)
-    add_subdirectory(${DIR})
-    get_filename_component(lib_name ${DIR} NAME)
-    target_link_libraries(${EXECUTABLE} PRIVATE ${lib_name})
-  endif()
-endforeach()
-
+# Handle external dependencies first
 set(EXPECTED_BUILD_TESTS OFF)
 set(EXPECTED_BUILD_PACKAGE OFF)
 
-file(GLOB EXTERNAL LIST_DIRECTORIES TRUE ./external/*)
-foreach(DIR ${EXTERNAL})
-  if(EXISTS ${DIR}/CMakeLists.txt)
-    add_subdirectory(${DIR})
-    if (EXISTS ${DIR}/include)
-      include_directories(${DIR}/include)
+# Add external dependencies
+file(GLOB EXTERNAL_DIRS LIST_DIRECTORIES TRUE ./external/*)
+foreach(DIR ${EXTERNAL_DIRS})
+    if(EXISTS ${DIR}/CMakeLists.txt)
+        add_subdirectory(${DIR})
+        # Make external includes available globally
+        if(EXISTS ${DIR}/include)
+            include_directories(${DIR}/include)
+        endif()
     endif()
-  endif()
 endforeach()
 
-file(GLOB INCLUDE_DIRS LIST_DIRECTORIES TRUE include/*)
-install(DIRECTORY ${INCLUDE_DIRS} DESTINATION ${PROJECT_INCLUDE_DIR})
+# Find system packages (add as needed)
+# find_package(fmt QUIET)
 
-include_directories(include)
+# Auto-discover and build all library subdirectories
+file(GLOB LIB_DIRS LIST_DIRECTORIES TRUE ./*)
+foreach(DIR ${LIB_DIRS})
+    # Skip external directory and non-directories
+    get_filename_component(DIR_NAME ${DIR} NAME)
+    if(IS_DIRECTORY ${DIR} AND EXISTS ${DIR}/CMakeLists.txt AND NOT DIR_NAME STREQUAL "external")
+        add_subdirectory(${DIR})
+    endif()
+endforeach()
+
+# Export all created libraries for use by executables
+# This creates a list of all libraries that were built
+get_directory_property(ALL_TARGETS BUILDSYSTEM_TARGETS)
+set(PROJECT_LIBRARIES "")
+foreach(TARGET ${ALL_TARGETS})
+    get_target_property(TARGET_TYPE ${TARGET} TYPE)
+    if(TARGET_TYPE STREQUAL "STATIC_LIBRARY" OR TARGET_TYPE STREQUAL "SHARED_LIBRARY" OR TARGET_TYPE STREQUAL "INTERFACE_LIBRARY")
+        list(APPEND PROJECT_LIBRARIES ${TARGET})
+    endif()
+endforeach()
+
+# Make the library list available to parent scope
+set(PROJECT_LIBRARIES ${PROJECT_LIBRARIES} PARENT_SCOPE)
+
+# Install headers
+file(GLOB INCLUDE_DIRS LIST_DIRECTORIES TRUE include/*)
+if(INCLUDE_DIRS)
+    install(DIRECTORY ${INCLUDE_DIRS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()

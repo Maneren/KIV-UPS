@@ -75,7 +75,8 @@ TEST_F(StreamTest, ClientConnectsToServer) {
   ASSERT_TRUE(read_result);
 
   const auto recvd_message = std::string_view(
-      reinterpret_cast<const char *>(buffer.data()), read_result.value()
+      reinterpret_cast<const char *>(buffer.data()),
+      static_cast<size_t>(read_result.value())
   );
 
   std::println("Received message: {}", recvd_message);

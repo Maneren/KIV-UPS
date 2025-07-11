@@ -14,11 +14,8 @@ configure build_system="Ninja Multi-Config": clean
 build config="Debug" target="all":
     cmake --build "{{ builddir }}" --config "{{ config }}" --target "{{ target }}"
 
-install config="Debug": (build config)
-    cmake --install "{{ builddir }}" --config "{{ config }}"
-
-run config="Debug" +args="": (install config)
-    'bin/{{ executable }}' {{ args }}
+run config="Debug" +args="": (build config)
+    '{{ builddir }}/bin/{{ config }}/{{ executable }}' {{ args }}
 
 test config="Debug": (build config "tests")
 

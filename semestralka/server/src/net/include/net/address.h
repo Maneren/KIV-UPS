@@ -142,8 +142,12 @@ template <> struct std::formatter<net::IPv6Address> {
 
     const auto cp = obj.to_sockaddr();
 
-    const auto result =
-        inet_ntop(obj.family(), &cp.sin6_addr, buffer.data(), buffer.size());
+    const auto result = inet_ntop(
+        obj.family(),
+        &cp.sin6_addr,
+        buffer.data(),
+        static_cast<socklen_t>(buffer.size())
+    );
 
     if (result == nullptr) {
       throw std::runtime_error("inet_ntop failed to stringify address");
