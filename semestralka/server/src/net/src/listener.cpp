@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <net/listener.h>
 #include <sys/socket.h>
+#include <tl/expected.hpp>
 
 namespace net {
 
@@ -8,7 +9,9 @@ constexpr int BACKLOG = 32;
 
 error::result<TcpListener> TcpListener::bind(const Address &addr) {
   auto sock = Socket::create(addr, SOCK_STREAM).value();
-  sock.setopts(SOL_SOCKET, SO_REUSEADDR, 1);
+  if (const auto result = sock.setopts(SOL_SOCKET, SO_REUSEADDR, 1); !result) {
+    return tl::make_unexpected(result.error());
+  }
 
   if (const auto result = sock.bind_to(addr); !result) {
     return tl::make_unexpected(result.error());
