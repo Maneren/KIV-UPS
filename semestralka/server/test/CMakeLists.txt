@@ -1,5 +1,3 @@
-enable_testing()
-
 include(${CMAKE_SOURCE_DIR}/cmake/TestTemplate.cmake)
 
 add_custom_target(tests

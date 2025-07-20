@@ -1,24 +1,26 @@
 include(${CMAKE_CURRENT_LIST_DIR}/CommonUtils.cmake)
 
 # Function to create a standardized executable with common settings
-function(create_executable TARGET_NAME)
+function(create_executable TARGET_NAME SOURCES)
     # Parse optional arguments
     cmake_parse_arguments(EXE
         "CONSOLE;GUI;TEST"
         "VERSION;OUTPUT_NAME"
-        "SOURCES;PRIVATE_DEPS;COMPILE_DEFS;INCLUDE_DIRS"
+        "PRIVATE_DEPS;COMPILE_DEFS;INCLUDE_DIRS"
         ${ARGN}
     )
 
     # Create executable
-    if(EXE_SOURCES)
-        add_executable(${TARGET_NAME} ${EXE_SOURCES})
+    if(SOURCES)
+        add_executable(${TARGET_NAME} ${SOURCES})
     else()
         # Auto-detect main source file
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
             add_executable(${TARGET_NAME} main.cpp)
         elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_NAME}.cpp")
             add_executable(${TARGET_NAME} ${TARGET_NAME}.cpp)
+        elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
+            add_executable(${TARGET_NAME} src/main.cpp)
         else()
             message(FATAL_ERROR "No source files specified and no main.cpp found for ${TARGET_NAME}")
         endif()
@@ -72,5 +74,12 @@ endfunction()
 # Helper function to automatically create executable
 function(auto_create_executable TARGET_NAME)
     get_filename_component(DIR_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-    create_executable(${TARGET_NAME} ${ARGN})
+
+    # Auto-collect sources
+    file(GLOB_RECURSE SOURCES
+        "src/*.cpp" "src/*.c" "src/*.cxx" "src/*.cc"
+        "src/*.h" "src/*.hpp" "src/*.hxx"
+    )
+
+    create_executable(${TARGET_NAME} "${SOURCES}" ${ARGN})
 endfunction()
