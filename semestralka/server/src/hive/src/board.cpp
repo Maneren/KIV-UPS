@@ -1,5 +1,6 @@
-#include <hive/board.h>
 #include <algorithm>
+#include <generator>
+#include <hive/board.h>
 #include <queue>
 #include <ranges>
 #include <stack>
@@ -131,11 +132,35 @@ std::unordered_set<TilePointer> Board::tiles_around_hive() const {
   return tiles;
 }
 
+bool Board::can_player_place_at(Player player, TilePointer ptr) const {
+  return is_empty(ptr) && neighbors_only_players(ptr, player);
+}
+
 std::generator<TilePointer> Board::valid_placements(Player player) const {
   for (const auto &ptr : tiles_around_hive()) {
     if (neighbors_only_players(ptr, player)) {
       co_yield ptr;
     }
+  }
+}
+
+std::generator<Move> Board::moves_for_piece(TilePointer pos, Piece piece) {
+  constexpr std::array<
+      std::generator<Move> (hive::Board::*)(TilePointer),
+      NUMBER_OF_PIECES>
+      PIECE_HANDLERS{
+          &Board::queens_moves,
+          &Board::spider_moves,
+          &Board::beetle_moves,
+          &Board::grasshopper_moves,
+          &Board::ant_moves
+      };
+
+  const auto &handler =
+      PIECE_HANDLERS.at(static_cast<std::uint8_t>(piece.kind));
+
+  for (const auto piece_move : (this->*handler)(pos)) {
+    co_yield piece_move;
   }
 }
 
@@ -151,41 +176,38 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
   }
 
   for (const auto placement_ptr : valid_placements(player)) {
-    for (std::size_t i = 0; i < NUMBER_OF_PIECES; ++i) {
-      if (pieces.at(i) == 0) {
+    for (const auto [piece_kind, count] : pieces) {
+      if (count == 0) {
         continue;
       }
 
-      const auto piece = static_cast<PieceKind>(i);
-      co_yield {.from = placement_ptr, .to = placement_ptr, .piece = piece};
+      co_yield {
+          .from = placement_ptr, .to = placement_ptr, .piece = piece_kind
+      };
     }
   }
 
-  constexpr std::array<
-      std::generator<Move> (hive::Board::*)(TilePointer),
-      NUMBER_OF_PIECES>
-      PIECE_HANDLERS{
-          &Board::queens_moves,
-          &Board::spider_moves,
-          &Board::beetle_moves,
-          &Board::grasshopper_moves,
-          &Board::ant_moves
-      };
-
   for (const auto [pos, piece] : moveable_pieces_for(player)) {
-    const auto &handler =
-        PIECE_HANDLERS.at(static_cast<std::uint8_t>(piece.kind));
-
-    for (const auto piece_move : (this->*handler)(pos)) {
+    for (const auto piece_move : moves_for_piece(pos, piece)) {
       co_yield piece_move;
     }
+  }
+}
+
+std::generator<std::pair<TilePointer, Piece>> Board::pieces() const {
+  for (const auto &[pos, tile] : data) {
+    if (tile.empty()) {
+      continue;
+    }
+
+    co_yield {pos, tile.back()};
   }
 }
 
 std::generator<std::pair<TilePointer, Piece>>
 Board::players_tiles(Player player) const {
   for (const auto &[pos, tile] : data) {
-    if (tile.back().owner != player) {
+    if (tile.empty() || tile.back().owner != player) {
       continue;
     }
 
@@ -212,16 +234,22 @@ Piece Board::remove_piece(TilePointer ptr) {
 }
 
 bool Board::moving_breaks_hive(TilePointer ptr) {
-  const auto &pieces = get(ptr);
+  const auto &tile = get(ptr);
 
-  if (pieces.size() > 1) {
+  if (tile.size() > 1) {
     return false;
   }
 
   const LiftPiece _(ptr, this);
 
   std::unordered_set<TilePointer> visited{};
-  std::stack<TilePointer> stack{{ptr}};
+  std::stack<TilePointer> stack{};
+
+  // start from one of the neighbors
+  for (const auto neighbor_ptr : neighbors(ptr)) {
+    stack.push(neighbor_ptr);
+    break;
+  }
 
   while (!stack.empty()) {
     const auto current = stack.top();
@@ -237,12 +265,8 @@ bool Board::moving_breaks_hive(TilePointer ptr) {
     }
   }
 
-  auto occupied_tiles = std::views::filter(data, [](const auto &pair) {
-    return !pair.second.empty();
-  });
-
   return std::ranges::any_of(
-      occupied_tiles | std::ranges::views::keys,
+      pieces() | std::ranges::views::keys,
       [&visited](const auto ptr) { return !visited.contains(ptr); }
   );
 }
@@ -378,7 +402,9 @@ std::generator<Move> Board::spider_moves(TilePointer spider) {
       visited.insert(ptr);
 
       for (const auto step_ptr : valid_steps(ptr)) {
-        new_stack.push_back(step_ptr);
+        if (!visited.contains(step_ptr)) {
+          new_stack.push_back(step_ptr);
+        }
       }
     }
 

@@ -59,12 +59,17 @@ public:
   [[nodiscard]] static Board from_fen_string(std::string_view fen);
   [[nodiscard]] std::string to_fen_string() const;
 
+  [[nodiscard]] std::generator<std::pair<TilePointer, Piece>> pieces() const;
+
   [[nodiscard]] std::generator<std::pair<TilePointer, Piece>>
   players_tiles(Player player) const;
 
   void add_piece(TilePointer ptr, Piece piece);
 
   Piece remove_piece(TilePointer ptr);
+
+  [[nodiscard]]
+  std::generator<Move> moves_for_piece(TilePointer pos, Piece piece);
 
   [[nodiscard]] std::generator<Move>
   moves_for_player(Player player, PlayerPiecesMap pieces);
@@ -81,6 +86,8 @@ public:
   neighbors_only_players(TilePointer ptr, Player player) const;
 
   [[nodiscard]] std::unordered_set<TilePointer> tiles_around_hive() const;
+
+  bool can_player_place_at(Player player, TilePointer ptr) const;
 
   [[nodiscard]] std::generator<TilePointer>
   valid_placements(Player player) const;
