@@ -46,9 +46,5 @@ include/divisible/*
 
 .idea/*.xml
 
-build/**/*
-
-include/*
-lib/*
-bin/*
-share/
+build
+/share
