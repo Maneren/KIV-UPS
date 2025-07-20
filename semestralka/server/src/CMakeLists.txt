@@ -6,10 +6,28 @@ set(EXPECTED_BUILD_TESTS OFF)
 set(EXPECTED_BUILD_PACKAGE OFF)
 
 # Add external dependencies
-file(GLOB EXTERNAL_DIRS LIST_DIRECTORIES TRUE ./external/*)
-foreach(DIR ${EXTERNAL_DIRS})
-    if(EXISTS ${DIR}/CMakeLists.txt)
+file(GLOB_RECURSE EXTERNAL_CMAKE_FILES ./external/*/CMakeLists.txt)
+
+# Sort by depth (shallowest first) and process unique directories
+set(PROCESSED_DIRS "")
+foreach(CMAKE_FILE ${EXTERNAL_CMAKE_FILES})
+    get_filename_component(DIR ${CMAKE_FILE} DIRECTORY)
+
+    # Check if this directory or a parent has already been processed
+    set(SHOULD_PROCESS TRUE)
+    foreach(PROCESSED_DIR ${PROCESSED_DIRS})
+        # Check if current dir is subdirectory of already processed dir
+        string(FIND ${DIR} ${PROCESSED_DIR} PARENT_MATCH)
+        if(PARENT_MATCH EQUAL 0)
+            set(SHOULD_PROCESS FALSE)
+            break()
+        endif()
+    endforeach()
+
+    if(SHOULD_PROCESS)
         add_subdirectory(${DIR})
+        list(APPEND PROCESSED_DIRS ${DIR})
+
         # Make external includes available globally
         if(EXISTS ${DIR}/include)
             include_directories(${DIR}/include)

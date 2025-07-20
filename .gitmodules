@@ -4,3 +4,12 @@
 [submodule "semestralka/server/external/expected"]
 	path = semestralka/server/src/external/expected
 	url = https://github.com/TartanLlama/expected.git
+[submodule "semestralka/server/src/external/raylib"]
+	path = semestralka/server/src/external/raylib
+	url = https://github.com/raysan5/raylib.git
+[submodule "semestralka/server/src/external/raylib-cpp"]
+	path = semestralka/server/src/external/raylib-cpp
+	url = https://github.com/RobLoach/raylib-cpp.git
+[submodule "semestralka/server/src/external/raygui"]
+	path = semestralka/server/src/external/raygui
+	url = https://github.com/raysan5/raygui.git
