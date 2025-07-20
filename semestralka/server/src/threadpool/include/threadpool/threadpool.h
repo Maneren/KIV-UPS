@@ -118,13 +118,8 @@ public:
    */
   template <typename Functor, typename... Args>
   void spawn(Functor &&f, Args &&...args)
-    requires(!std::is_same_v<std::decay_t<Functor>, std::function<void()>>)
+    requires(std::is_same_v<std::invoke_result_t<Functor, Args...>, void>)
   {
-    static_assert(
-        std::is_same_v<std::invoke_result_t<Functor, Args...>, void>,
-        "The function must not return any value."
-    );
-
     const auto task = std::make_shared<std::packaged_task<void()>>(
         [f = std::forward<Functor>(f), &args...] {
           f(std::forward<Args>(args)...);

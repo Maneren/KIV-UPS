@@ -1,10 +1,12 @@
-#include <algorithm>
 #include <threadpool/threadpool.h>
 
 namespace threadpool {
 
 Threadpool::Threadpool(size_t thread_count) {
-  thread_count = std::min(thread_count, static_cast<size_t>(8));
+  if (thread_count == 0) {
+    thread_count = std::thread::hardware_concurrency();
+  }
+
   mWorkers.reserve(thread_count);
 
   for (std::size_t i = 0; i < thread_count; ++i) {
