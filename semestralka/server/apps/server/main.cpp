@@ -35,7 +35,7 @@ int main() {
         std::vector<std::byte> buffer(128);
 
         while (true) {
-          const auto read_result = client_stream.recv(buffer);
+          const auto read_result = client_stream.read(std::span(buffer));
 
           if (!read_result) {
             std::println("Failed to read from client: {}", read_result.error());
@@ -53,20 +53,21 @@ int main() {
 
           std::stringstream ss;
           for (const auto &byte : received_bytes) {
-            ss << std::format("{:02x}", static_cast<int>(byte));
+            std::print(ss, "{:02x}", static_cast<int>(byte));
           }
 
           std::println(
-              "Received {} bytes from address {}: {}",
+              "Received {} bytes from address {}: {} (\"{}\")",
               bytes_read,
               client_address,
-              ss.str()
+              ss.str(),
+              std::string(received_bytes.begin(), received_bytes.end())
           );
         }
       });
     }
   } catch (const std::exception &e) {
-    std::cerr << "Unexpected error: " << e.what() << std::endl;
+    std::println(std::cerr, "Unexpected error: {}", e.what());
     return 1;
   }
 

@@ -35,23 +35,4 @@ TcpStream &TcpStream::operator=(TcpStream &&other) noexcept {
   return *this;
 }
 
-error::result<ssize_t> TcpStream::read(std::span<std::byte> buf) const {
-  return error::from_os(sock.read(buf.data(), buf.size()));
-}
-
-error::result<ssize_t>
-TcpStream::write(const std::span<const std::byte> buf) const {
-  return error::from_os(sock.write(buf.data(), buf.size()));
-}
-
-error::result<ssize_t>
-TcpStream::recv(const std::span<std::byte> buf, int flags) const {
-  return error::from_os(sock.recv(buf.data(), buf.size(), flags));
-}
-
-error::result<ssize_t>
-TcpStream::send(const std::span<const std::byte> buf, int flags) const {
-  return error::from_os(sock.send(buf.data(), buf.size(), flags));
-}
-
 } // namespace net

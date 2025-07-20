@@ -23,14 +23,29 @@ public:
   static error::result<TcpStream>
   connect_timeout(const Address &addr, std::chrono::microseconds timeout);
 
-  [[nodiscard]] error::result<ssize_t> read(std::span<std::byte> buf) const;
-  [[nodiscard]] error::result<ssize_t> write(std::span<const std::byte> buf
-  ) const;
+  template <typename T>
+  [[nodiscard]] error::result<ssize_t> read(std::span<T> buf) const {
+    const auto byte_buf = std::as_writable_bytes(buf);
+    return error::from_os(sock.read(byte_buf.data(), byte_buf.size()));
+  };
+  template <typename T>
+  [[nodiscard]] error::result<ssize_t> write(std::span<T> buf) const {
+    const auto byte_buf = std::as_bytes(buf);
+    return error::from_os(sock.write(byte_buf.data(), byte_buf.size()));
+  };
 
+  template <typename T>
   [[nodiscard]] error::result<ssize_t>
-  recv(std::span<std::byte> buf, int flags = 0) const;
+  recv(std::span<T> buf, int flags = 0) const {
+    const auto byte_buf = std::as_writable_bytes(buf);
+    return error::from_os(sock.recv(byte_buf.data(), byte_buf.size(), flags));
+  };
+  template <typename T>
   [[nodiscard]] error::result<ssize_t>
-  send(std::span<const std::byte> buf, int flags = 0) const;
+  send(std::span<T> buf, int flags = 0) const {
+    const auto byte_buf = std::as_bytes(buf);
+    return error::from_os(sock.send(byte_buf.data(), byte_buf.size(), flags));
+  };
 
   [[nodiscard]] const Socket &socket() const { return sock; }
 };
