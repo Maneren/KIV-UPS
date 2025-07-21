@@ -1,0 +1,26 @@
+#include "net/tcp_iostream.h"
+#include <iostream>
+#include <net/listener.h>
+#include <utils/print.h>
+
+int main() {
+  try {
+    const auto address =
+        net::IPv4Address::from_string("127.0.0.1:8080").value();
+
+    auto stream = net::TcpStream::connect(address).value();
+
+    std::println("Connected to {}", address);
+
+    net::TcpIostream iostream{stream};
+
+    while (true) {
+      std::println(iostream, "Hello world!");
+    }
+  } catch (const std::exception &e) {
+    std::cerr << "Unexpected error: " << e.what() << '\n';
+    return 1;
+  }
+
+  return 0;
+}
