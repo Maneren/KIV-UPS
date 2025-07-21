@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <map>
 
 namespace hive {
 
@@ -30,7 +31,7 @@ struct Move {
   PieceKind piece;
 };
 
-using PlayerPiecesMap = std::array<std::uint8_t, NUMBER_OF_PIECES>;
+using PlayerPiecesMap = std::map<PieceKind, size_t>;
 
 using Direction = std::pair<Coordinate, Coordinate>;
 
