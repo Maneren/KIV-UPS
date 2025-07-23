@@ -57,7 +57,9 @@ function(set_output_directories TARGET TYPE)
 endfunction()
 
 function(set_version_properties TARGET VERSION)
-    set_target_properties(${TARGET} PROPERTIES
-        VERSION ${VERSION}
-        SOVERSION ${VERSION})
+    if (VERSION)
+        set_target_properties(${TARGET} PROPERTIES
+            VERSION ${VERSION}
+            SOVERSION ${VERSION})
+    endif()
 endfunction()

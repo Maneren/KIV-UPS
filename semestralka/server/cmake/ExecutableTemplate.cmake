@@ -23,10 +23,16 @@ function(create_executable TARGET SOURCES)
     target_compile_definitions(${TARGET} PRIVATE "${EXE_COMPILE_DEFS}")
     link_dependencies(${TARGET} PRIVATE "${EXE_PRIVATE_DEPS}")
 
-    set_output_directories(${TARGET} $<IF:$<BOOL:${EXE_TEST}>,TEST,EXECUTABLE>)
+    if(EXE_TEST)
+        set_output_directories(${TARGET} TEST)
+    else()
+        set_output_directories(${TARGET} EXECUTABLE)
+    endif()
+
     if(EXE_OUTPUT_NAME)
         set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME ${EXE_OUTPUT_NAME})
     endif()
+
     set_version_properties(${TARGET} "${EXE_VERSION}")
 
     if(WIN32)
