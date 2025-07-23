@@ -81,12 +81,15 @@ void draw_hex_outline(
   }
 }
 
-} // namespace
+const std::map<hive::PieceKind, raylib::Color> PIECE_COLORS = {
+    {hive::PieceKind::Queen, raylib::Color{205, 180, 0, 255}},
+    {hive::PieceKind::Spider, raylib::Color::Red()},
+    {hive::PieceKind::Ant, raylib::Color::Blue()},
+    {hive::PieceKind::Beetle, raylib::Color::Purple()},
+    {hive::PieceKind::Grasshopper, raylib::Color::DarkGreen()}
+};
 
-void BoardRenderer::draw(const GameState &game, const HiveGuiState &gui) {
-  GuiSetStyle(0, TEXT_SIZE, TEXT_FONT_SIZE);
-
-  // --- Draw current player's turn label centered at top ---
+void draw_turn_label(const GameState &game, const HiveGuiState &gui) {
   const std::string turnText = game.current_player == hive::Player::White
                                    ? "White's turn"
                                    : "Black's turn";
@@ -100,29 +103,41 @@ void BoardRenderer::draw(const GameState &game, const HiveGuiState &gui) {
   GuiLabel(
       Rectangle{label_x, label_y, label_width, label_height}, turnText.data()
   );
+}
+
+} // namespace
+
+void BoardRenderer::draw(const GameState &game, const HiveGuiState &gui) {
+  GuiSetStyle(0, TEXT_SIZE, TEXT_FONT_SIZE);
+
+  draw_turn_label(game, gui);
 
   for (const auto &[ptr, piece] : game.board.pieces()) {
     const raylib::Vector2 pos = hex_to_pixel(ptr);
 
     // Draw hexagon
-    pos.DrawPoly(HEX_SIDES, HEX_SIZE, 0, raylib::Color::LightGray());
+    const auto tile_color = PIECE_COLORS.at(piece.kind);
+    pos.DrawPoly(HEX_SIDES, HEX_SIZE, 0, tile_color);
 
-    const std::string &letter = piece_letter(piece);
+    const std::string letter = piece_letter(piece);
     const raylib::Vector2 textPos(pos.x - TEXT_OFFSET, pos.y - TEXT_OFFSET);
+    const auto text_color = piece.owner == hive::Player::White
+                                ? raylib::Color::White()
+                                : raylib::Color::Black();
     font.DrawText(
-        letter,
-        textPos,
-        TEXT_FONT_SIZE,
-        TEXT_FONT_SPACING,
-        raylib::Color::Black()
+        letter, textPos, TEXT_FONT_SIZE, TEXT_FONT_SPACING, text_color
     );
 
     draw_hex_outline(pos, raylib::Color::DarkGray(), 2.0F);
+  }
 
-    // Draw selection indicator if this tile is selected
-    if (ptr == gui.selected_tile) {
-      draw_hex_outline(pos, raylib::Color::Blue());
-    }
+  for (const auto &move : gui.valid_moves) {
+    const auto pos = hex_to_pixel(move.to);
+    draw_hex_outline(pos, raylib::Color::Green());
+  }
+
+  if (gui.selected_tile) {
+    draw_hex_outline(hex_to_pixel(*gui.selected_tile), raylib::Color::Black());
   }
 }
 
@@ -192,12 +207,5 @@ void BoardRenderer::draw_available(const GameState &game, HiveGuiState &gui) {
     // --- Update selected_kind in gui if changed ---
     gui.selected_kind =
         static_cast<hive::PieceKind>(availableKinds[dropdownIdx]);
-  }
-}
-
-void BoardRenderer::draw_valid_moves(const HiveGuiState &gui) {
-  for (const auto &move : gui.valid_moves) {
-    const auto pos = hex_to_pixel(move.to);
-    draw_hex_outline(pos, raylib::Color::Green());
   }
 }

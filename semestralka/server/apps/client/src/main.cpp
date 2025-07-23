@@ -38,7 +38,6 @@ int main() {
 
     BoardRenderer::draw(game, gui);
     BoardRenderer::draw_available(game, gui);
-    BoardRenderer::draw_valid_moves(gui);
 
     handle_input(game, gui);
 
