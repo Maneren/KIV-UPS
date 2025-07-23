@@ -1,9 +1,11 @@
 #pragma once
 
+#include <array>
 #include <hive/types.h>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <utils/format.h>
 #include <utils/generator.h>
 #include <utils/print.h>
@@ -87,6 +89,8 @@ public:
 
   [[nodiscard]] std::unordered_set<TilePointer> tiles_around_hive() const;
 
+  bool can_player_place(Player player, PieceKind kind) const;
+
   bool can_player_place_at(Player player, TilePointer ptr) const;
 
   [[nodiscard]] std::generator<TilePointer>
@@ -118,8 +122,40 @@ public:
 
   [[nodiscard]] std::generator<Move> ant_moves(TilePointer ant);
 
+  void apply_move(Move move, Player player) {
+    if (move.from == move.to) {
+      auto &available = player_pieces.at(player).at(move.piece_kind);
+
+      if (available == 0) {
+        throw std::runtime_error("Attempted to add piece when no pieces left");
+      }
+
+      const auto piece = Piece{.kind = move.piece_kind, .owner = player};
+      add_piece(move.from, piece);
+      --available;
+      return;
+    }
+
+    const auto piece = remove_piece(move.from);
+    if (piece.kind != move.piece_kind) {
+      throw std::runtime_error("Tried to move piece of different kind");
+    }
+    add_piece(move.to, piece);
+  };
+
+  const std::map<Player, PlayerPiecesMap> &get_player_pieces() const {
+    return player_pieces;
+  }
+
 private:
   std::unordered_map<TilePointer, std::vector<Piece>> data;
+
+  static const PlayerPiecesMap DEFAULT_PLAYER_PIECES;
+
+  std::map<Player, PlayerPiecesMap> player_pieces{
+      {Player::White, DEFAULT_PLAYER_PIECES},
+      {Player::Black, DEFAULT_PLAYER_PIECES}
+  };
 
   friend std::formatter<Board>;
 };

@@ -170,7 +170,7 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
     co_yield {
         .from = {.p = 0, .q = 0},
         .to = {.p = 0, .q = 0},
-        .piece = PieceKind::Queen,
+        .piece_kind = PieceKind::Queen,
     };
     co_return;
   }
@@ -182,7 +182,7 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
       }
 
       co_yield {
-          .from = placement_ptr, .to = placement_ptr, .piece = piece_kind
+          .from = placement_ptr, .to = placement_ptr, .piece_kind = piece_kind
       };
     }
   }
@@ -226,7 +226,7 @@ Piece Board::remove_piece(TilePointer ptr) {
     throw std::runtime_error("Tried to remove piece from empty tile");
   }
 
-  auto &pieces = it->second;
+  auto &[_, pieces] = *it;
   const auto piece = pieces.back();
   pieces.pop_back();
 
@@ -358,7 +358,7 @@ std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) {
           co_yield Move{
               .from = grasshopper,
               .to = current,
-              .piece = PieceKind::Grasshopper
+              .piece_kind = PieceKind::Grasshopper
           };
         }
         break;
@@ -373,7 +373,9 @@ std::generator<Move> Board::queens_moves(TilePointer queen) {
   const LiftPiece _(queen, this);
 
   for (const auto step_ptr : valid_steps(queen, true)) {
-    co_yield Move{.from = queen, .to = step_ptr, .piece = PieceKind::Queen};
+    co_yield Move{
+        .from = queen, .to = step_ptr, .piece_kind = PieceKind::Queen
+    };
   }
 }
 
@@ -382,7 +384,7 @@ std::generator<Move> Board::beetle_moves(TilePointer beetle) {
 
   for (const auto ptr : neighboring_cells(beetle)) {
     if (has_neighbor(ptr)) {
-      co_yield Move{.from = beetle, .to = ptr, .piece = PieceKind::Beetle};
+      co_yield Move{.from = beetle, .to = ptr, .piece_kind = PieceKind::Beetle};
     }
   }
 }
@@ -416,7 +418,7 @@ std::generator<Move> Board::spider_moves(TilePointer spider) {
   }
 
   for (const auto ptr : stack) {
-    co_yield Move{.from = spider, .to = ptr, .piece = PieceKind::Spider};
+    co_yield Move{.from = spider, .to = ptr, .piece_kind = PieceKind::Spider};
   }
 }
 
@@ -440,7 +442,7 @@ std::generator<Move> Board::ant_moves(TilePointer ant) {
     }
     visited.insert(current);
 
-    co_yield Move{.from = ant, .to = current, .piece = PieceKind::Ant};
+    co_yield Move{.from = ant, .to = current, .piece_kind = PieceKind::Ant};
 
     // Add next level neighbors
     for (const auto neighbor : valid_steps(current)) {
@@ -448,5 +450,17 @@ std::generator<Move> Board::ant_moves(TilePointer ant) {
     }
   }
 }
+
+const PlayerPiecesMap Board::DEFAULT_PLAYER_PIECES = {
+    {PieceKind::Queen, 1},
+    {PieceKind::Grasshopper, 2},
+    {PieceKind::Beetle, 2},
+    {PieceKind::Spider, 2},
+    {PieceKind::Ant, 2},
+};
+
+bool Board::can_player_place(Player player, PieceKind kind) const {
+  return player_pieces.at(player).at(kind) > 0;
+};
 
 } // namespace hive

@@ -4,14 +4,6 @@ GameState GameState::create_default() {
   GameState state;
   state.board = hive::Board{};
   state.current_player = hive::Player::White;
-  state.available_white = {
-      {hive::PieceKind::Ant, 2},
-      {hive::PieceKind::Grasshopper, 2},
-      {hive::PieceKind::Beetle, 2},
-      {hive::PieceKind::Spider, 2},
-      {hive::PieceKind::Queen, 1}
-  };
-  state.available_black = state.available_white;
   return state;
 }
 
@@ -22,9 +14,7 @@ void GameState::switch_player() {
 }
 
 bool GameState::can_place_piece(hive::PieceKind kind) const {
-  const auto &available =
-      current_player == hive::Player::White ? available_white : available_black;
-  return available.at(kind) > 0;
+  return board.can_player_place(current_player, kind);
 }
 
 void GameState::place_piece(hive::TilePointer pos, hive::PieceKind kind) {
@@ -32,9 +22,6 @@ void GameState::place_piece(hive::TilePointer pos, hive::PieceKind kind) {
     return;
   }
 
-  board.add_piece(pos, hive::Piece{.kind = kind, .owner = current_player});
-  auto &available =
-      current_player == hive::Player::White ? available_white : available_black;
-  available.at(kind)--;
+  board.apply_move(hive::make_placement(pos, kind), current_player);
   switch_player();
 }

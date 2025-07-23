@@ -6,25 +6,23 @@
 #include <Window.hpp>
 #include <hive/board.h>
 
+using namespace hive;
+
 int main() {
   GameState game = GameState::create_default();
   HiveGuiState gui;
   // Initial board setup
-  game.board.add_piece(
-      {.p = 0, .q = 0},
-      {.kind = hive::PieceKind::Queen, .owner = hive::Player::Black}
+  game.board.apply_move(
+      make_placement({.p = 0, .q = 0}, PieceKind::Queen), Player::Black
   );
-  game.board.add_piece(
-      {.p = 1, .q = 0},
-      {.kind = hive::PieceKind::Queen, .owner = hive::Player::White}
+  game.board.apply_move(
+      make_placement({.p = 1, .q = 0}, PieceKind::Queen), Player::White
   );
-  game.board.add_piece(
-      {.p = 0, .q = 1},
-      {.kind = hive::PieceKind::Spider, .owner = hive::Player::Black}
+  game.board.apply_move(
+      make_placement({.p = 0, .q = 1}, PieceKind::Spider), Player::Black
   );
-  game.board.add_piece(
-      {.p = 1, .q = 1},
-      {.kind = hive::PieceKind::Ant, .owner = hive::Player::White}
+  game.board.apply_move(
+      make_placement({.p = 1, .q = 1}, PieceKind::Ant), Player::White
   );
 
   raylib::Window window{

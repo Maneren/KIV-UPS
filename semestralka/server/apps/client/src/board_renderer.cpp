@@ -127,9 +127,8 @@ void BoardRenderer::draw(const GameState &game, const HiveGuiState &gui) {
 }
 
 void BoardRenderer::draw_available(const GameState &game, HiveGuiState &gui) {
-  const auto &available = game.current_player == hive::Player::White
-                              ? game.available_white
-                              : game.available_black;
+  const auto &available =
+      game.board.get_player_pieces().at(game.current_player);
 
   // Cache color and font outside the loop
   const raylib::Color textColor(

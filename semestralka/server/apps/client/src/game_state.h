@@ -5,8 +5,6 @@ class GameState {
 public:
   hive::Board board{};
   hive::Player current_player{};
-  hive::PlayerPiecesMap available_white;
-  hive::PlayerPiecesMap available_black;
 
   static GameState create_default();
 
