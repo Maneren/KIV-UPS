@@ -1,6 +1,6 @@
-#include <net/listener.h>
 #include <gtest/gtest.h>
 #include <latch>
+#include <net/listener.h>
 #include <net/stream.h>
 #include <optional>
 #include <string_view>
@@ -44,7 +44,8 @@ protected:
       std::array<std::byte, message.size()> buffer{};
       std::memcpy(buffer.data(), message.data(), message.size());
 
-      const auto write_result = client_stream.write(buffer);
+      const auto write_result =
+          client_stream.write(std::span<std::byte>(buffer));
 
       if (!write_result) {
         std::println("Failed to write to client: {}", write_result.error());
@@ -70,7 +71,7 @@ TEST_F(StreamTest, ClientConnectsToServer) {
 
   std::array<std::byte, 128> buffer{};
 
-  const auto read_result = stream.read(buffer);
+  const auto read_result = stream.read(std::span<std::byte>(buffer));
 
   ASSERT_TRUE(read_result);
 
