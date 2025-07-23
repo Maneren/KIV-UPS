@@ -1,122 +1,63 @@
-# Common utilities for CMake templates
-# This file contains shared functions used across library, executable, and test templates
-
-# Function to set common compile options for a target
-function(set_common_compile_options TARGET_NAME VISIBILITY)
-    target_compile_options(${TARGET_NAME} ${VISIBILITY}
-        # Warning flags
+function(set_compiler_and_linker_flags TARGET TEST)
+    target_compile_options(${TARGET} PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
         $<$<CXX_COMPILER_ID:MSVC>:/W4>
-
-        # Debug flags
-        $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:GNU,Clang>:-g3 -gdwarf-5 -fno-omit-frame-pointer>>
-        $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/Od /Zi>>
-
-        # Release flags
-        $<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -DNDEBUG>>
-        $<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/O2 /DNDEBUG>>
-    )
-endfunction()
-
-# Function to set enhanced compile options for tests
-function(set_test_compile_options TARGET_NAME)
-    target_compile_options(${TARGET_NAME} PRIVATE
-        # Warning flags (more aggressive for tests)
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Wconversion>
-        $<$<CXX_COMPILER_ID:MSVC>:/W4>
-
-        # Debug flags (tests usually run in debug)
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-g3 -O0>
-        $<$<CXX_COMPILER_ID:MSVC>:/Od /Zi>
-
-        # Sanitizers (always enabled for tests)
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-fsanitize=address,undefined,leak>
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-fno-omit-frame-pointer>
-    )
-endfunction()
-
-# Function to set sanitizer options (debug builds only for non-test targets)
-function(set_sanitizer_options TARGET_NAME)
-    target_compile_options(${TARGET_NAME} PRIVATE
-        $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:GNU,Clang>>:-fsanitize=address,undefined,leak>
     )
 
-    target_link_options(${TARGET_NAME} PRIVATE
-        $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:GNU,Clang>>:-fsanitize=address,undefined,leak>
-    )
-endfunction()
-
-# Function to set sanitizer options for tests (always enabled)
-function(set_test_sanitizer_options TARGET_NAME)
-    target_link_options(${TARGET_NAME} PRIVATE
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-fsanitize=address,undefined,leak>
-    )
-endfunction()
-
-# Function to set C++ standard based on target type
-function(set_cxx_standard TARGET_NAME VISIBILITY)
-    target_compile_features(${TARGET_NAME} ${VISIBILITY} cxx_std_20)
-endfunction()
-
-# Function to handle compile definitions
-function(add_compile_definitions_with_visibility TARGET_NAME VISIBILITY DEFINITIONS)
-    if(DEFINITIONS)
-        target_compile_definitions(${TARGET_NAME} ${VISIBILITY} ${DEFINITIONS})
+    set(CXX_GNU_DEBUG_INFO -g3 -gdwarf-5 -Og -fno-omit-frame-pointer)
+    set(CXX_SANITIZERS -fsanitize=address,undefined,leak)
+    if(TEST)
+        target_compile_options(${TARGET} PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wconversion ${CXX_GNU_DEBUG_INFO}>
+            $<$<CXX_COMPILER_ID:MSVC>:/W4 /Od /Zi>
+        )
+        target_link_options(${TARGET} PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:${CXX_SANITIZERS}>
+        )
+    else()
+        target_compile_options(${TARGET} PRIVATE
+            $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:GNU,Clang>:${CXX_GNU_DEBUG_INFO}>>
+            $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:GNU,Clang>:${CXX_SANITIZERS}>>
+            $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/Od /Zi>>
+            $<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -DNDEBUG>>
+            $<$<CONFIG:Release>:$<$<CXX_COMPILER_ID:MSVC>:/O2 /DNDEBUG>>
+        )
+        target_link_options(${TARGET} PRIVATE
+            $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:GNU,Clang>:${CXX_SANITIZERS}>>
+        )
     endif()
 endfunction()
 
-# Function to handle include directories
-function(add_include_directories_if_provided TARGET_NAME VISIBILITY DIRECTORIES)
-    if(DIRECTORIES)
-        target_include_directories(${TARGET_NAME} ${VISIBILITY} ${DIRECTORIES})
+function(link_dependencies TARGET VISIBILITY DEPENDENCIES)
+    if(DEPENDENCIES)
+        target_link_libraries(${TARGET} ${VISIBILITY} ${DEPENDENCIES})
     endif()
 endfunction()
 
-# Function to handle library dependencies
-function(link_dependencies TARGET_NAME PRIVATE_DEPS PUBLIC_DEPS INTERFACE_DEPS IS_HEADER_ONLY)
-    if(PRIVATE_DEPS AND NOT IS_HEADER_ONLY)
-        target_link_libraries(${TARGET_NAME} PRIVATE ${PRIVATE_DEPS})
-    endif()
-
-    if(PUBLIC_DEPS)
-        if(IS_HEADER_ONLY)
-            target_link_libraries(${TARGET_NAME} INTERFACE ${PUBLIC_DEPS})
-        else()
-            target_link_libraries(${TARGET_NAME} PUBLIC ${PUBLIC_DEPS})
-        endif()
-    endif()
-
-    if(INTERFACE_DEPS)
-        target_link_libraries(${TARGET_NAME} INTERFACE ${INTERFACE_DEPS})
+function(add_include_directories TARGET VISIBILITY DIRS)
+    if(DIRS)
+        target_include_directories(${TARGET} ${VISIBILITY} ${DIRS})
     endif()
 endfunction()
 
-# Function to set common output directories
-function(set_output_directories TARGET_NAME TYPE)
+function(set_output_directories TARGET TYPE)
     if(TYPE STREQUAL "LIBRARY")
-        set_target_properties(${TARGET_NAME} PROPERTIES
+        set_target_properties(${TARGET} PROPERTIES
             ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
             LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-        )
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
     elseif(TYPE STREQUAL "EXECUTABLE")
-        set_target_properties(${TARGET_NAME} PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-        )
+        set_target_properties(${TARGET} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
     elseif(TYPE STREQUAL "TEST")
-        set_target_properties(${TARGET_NAME} PROPERTIES
+        set_target_properties(${TARGET} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/test/bin
-            FOLDER "Tests"
-        )
+            FOLDER "Tests")
     endif()
 endfunction()
 
-# Function to set version properties
-function(set_version_properties TARGET_NAME VERSION)
-    if(VERSION)
-        set_target_properties(${TARGET_NAME} PROPERTIES
-            VERSION ${VERSION}
-            SOVERSION ${VERSION}
-        )
-    endif()
+function(set_version_properties TARGET VERSION)
+    set_target_properties(${TARGET} PROPERTIES
+        VERSION ${VERSION}
+        SOVERSION ${VERSION})
 endfunction()

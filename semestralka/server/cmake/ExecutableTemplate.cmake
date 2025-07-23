@@ -1,8 +1,6 @@
 include(${CMAKE_CURRENT_LIST_DIR}/CommonUtils.cmake)
 
-# Function to create a standardized executable with common settings
-function(create_executable TARGET_NAME SOURCES)
-    # Parse optional arguments
+function(create_executable TARGET SOURCES)
     cmake_parse_arguments(EXE
         "CONSOLE;GUI;TEST"
         "VERSION;OUTPUT_NAME"
@@ -10,76 +8,37 @@ function(create_executable TARGET_NAME SOURCES)
         ${ARGN}
     )
 
-    # Create executable
     if(SOURCES)
-        add_executable(${TARGET_NAME} ${SOURCES})
-    else()
-        # Auto-detect main source file
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
-            add_executable(${TARGET_NAME} main.cpp)
-        elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${TARGET_NAME}.cpp")
-            add_executable(${TARGET_NAME} ${TARGET_NAME}.cpp)
-        elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
-            add_executable(${TARGET_NAME} src/main.cpp)
+        if (EXE_TEST)
+            add_executable(${TARGET} EXCLUDE_FROM_ALL "${SOURCES}")
         else()
-            message(FATAL_ERROR "No source files specified and no main.cpp found for ${TARGET_NAME}")
+            add_executable(${TARGET} "${SOURCES}")
         endif()
+    else()
+        message(FATAL_ERROR "Executable ${TARGET} has no sources")
     endif()
 
-    # Set include directories
-    add_include_directories_if_provided(${TARGET_NAME} PRIVATE "${EXE_INCLUDE_DIRS}")
+    add_include_directories(${TARGET} PRIVATE "${EXE_INCLUDE_DIRS}")
+    set_compiler_and_linker_flags(${TARGET} ${EXE_TEST})
+    target_compile_definitions(${TARGET} PRIVATE "${EXE_COMPILE_DEFS}")
+    link_dependencies(${TARGET} PRIVATE "${EXE_PRIVATE_DEPS}")
 
-    # Set common compile options and sanitizers
-    set_common_compile_options(${TARGET_NAME} PRIVATE)
-    set_sanitizer_options(${TARGET_NAME})
-
-    # Set C++ standard
-    set_cxx_standard(${TARGET_NAME} PRIVATE)
-
-    # Add compile definitions
-    add_compile_definitions_with_visibility(${TARGET_NAME} PRIVATE "${EXE_COMPILE_DEFS}")
-
-    # Link dependencies
-    if(EXE_PRIVATE_DEPS)
-        target_link_libraries(${TARGET_NAME} PRIVATE ${EXE_PRIVATE_DEPS})
-    endif()
-
-    # Set executable properties
-    set_output_directories(${TARGET_NAME} EXECUTABLE)
-
-    # Set custom output name if provided
+    set_output_directories(${TARGET} $<IF:$<BOOL:${EXE_TEST}>,TEST,EXECUTABLE>)
     if(EXE_OUTPUT_NAME)
-        set_target_properties(${TARGET_NAME} PROPERTIES
-            OUTPUT_NAME ${EXE_OUTPUT_NAME}
-        )
+        set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME ${EXE_OUTPUT_NAME})
     endif()
+    set_version_properties(${TARGET} "${EXE_VERSION}")
 
-    # Set version if provided
-    set_version_properties(${TARGET_NAME} "${EXE_VERSION}")
-
-    # Set subsystem for Windows
     if(WIN32)
         if(EXE_CONSOLE)
-            set_target_properties(${TARGET_NAME} PROPERTIES
-                WIN32_EXECUTABLE FALSE
-            )
+            set_target_properties(${TARGET} PROPERTIES WIN32_EXECUTABLE FALSE)
         elseif(EXE_GUI)
-            set_target_properties(${TARGET_NAME} PROPERTIES
-                WIN32_EXECUTABLE TRUE
-            )
+            set_target_properties(${TARGET} PROPERTIES WIN32_EXECUTABLE TRUE)
         endif()
     endif()
 endfunction()
 
-# Helper function to automatically create executable
-function(auto_create_executable TARGET_NAME)
-    get_filename_component(DIR_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-
-    # Auto-collect sources
-    file(GLOB_RECURSE SOURCES
-        "src/*.cpp" "src/*.c" "src/*.cxx" "src/*.cc"
-        "src/*.h" "src/*.hpp" "src/*.hxx"
-    )
-
-    create_executable(${TARGET_NAME} "${SOURCES}" ${ARGN})
+function(auto_create_executable TARGET)
+    file(GLOB_RECURSE SOURCES src/*.cpp src/*.c src/*.cxx src/*.cc src/*.h src/*.hpp src/*.hxx)
+    create_executable(${TARGET} "${SOURCES}" ${ARGN})
 endfunction()

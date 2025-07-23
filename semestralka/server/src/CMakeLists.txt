@@ -1,14 +1,9 @@
-# Include the library template
-include(${CMAKE_SOURCE_DIR}/cmake/LibraryTemplate.cmake)
-
 # Handle external dependencies first
 set(EXPECTED_BUILD_TESTS OFF)
 set(EXPECTED_BUILD_PACKAGE OFF)
 
 # Add external dependencies
 file(GLOB_RECURSE EXTERNAL_CMAKE_FILES ./external/*/CMakeLists.txt)
-
-# Sort by depth (shallowest first) and process unique directories
 set(PROCESSED_DIRS "")
 foreach(CMAKE_FILE ${EXTERNAL_CMAKE_FILES})
     get_filename_component(DIR ${CMAKE_FILE} DIRECTORY)
@@ -35,13 +30,9 @@ foreach(CMAKE_FILE ${EXTERNAL_CMAKE_FILES})
     endif()
 endforeach()
 
-# Find system packages (add as needed)
-# find_package(fmt QUIET)
-
 # Auto-discover and build all library subdirectories
 file(GLOB LIB_DIRS LIST_DIRECTORIES TRUE ./*)
 foreach(DIR ${LIB_DIRS})
-    # Skip external directory and non-directories
     get_filename_component(DIR_NAME ${DIR} NAME)
     if(IS_DIRECTORY ${DIR} AND EXISTS ${DIR}/CMakeLists.txt AND NOT DIR_NAME STREQUAL "external")
         add_subdirectory(${DIR})
@@ -49,7 +40,6 @@ foreach(DIR ${LIB_DIRS})
 endforeach()
 
 # Export all created libraries for use by executables
-# This creates a list of all libraries that were built
 get_directory_property(ALL_TARGETS BUILDSYSTEM_TARGETS)
 set(PROJECT_LIBRARIES "")
 foreach(TARGET ${ALL_TARGETS})

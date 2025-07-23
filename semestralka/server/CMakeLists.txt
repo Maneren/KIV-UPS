@@ -10,6 +10,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
+include(cmake/ExecutableTemplate.cmake)
+include(cmake/LibraryTemplate.cmake)
+
 add_subdirectory(src)
 add_subdirectory(apps)
 
