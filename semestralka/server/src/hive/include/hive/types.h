@@ -116,10 +116,10 @@ template <> struct std::formatter<hive::Move> {
   static auto format(auto &obj, std::format_context &ctx) {
     if (obj.from != obj.to) {
       return std::format_to(
-          ctx.out(), "{}: {} -> {}", obj.piece, obj.from, obj.to
+          ctx.out(), "{}: {} -> {}", obj.piece_kind, obj.from, obj.to
       );
     }
 
-    return std::format_to(ctx.out(), "{}: {}", obj.piece, obj.to);
+    return std::format_to(ctx.out(), "{}: {}", obj.piece_kind, obj.to);
   }
 };
