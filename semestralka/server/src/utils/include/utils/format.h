@@ -66,3 +66,18 @@ struct std::formatter<std::unordered_map<T, U>> {
     return std::format_to(ctx.out(), "}}");
   }
 };
+
+template <typename T>
+  requires(std::semiregular<std::formatter<T>>)
+struct std::formatter<std::optional<T>> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  static auto format(auto &obj, std::format_context &ctx) {
+    if (obj.has_value()) {
+      return std::format_to(ctx.out(), "{}", obj.value());
+    }
+    return std::format_to(ctx.out(), "nullopt");
+  }
+};
