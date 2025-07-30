@@ -1,16 +1,18 @@
-#include "board_renderer.h"
 #include "game_state.h"
 #include "gui_state.h"
 #include "input_handler.h"
+#include "renderer.h"
 #include <Color.hpp>
 #include <Window.hpp>
 #include <hive/board.h>
+
+#define RAYGUI_IMPLEMENTATION
+#include <raygui.h>
 
 using namespace hive;
 
 int main() {
   GameState game = GameState::create_default();
-  HiveGuiState gui;
   // Initial board setup
   game.board.apply_move(
       make_placement({.p = 0, .q = 0}, PieceKind::Queen), Player::Black
@@ -30,16 +32,20 @@ int main() {
   };
   window.SetTargetFPS(60);
 
-  gui.window_size = raylib::Vector2{800, 600};
+  HiveGuiState gui;
+  gui.resize(raylib::Window::GetSize());
 
   while (!raylib::Window::ShouldClose()) {
+    if (raylib::Window::IsResized()) {
+      gui.resize(raylib::Window::GetSize());
+    }
+
     window.BeginDrawing();
     window.ClearBackground(raylib::Color::RayWhite());
 
-    BoardRenderer::draw(game, gui);
-    BoardRenderer::draw_available(game, gui);
-
     handle_input(game, gui);
+
+    renderer::draw(game, gui);
 
     window.EndDrawing();
   }
