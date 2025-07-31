@@ -8,7 +8,7 @@
  * Requires C++20 for std::format and std::format_to.
  */
 
-#ifdef __cpp_lib_print // C++ >= 23
+#if __cplusplus >= 202211L // C++ >= 23
 
 #include <print>
 

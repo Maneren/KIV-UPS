@@ -3,7 +3,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/CommonUtils.cmake)
 function(create_library TARGET SOURCES HEADERS)
     cmake_parse_arguments(LIB
         "STATIC;SHARED;HEADER_ONLY"
-        "VERSION;NAMESPACE"
+        "VERSION;NAMESPACE;CXX_STD"
         "PRIVATE_DEPS;PUBLIC_DEPS;INTERFACE_DEPS;COMPILE_DEFS;INCLUDE_DIRS"
         ${ARGN}
     )
@@ -52,6 +52,10 @@ function(create_library TARGET SOURCES HEADERS)
 
     if(LIB_SHARED)
         set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
+
+    if(LIB_CXX_STD)
+        target_compile_features(${TARGET} ${VISIBILITY} cxx_std_${LIB_CXX_STD})
     endif()
 endfunction()
 

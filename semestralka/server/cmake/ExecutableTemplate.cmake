@@ -3,7 +3,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/CommonUtils.cmake)
 function(create_executable TARGET SOURCES)
     cmake_parse_arguments(EXE
         "CONSOLE;GUI;TEST"
-        "VERSION;OUTPUT_NAME"
+        "VERSION;OUTPUT_NAME;CXX_STD"
         "PRIVATE_DEPS;COMPILE_DEFS;INCLUDE_DIRS"
         ${ARGN}
     )
@@ -22,6 +22,12 @@ function(create_executable TARGET SOURCES)
     set_compiler_and_linker_flags(${TARGET} ${EXE_TEST})
     target_compile_definitions(${TARGET} PRIVATE "${EXE_COMPILE_DEFS}")
     link_dependencies(${TARGET} PRIVATE "${EXE_PRIVATE_DEPS}")
+
+    if(EXE_CXX_STD)
+        target_compile_features(${TARGET} PUBLIC cxx_std_${EXE_CXX_STD})
+    else()
+        target_compile_features(${TARGET} PUBLIC cxx_std_20)
+    endif()
 
     if(EXE_TEST)
         set_output_directories(${TARGET} TEST)
