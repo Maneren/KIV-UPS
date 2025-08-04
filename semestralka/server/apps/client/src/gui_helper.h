@@ -1,3 +1,5 @@
+#pragma once
+
 #include "gui_state.h"
 #include <Vector2.hpp>
 #include <hive/types.h>
