@@ -12,4 +12,3 @@ constexpr float HEX_ANGLE_STEP = 60.0F * (std::numbers::pi_v<float> / 180.0F);
 constexpr int HEX_SIDES = 6;
 
 constexpr int TEXT_FONT_SIZE = 32;
-constexpr int TEXT_FONT_SPACING = 5;

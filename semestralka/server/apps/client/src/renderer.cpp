@@ -1,20 +1,21 @@
 #include "renderer.h"
 #include "consts.h"
 #include "gui_helper.h"
+#include "rayutils/text.h"
 #include <Functions.hpp>
 #include <Rectangle.hpp>
+#include <Text.hpp>
 #include <map>
 #include <raygui.h>
 #include <raylib-cpp.hpp>
+#include <rayutils/format.h>
 #include <utils/print.h>
 
 constexpr float OUTLINE_THICKNESS = 2.0F;
 constexpr float OUTLINE_THICKNESS_SPECIAL = 3.0F;
-constexpr float TEXT_OFFSET = 10.F;
 constexpr float AVAILABLE_Y_OFFSET = 20.F;
 constexpr float AVAILABLE_X_OFFSET = 20.F;
-constexpr float AVAILABLE_LINE_HEIGHT = 20.F;
-constexpr float AVAILABLE_TEXT_FONT_SIZE = 16.F;
+constexpr float AVAILABLE_TEXT_FONT_SIZE = 24.F;
 
 namespace {
 
@@ -63,8 +64,67 @@ void draw_turn_label(const GameState &game, const HiveGuiState &gui) {
   constexpr float label_y = 10.F;
 
   GuiLabel(
-      Rectangle{label_x, label_y, label_width, label_height}, turnText.data()
+      raylib::Rectangle{label_x, label_y, label_width, label_height},
+      turnText.c_str()
   );
+}
+
+void draw_tiles(const GameState &game, const HiveGuiState &gui_state) {
+  for (const auto &[ptr, piece] : game.board.pieces()) {
+    const raylib::Vector2 pos = gui::hex_to_pixel(gui_state, ptr);
+
+    // Draw hexagon
+    const auto tile_color = PIECE_COLORS.at(piece.kind);
+    pos.DrawPoly(HEX_SIDES, HEX_SIZE, 0, tile_color);
+
+    const auto text_color = piece.owner == hive::Player::White
+                                ? raylib::Color::White()
+                                : raylib::Color::Black();
+
+    const raylib::Text letter =
+        rayutils::text(gui::piece_letter(piece), TEXT_FONT_SIZE, text_color);
+
+    const auto letter_dimensions = letter.MeasureEx();
+    letter.Draw(pos - letter_dimensions / 2.F);
+
+    draw_hex_outline(pos, raylib::Color::DarkGray());
+  }
+
+  // Highlight valid moves
+  if (gui_state.valid_moves()) {
+    for (const auto &move : *gui_state.valid_moves()) {
+      const auto pos = gui::hex_to_pixel(gui_state, move.to);
+      draw_hex_outline(pos, raylib::Color::Green(), OUTLINE_THICKNESS_SPECIAL);
+    }
+  }
+
+  // Highlight selected tile
+  if (gui_state.selected_tile()) {
+    draw_hex_outline(
+        gui::hex_to_pixel(gui_state, *gui_state.selected_tile()),
+        raylib::Color::Black(),
+        OUTLINE_THICKNESS_SPECIAL
+    );
+  }
+}
+
+void draw_available(const GameState &game) {
+  const auto &available =
+      game.board.get_player_pieces().at(game.current_player);
+
+  auto text = rayutils::empty_text(
+      AVAILABLE_TEXT_FONT_SIZE, raylib::Color::DarkGray(), font
+  );
+
+  for (const auto [piece_kind, count] : available) {
+    if (!text.text.empty()) {
+      text.text += '\n';
+    }
+
+    text.text += std::format("{}: {}", gui::kind_letter(piece_kind), count);
+  }
+
+  text.Draw(AVAILABLE_X_OFFSET, AVAILABLE_Y_OFFSET);
 }
 
 } // namespace
@@ -76,62 +136,9 @@ void draw(const GameState &game, const HiveGuiState &gui_state) {
 
   draw_turn_label(game, gui_state);
 
-  for (const auto &[ptr, piece] : game.board.pieces()) {
-    const raylib::Vector2 pos = gui::hex_to_pixel(gui_state, ptr);
+  draw_tiles(game, gui_state);
 
-    // Draw hexagon
-    const auto tile_color = PIECE_COLORS.at(piece.kind);
-    pos.DrawPoly(HEX_SIDES, HEX_SIZE, 0, tile_color);
-
-    const std::string letter = gui::piece_letter(piece);
-    const raylib::Vector2 textPos(pos.x - TEXT_OFFSET, pos.y - TEXT_OFFSET);
-    const auto text_color = piece.owner == hive::Player::White
-                                ? raylib::Color::White()
-                                : raylib::Color::Black();
-    font.DrawText(
-        letter, textPos, TEXT_FONT_SIZE, TEXT_FONT_SPACING, text_color
-    );
-
-    draw_hex_outline(pos, raylib::Color::DarkGray());
-  }
-
-  if (gui_state.valid_moves()) {
-    for (const auto &move : *gui_state.valid_moves()) {
-      const auto pos = gui::hex_to_pixel(gui_state, move.to);
-      draw_hex_outline(pos, raylib::Color::Green(), OUTLINE_THICKNESS_SPECIAL);
-    }
-  }
-
-  if (gui_state.selected_tile()) {
-    draw_hex_outline(
-        gui::hex_to_pixel(gui_state, *gui_state.selected_tile()),
-        raylib::Color::Black(),
-        OUTLINE_THICKNESS_SPECIAL
-    );
-  }
-
-  const auto &available =
-      game.board.get_player_pieces().at(game.current_player);
-
-  const raylib::Color textColor(
-      game.current_player == hive::Player::White ? raylib::Color::RayWhite()
-                                                 : raylib::Color::DarkGray()
-  );
-
-  for (auto i = 0U; const auto [piece_kind, count] : available) {
-    const std::string txt =
-        std::format("{}: {}", gui::kind_letter(piece_kind), count);
-
-    font.DrawText(
-        txt,
-        {AVAILABLE_X_OFFSET,
-         AVAILABLE_Y_OFFSET +
-             (static_cast<float>(i++) * AVAILABLE_LINE_HEIGHT)},
-        AVAILABLE_TEXT_FONT_SIZE,
-        TEXT_FONT_SPACING,
-        textColor
-    );
-  }
+  draw_available(game);
 }
 
 } // namespace renderer
