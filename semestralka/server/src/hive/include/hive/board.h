@@ -60,9 +60,6 @@ public:
   [[nodiscard]] bool has_placed(Player player) const;
   [[nodiscard]] bool has_placed_queen(Player player) const;
 
-  [[nodiscard]] static Board from_fen_string(std::string_view fen);
-  [[nodiscard]] std::string to_fen_string() const;
-
   [[nodiscard]] std::generator<std::pair<TilePointer, Piece>> pieces() const;
 
   [[nodiscard]] std::generator<std::pair<TilePointer, Piece>>

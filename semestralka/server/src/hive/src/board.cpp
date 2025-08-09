@@ -10,76 +10,6 @@
 
 namespace hive {
 
-Board Board::from_fen_string(std::string_view fen) {
-  Board board{};
-
-  // auto lines = std::views::split(fen, '/');
-  //
-  // size_t row_index = 0;
-  //
-  // for (const auto line : lines) {
-  //   if (row_index >= BOARD_SIZE) {
-  //     throw std::invalid_argument("Invalid FEN string");
-  //   }
-  //
-  //   std::string_view row_str(line.begin(), line.end());
-  //   size_t col_index = 0;
-  //
-  //   for (const char c : row_str) {
-  //     if (col_index >= BOARD_SIZE) {
-  //       throw std::invalid_argument("Row too long in FEN string");
-  //     }
-  //
-  //     if (std::isdigit(c) != 0) {
-  //       // Skip empty cells (they're already initialized to EMPTY)
-  //       col_index += c - '0';
-  //     } else if (c == 'X' || c == 'x') {
-  //       board.set(col_index, row_index, CellState::X);
-  //       col_index++;
-  //     } else if (c == 'O' || c == 'o') {
-  //       board.set(col_index, row_index, CellState::O);
-  //       col_index++;
-  //     } else {
-  //       throw std::invalid_argument("Invalid character in FEN string");
-  //     }
-  //   }
-  //
-  //   row_index++;
-  // }
-
-  return board;
-}
-
-std::string Board::to_fen_string() const {
-  std::string result;
-
-  // for (size_t row = 0; row < BOARD_SIZE; row++) {
-  //   size_t empty_cells = 0;
-  //
-  //   for (size_t col = 0; col < BOARD_SIZE; col++) {
-  //     if (get(col, row) == CellState::EMPTY) {
-  //       empty_cells++;
-  //       continue;
-  //     }
-  //
-  //     if (empty_cells > 0) {
-  //       result += std::to_string(empty_cells);
-  //       empty_cells = 0;
-  //     }
-  //
-  //     result += get(col, row) == CellState::X ? 'x' : 'o';
-  //   }
-  //
-  //   result += '/';
-  // }
-  //
-  // while (result.back() == '/') {
-  //   result.pop_back();
-  // }
-
-  return result;
-}
-
 namespace {
 std::generator<TilePointer> neighboring_cells(TilePointer ptr) {
   for (const auto &[p, q] : DIRECTIONS) {
@@ -89,17 +19,17 @@ std::generator<TilePointer> neighboring_cells(TilePointer ptr) {
 } // namespace
 
 std::generator<TilePointer> Board::empty_neighbors(TilePointer ptr) const {
-  for (const auto ptr : neighboring_cells(ptr)) {
-    if (is_empty(ptr)) {
-      co_yield ptr;
+  for (const auto neighbor : neighboring_cells(ptr)) {
+    if (is_empty(neighbor)) {
+      co_yield neighbor;
     }
   }
 }
 
 std::generator<TilePointer> Board::neighbors(TilePointer ptr) const {
-  for (const auto ptr : neighboring_cells(ptr)) {
-    if (!is_empty(ptr)) {
-      co_yield ptr;
+  for (const auto neighbor : neighboring_cells(ptr)) {
+    if (!is_empty(neighbor)) {
+      co_yield neighbor;
     }
   }
 }
