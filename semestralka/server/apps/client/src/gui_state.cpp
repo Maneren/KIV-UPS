@@ -5,8 +5,6 @@ void HiveGuiState::select_tile(hive::TilePointer tile) {
   _selected_tile = std::make_optional(tile);
 }
 
-void HiveGuiState::unselect_tile() { _selected_tile = std::nullopt; }
-
 void HiveGuiState::clear_selection() {
   _selected_tile = std::nullopt;
   _valid_moves = std::nullopt;

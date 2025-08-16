@@ -23,7 +23,6 @@ struct HiveGuiState {
   void select_kind(hive::PieceKind kind) { _selected_kind = kind; }
 
   void select_tile(hive::TilePointer tile);
-  void unselect_tile();
 
   void clear_selection();
   void update_valid_moves(
