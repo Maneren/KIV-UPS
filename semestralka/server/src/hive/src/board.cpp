@@ -133,7 +133,8 @@ std::unordered_set<TilePointer> Board::tiles_around_hive() const {
 }
 
 bool Board::can_player_place_at(Player player, TilePointer ptr) const {
-  return is_empty(ptr) && neighbors_only_players(ptr, player);
+  return is_empty(ptr) &&
+         (!has_placed(player) || neighbors_only_players(ptr, player));
 }
 
 std::generator<TilePointer> Board::valid_placements(Player player) const {
@@ -166,15 +167,6 @@ std::generator<Move> Board::moves_for_piece(TilePointer pos, Piece piece) {
 
 std::generator<Move>
 Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
-  if (data.empty()) {
-    co_yield {
-        .from = {.p = 0, .q = 0},
-        .to = {.p = 0, .q = 0},
-        .piece_kind = PieceKind::Queen,
-    };
-    co_return;
-  }
-
   for (const auto placement_ptr : valid_placements(player)) {
     for (const auto [piece_kind, count] : pieces) {
       if (count == 0) {
@@ -187,9 +179,11 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
     }
   }
 
-  for (const auto [pos, piece] : moveable_pieces_for(player)) {
-    for (const auto piece_move : moves_for_piece(pos, piece)) {
-      co_yield piece_move;
+  if (has_placed_queen(player)) {
+    for (const auto [pos, piece] : moveable_pieces_for(player)) {
+      for (const auto piece_move : moves_for_piece(pos, piece)) {
+        co_yield piece_move;
+      }
     }
   }
 }
@@ -234,6 +228,10 @@ Piece Board::remove_piece(TilePointer ptr) {
 }
 
 bool Board::moving_breaks_hive(TilePointer ptr) {
+  if (data.size() <= 2) {
+    return true;
+  }
+
   const auto &tile = get(ptr);
 
   if (tile.size() > 1) {
@@ -274,7 +272,7 @@ bool Board::moving_breaks_hive(TilePointer ptr) {
 std::generator<std::pair<TilePointer, Piece>>
 Board::moveable_pieces_for(Player player) {
   for (const auto [pos, piece] : players_tiles(player)) {
-    if (moving_breaks_hive(pos)) {
+    if (can_player_move(player, pos)) {
       continue;
     }
 
@@ -332,9 +330,10 @@ bool Board::has_neighbor_in_direction(
 }
 
 bool Board::has_neighbor(TilePointer cell) const {
-  return std::ranges::any_of(neighboring_cells(cell), [this](TilePointer ptr) {
-    return !is_empty(ptr);
-  });
+  return data.size() == 2 ||
+         std::ranges::any_of(neighboring_cells(cell), [this](TilePointer ptr) {
+           return !is_empty(ptr);
+         });
 }
 
 std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) {
@@ -462,5 +461,13 @@ const PlayerPiecesMap Board::DEFAULT_PLAYER_PIECES = {
 bool Board::can_player_place(Player player, PieceKind kind) const {
   return player_pieces.at(player).at(kind) > 0;
 };
+
+bool Board::has_placed_queen(Player player) const {
+  return player_pieces.at(player).at(PieceKind::Queen) == 0;
+}
+
+bool Board::has_placed(Player player) const {
+  return player_pieces.at(player) != DEFAULT_PLAYER_PIECES;
+}
 
 } // namespace hive

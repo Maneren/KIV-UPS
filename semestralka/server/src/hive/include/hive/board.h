@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <hive/types.h>
 #include <stdexcept>
 #include <string>
@@ -58,6 +57,9 @@ public:
     return it == data.end() || it->second.empty();
   }
 
+  [[nodiscard]] bool has_placed(Player player) const;
+  [[nodiscard]] bool has_placed_queen(Player player) const;
+
   [[nodiscard]] static Board from_fen_string(std::string_view fen);
   [[nodiscard]] std::string to_fen_string() const;
 
@@ -88,6 +90,11 @@ public:
   neighbors_only_players(TilePointer ptr, Player player) const;
 
   [[nodiscard]] std::unordered_set<TilePointer> tiles_around_hive() const;
+
+  bool can_player_move(Player player, TilePointer ptr) {
+    return !is_empty(ptr) && has_placed_queen(player) &&
+           get_top(ptr).owner == player && !moving_breaks_hive(ptr);
+  }
 
   bool can_player_place(Player player, PieceKind kind) const;
 
