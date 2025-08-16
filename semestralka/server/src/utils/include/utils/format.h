@@ -83,3 +83,11 @@ struct std::formatter<std::optional<T>> : static_formatter<std::optional<T>> {
     return std::format_to(ctx.out(), "nullopt");
   }
 };
+
+template <typename T>
+  requires(formattable<T>)
+struct std::formatter<std::pair<T, T>> : static_formatter<std::pair<T, T>> {
+  static auto format(auto &obj, std::format_context &ctx) {
+    return std::format_to(ctx.out(), "({}, {})", obj.first, obj.second);
+  }
+};
