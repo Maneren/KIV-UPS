@@ -12,25 +12,18 @@
 using namespace hive;
 
 int main() {
-  GameState game = GameState::create_default();
-  // Initial board setup
-  game.board.apply_move(
-      make_placement({.p = 0, .q = 0}, PieceKind::Queen), Player::Black
-  );
-  game.board.apply_move(
-      make_placement({.p = 1, .q = 0}, PieceKind::Queen), Player::White
-  );
-  game.board.apply_move(
-      make_placement({.p = 0, .q = 1}, PieceKind::Spider), Player::Black
-  );
-  game.board.apply_move(
-      make_placement({.p = 1, .q = 1}, PieceKind::Ant), Player::White
-  );
+  constexpr int DEFAUTL_WINDOW_WIDTH = 800;
+  constexpr int DEFAULT_WINDOW_HEIGHT = 600;
+  constexpr int TARGET_FPS = 60;
 
+  auto game = GameState::create_default();
   raylib::Window window{
-      800, 600, "Hive Game - Raylib Client", FLAG_MSAA_4X_HINT
+      DEFAUTL_WINDOW_WIDTH,
+      DEFAULT_WINDOW_HEIGHT,
+      "Hive Game - Raylib Client",
+      FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE
   };
-  window.SetTargetFPS(60);
+  window.SetTargetFPS(TARGET_FPS);
 
   HiveGuiState gui;
   gui.resize(raylib::Window::GetSize());
