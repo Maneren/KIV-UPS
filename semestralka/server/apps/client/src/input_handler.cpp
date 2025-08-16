@@ -3,7 +3,6 @@
 #include "gui_helper.h"
 #include <Mouse.hpp>
 #include <raygui.h>
-#include <raylib.h>
 
 namespace {
 
@@ -18,7 +17,7 @@ std::generator<hive::TilePointer> clicable_tiles(const GameState &game) {
 
 bool handle_kind_selection(GameState &game, HiveGuiState &gui_state) {
   const auto &available =
-      game.board.get_player_pieces().at(game.current_player);
+      game.board.get_player_pieces().at(game.current_player());
 
   // --- Build filtered list of available pieces for dropdown ---
   std::vector<hive::PieceKind> availableKinds;
@@ -32,32 +31,43 @@ bool handle_kind_selection(GameState &game, HiveGuiState &gui_state) {
         availableString += ';';
       }
       availableKinds.push_back(piece_kind);
-      availableString +=
-          gui::piece_letter({.kind = piece_kind, .owner = game.current_player});
+      availableString += gui::piece_letter(
+          {.kind = piece_kind, .owner = game.current_player()}
+      );
     }
   }
 
   const Rectangle kind_selection_box = {20, 200, 100, TEXT_FONT_SIZE + 8};
 
   if (!availableKinds.empty()) {
-    static int dropdownIdx = 0;
+    static std::unordered_map<hive::Player, int> dropdownIdxs{
+        {hive::Player::White, 0}, {hive::Player::Black, 0}
+    };
     static bool dropdownActive = false;
 
-    const auto clicked = GuiDropdownBox(
-                             kind_selection_box,
-                             availableString.c_str(),
-                             &dropdownIdx,
-                             dropdownActive
-                         ) != 0;
+    auto &dropdownIdx = dropdownIdxs.at(game.current_player());
+
+    if (dropdownIdx >= static_cast<int>(availableKinds.size())) {
+      dropdownIdx = 0;
+      gui_state.select_kind(availableKinds.front());
+    }
+
+    const auto dropdown = GuiDropdownBox(
+        kind_selection_box,
+        availableString.c_str(),
+        &dropdownIdx,
+        dropdownActive
+    );
 
     gui_state.select_kind(availableKinds[dropdownIdx]);
 
-    if (clicked) {
+    if (dropdown != 0) {
       dropdownActive = !dropdownActive;
+      gui_state.select_kind(availableKinds[dropdownIdx]);
       return true;
     }
-  } else {
-    GuiLabel(kind_selection_box, "No available pieces");
+
+    return dropdownActive;
   }
 
   return false;
@@ -80,6 +90,16 @@ void handle_input(GameState &game, HiveGuiState &gui_state) {
     return;
   }
 
+  if (game.board.is_empty()) {
+    const auto kind = gui_state.selected_kind();
+
+    const hive::TilePointer ptr{.p = 0, .q = 0};
+
+    game.place_piece(ptr, kind);
+
+    return;
+  }
+
   std::optional<hive::TilePointer> clicked;
 
   for (const auto ptr : clicable_tiles(game)) {
@@ -96,6 +116,11 @@ void handle_input(GameState &game, HiveGuiState &gui_state) {
   const auto ptr = *clicked;
 
   if (gui_state.valid_moves()) {
+    if (gui_state.selected_tile() == ptr) {
+      gui_state.clear_selection();
+      return;
+    }
+
     const auto move =
         std::ranges::find_if(*gui_state.valid_moves(), [ptr](auto move) {
           return move.to == ptr;
@@ -120,8 +145,7 @@ void handle_input(GameState &game, HiveGuiState &gui_state) {
 
   const auto piece = game.board.get(ptr).back();
 
-  if (piece.owner == game.current_player &&
-      !game.board.moving_breaks_hive(ptr)) {
+  if (game.board.can_player_move(game.current_player(), ptr)) {
     gui_state.update_valid_moves(game.board, ptr, piece);
     return;
   }
