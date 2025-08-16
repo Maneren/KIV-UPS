@@ -53,7 +53,7 @@ const std::map<hive::PieceKind, raylib::Color> PIECE_COLORS = {
 };
 
 void draw_turn_label(const GameState &game, const HiveGuiState &gui) {
-  const std::string turnText = game.current_player == hive::Player::White
+  const std::string turnText = game.current_player() == hive::Player::White
                                    ? "White's turn"
                                    : "Black's turn";
   const auto label_width =
@@ -110,7 +110,7 @@ void draw_tiles(const GameState &game, const HiveGuiState &gui_state) {
 
 void draw_available(const GameState &game) {
   const auto &available =
-      game.board.get_player_pieces().at(game.current_player);
+      game.board.get_player_pieces().at(game.current_player());
 
   auto text = rayutils::empty_text(
       AVAILABLE_TEXT_FONT_SIZE, raylib::Color::DarkGray(), font
