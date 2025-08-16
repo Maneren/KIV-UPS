@@ -1,18 +1,30 @@
 #pragma once
 
-#include <concepts>
 #include <format>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
+namespace {
+
 template <typename T>
-  requires(std::semiregular<std::formatter<T>>)
-struct std::formatter<std::vector<T>> {
+concept formattable = std::semiregular<std::formatter<T>>;
+
+template <typename... Args>
+concept all_formattable = (formattable<Args> && ...);
+
+// base formatter template that handles the parse boilerplate
+template <typename t> struct static_formatter {
   static constexpr auto parse(std::format_parse_context &ctx) {
     return ctx.begin();
   }
+};
 
+} // namespace
+
+template <typename T, typename A>
+  requires(formattable<T>)
+struct std::formatter<std::vector<T, A>> : static_formatter<std::vector<T, A>> {
   static auto format(auto &obj, std::format_context &ctx) {
     std::format_to(ctx.out(), "[");
     for (const auto &item : obj) {
@@ -25,13 +37,10 @@ struct std::formatter<std::vector<T>> {
   }
 };
 
-template <typename T>
-  requires(std::semiregular<std::formatter<T>>)
-struct std::formatter<std::unordered_set<T>> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
+template <typename T, typename H, typename P, typename A>
+  requires(formattable<T>)
+struct std::formatter<std::unordered_set<T, H, P, A>>
+    : static_formatter<std::unordered_set<T, H, P, A>> {
   static auto format(auto &obj, std::format_context &ctx) {
     std::format_to(ctx.out(), "{{");
     bool first = true;
@@ -46,15 +55,10 @@ struct std::formatter<std::unordered_set<T>> {
   }
 };
 
-template <typename T, typename U>
-  requires(
-      std::semiregular<std::formatter<T>> && std::semiregular<std::formatter<U>>
-  )
-struct std::formatter<std::unordered_map<T, U>> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
+template <typename T, typename U, typename H, typename P, typename A>
+  requires(all_formattable<T, U>)
+struct std::formatter<std::unordered_map<T, U, H, P, A>>
+    : static_formatter<std::unordered_map<T, U, H, P, A>> {
   static auto format(auto &obj, std::format_context &ctx) {
     std::format_to(ctx.out(), "{{");
     bool first = true;
@@ -70,12 +74,8 @@ struct std::formatter<std::unordered_map<T, U>> {
 };
 
 template <typename T>
-  requires(std::semiregular<std::formatter<T>>)
-struct std::formatter<std::optional<T>> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
+  requires(formattable<T>)
+struct std::formatter<std::optional<T>> : static_formatter<std::optional<T>> {
   static auto format(auto &obj, std::format_context &ctx) {
     if (obj.has_value()) {
       return std::format_to(ctx.out(), "{}", obj.value());
