@@ -5,6 +5,7 @@
 #include <Functions.hpp>
 #include <Rectangle.hpp>
 #include <Text.hpp>
+#include <cmath>
 #include <map>
 #include <raygui.h>
 #include <raylib-cpp.hpp>
@@ -24,7 +25,8 @@ const raylib::Font font;
 void draw_hex_outline(
     const raylib::Vector2 &center,
     const raylib::Color &color,
-    float thickness = OUTLINE_THICKNESS
+    float thickness,
+    float size = HEX_SIZE
 ) {
   for (int i = 0; i < HEX_SIDES; ++i) {
     const float start_angle = static_cast<float>(i) * HEX_ANGLE_STEP;
@@ -32,12 +34,11 @@ void draw_hex_outline(
         static_cast<float>((i + 1) % HEX_SIDES) * HEX_ANGLE_STEP;
 
     const raylib::Vector2 start{
-        center.x + (HEX_SIZE * cosf(start_angle)),
-        center.y + (HEX_SIZE * sinf(start_angle))
+        center.x + (size * cosf(start_angle)),
+        center.y + (size * sinf(start_angle))
     };
     const raylib::Vector2 end{
-        center.x + (HEX_SIZE * cosf(end_angle)),
-        center.y + (HEX_SIZE * sinf(end_angle))
+        center.x + (size * cosf(end_angle)), center.y + (size * sinf(end_angle))
     };
 
     DrawLineEx(start, end, thickness, color);
@@ -73,21 +74,28 @@ void draw_tiles(const GameState &game, const HiveGuiState &gui_state) {
   for (const auto &[ptr, piece] : game.board.pieces()) {
     const raylib::Vector2 pos = gui::hex_to_pixel(gui_state, ptr);
 
-    // Draw hexagon
-    const auto tile_color = PIECE_COLORS.at(piece.kind);
-    pos.DrawPoly(HEX_SIDES, HEX_SIZE, 0, tile_color);
+    size_t i = 0;
 
-    const auto text_color = piece.owner == hive::Player::White
-                                ? raylib::Color::White()
-                                : raylib::Color::Black();
+    for (const auto &piece : game.board.get(ptr)) {
+      // Draw hexagon
+      const auto tile_color = PIECE_COLORS.at(piece.kind);
 
-    const raylib::Text letter =
-        rayutils::text(gui::piece_letter(piece), TEXT_FONT_SIZE, text_color);
+      const auto size = HEX_SIZE * static_cast<float>(std::pow(0.85F, i++));
 
-    const auto letter_dimensions = letter.MeasureEx();
-    letter.Draw(pos - letter_dimensions / 2.F);
+      pos.DrawPoly(HEX_SIDES, size, 0, tile_color);
 
-    draw_hex_outline(pos, raylib::Color::DarkGray());
+      const auto text_color = piece.owner == hive::Player::White
+                                  ? raylib::Color::White()
+                                  : raylib::Color::Black();
+
+      const raylib::Text letter =
+          rayutils::text(gui::piece_letter(piece), TEXT_FONT_SIZE, text_color);
+
+      const auto letter_dimensions = letter.MeasureEx();
+      letter.Draw(pos - letter_dimensions / 2.F);
+
+      draw_hex_outline(pos, raylib::Color::DarkGray(), OUTLINE_THICKNESS, size);
+    }
   }
 
   // Highlight valid moves
