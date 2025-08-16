@@ -1,0 +1,4 @@
+leak:libGL.so
+leak:libglapi.so
+leak:_glfwInitGLX
+leak:extensionSupportedGLX

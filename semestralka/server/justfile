@@ -3,6 +3,7 @@ executable := "hive_client"
 export CMAKE_EXPORT_COMPILE_COMMANDS := "1"
 export CTEST_OUTPUT_ON_FAILURE := "1"
 export CTEST_PARALLEL_LEVEL := "0"
+export LSAN_OPTIONS := "suppressions=lsan_suppressions.txt"
 
 [private]
 default:
