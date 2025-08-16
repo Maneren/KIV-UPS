@@ -54,6 +54,23 @@ constexpr std::array<Direction, 6> DIRECTIONS{
 
 } // namespace hive
 
+template <> struct std::formatter<hive::Player> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  static auto format(auto &obj, std::format_context &ctx) {
+    switch (obj) {
+    case hive::Player::White:
+      return std::format_to(ctx.out(), "White");
+    case hive::Player::Black:
+      return std::format_to(ctx.out(), "Black");
+    default:
+      return std::format_to(ctx.out(), "Unknown Player");
+    }
+  }
+};
+
 template <> struct std::formatter<hive::PieceKind> {
   static constexpr auto parse(std::format_parse_context &ctx) {
     return ctx.begin();
