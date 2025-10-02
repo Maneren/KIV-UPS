@@ -20,7 +20,10 @@ constexpr float AVAILABLE_TEXT_FONT_SIZE = 24.F;
 
 namespace {
 
-const raylib::Font font;
+const raylib::Font &get_font() {
+  static const raylib::Font font;
+  return font;
+}
 
 void draw_hex_outline(
     const raylib::Vector2 &center,
@@ -34,11 +37,12 @@ void draw_hex_outline(
         static_cast<float>((i + 1) % HEX_SIDES) * HEX_ANGLE_STEP;
 
     const raylib::Vector2 start{
-        center.x + (size * cosf(start_angle)),
-        center.y + (size * sinf(start_angle))
+        center.x + (size * std::cos(start_angle)),
+        center.y + (size * std::sin(start_angle))
     };
     const raylib::Vector2 end{
-        center.x + (size * cosf(end_angle)), center.y + (size * sinf(end_angle))
+        center.x + (size * std::cos(end_angle)),
+        center.y + (size * std::sin(end_angle))
     };
 
     DrawLineEx(start, end, thickness, color);
@@ -121,7 +125,7 @@ void draw_available(const GameState &game) {
       game.board.get_player_pieces().at(game.current_player());
 
   auto text = rayutils::empty_text(
-      AVAILABLE_TEXT_FONT_SIZE, raylib::Color::DarkGray(), font
+      AVAILABLE_TEXT_FONT_SIZE, raylib::Color::DarkGray(), get_font()
   );
 
   for (const auto [piece_kind, count] : available) {

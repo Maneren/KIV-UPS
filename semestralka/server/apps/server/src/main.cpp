@@ -1,6 +1,5 @@
 #include <iostream>
 #include <net/listener.h>
-#include <ostream>
 #include <sstream>
 #include <threadpool/threadpool.h>
 #include <utils/print.h>

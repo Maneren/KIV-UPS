@@ -12,13 +12,13 @@
 using namespace hive;
 
 int main() {
-  constexpr int DEFAUTL_WINDOW_WIDTH = 800;
+  constexpr int DEFAULT_WINDOW_WIDTH = 800;
   constexpr int DEFAULT_WINDOW_HEIGHT = 600;
   constexpr int TARGET_FPS = 60;
 
   auto game = GameState::create_default();
   raylib::Window window{
-      DEFAUTL_WINDOW_WIDTH,
+      DEFAULT_WINDOW_WIDTH,
       DEFAULT_WINDOW_HEIGHT,
       "Hive Game - Raylib Client",
       FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE
