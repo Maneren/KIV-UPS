@@ -11,12 +11,15 @@ namespace hive {
 enum class Player : std::uint8_t { Black, White };
 enum class PieceKind : std::uint8_t { Queen, Spider, Beetle, Grasshopper, Ant };
 constexpr std::size_t NUMBER_OF_PIECES = 5;
+
 struct Piece {
   PieceKind kind;
   Player owner;
+
+  bool operator==(const Piece &other) const = default;
 };
 
-using Coordinate = int;
+using Coordinate = std::int32_t;
 
 struct TilePointer {
   Coordinate p;
@@ -29,6 +32,8 @@ struct Move {
   TilePointer from;
   TilePointer to;
   PieceKind piece_kind;
+
+  bool operator==(const Move &other) const = default;
 };
 
 inline Move make_move(TilePointer from, TilePointer to, PieceKind piece_kind) {
