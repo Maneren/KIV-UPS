@@ -1,10 +1,10 @@
 #pragma once
 
-#include <net/error.h>
-#include <utils/functional.h>
 #include <chrono>
 #include <net/address.h>
+#include <net/error.h>
 #include <net/file_descriptor.h>
+#include <utils/functional.h>
 #include <utils/print.h>
 
 namespace net {

@@ -1,12 +1,12 @@
-#include <net/error.h>
-#include <utils/functional.h>
 #include <fcntl.h>
 #include <limits>
 #include <net/address.h>
+#include <net/error.h>
 #include <net/socket.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <utils/functional.h>
 
 namespace net {
 

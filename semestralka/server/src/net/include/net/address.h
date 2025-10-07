@@ -1,12 +1,12 @@
 #pragma once
 
-#include <net/error.h>
 #include <arpa/inet.h>
 #include <array>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <format>
+#include <net/error.h>
 #include <netinet/in.h>
 #include <tuple>
 #include <utils/match.h>

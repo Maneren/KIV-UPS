@@ -1,6 +1,5 @@
 #pragma once
 
-#include <utils/match.h>
 #include <cerrno>
 #include <cstring>
 #include <format>
@@ -8,6 +7,7 @@
 #include <string_view>
 #include <tl/expected.hpp>
 #include <utility>
+#include <utils/match.h>
 #include <variant>
 
 namespace net::error {
