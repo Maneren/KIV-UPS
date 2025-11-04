@@ -13,7 +13,7 @@ configure build_system="Ninja Multi-Config": clean
     cmake -B "{{ builddir }}" -G "{{ build_system }}" -DCMAKE_COLOR_DIAGNOSTICS=ON
 
 build config="Debug" target="all":
-    mold -run cmake --build "{{ builddir }}" --config "{{ config }}" --target "{{ target }}"
+    cmake --build "{{ builddir }}" --config "{{ config }}" --target "{{ target }}"
 
 run config="Debug" +args="": (build config)
     '{{ builddir }}/bin/{{ config }}/{{ executable }}' {{ args }}
