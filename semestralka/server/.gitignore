@@ -40,11 +40,15 @@
 **/CMakeScripts
 **/compile_commands.json
 
-include/divisible/*
-
-## Local
+## Local 
 
 .idea/*.xml
 
-build
+build/**/*
+
 /share
+
+include/*
+lib/*
+bin/*
+test/test_runner
