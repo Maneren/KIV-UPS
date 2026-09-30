@@ -12,7 +12,7 @@ Threadpool::Threadpool(size_t thread_count) {
   for (std::size_t i = 0; i < thread_count; ++i) {
     mWorkers.emplace_back([this] {
       while (true) {
-        std::function<void()> task;
+        task_type task;
         {
           std::unique_lock<std::mutex> lock(mMutex);
           mCondition.wait(

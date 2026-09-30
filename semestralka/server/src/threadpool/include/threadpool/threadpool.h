@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <future>
 #include <queue>
@@ -8,6 +9,14 @@
 #include <vector>
 
 namespace threadpool {
+
+template <typename R> class pool_future;
+
+#if __cpp_lib_move_only_function >= 202110L
+using task_type = std::move_only_function<void()>;
+#else
+using task_type = std::function<void()>;
+#endif
 
 /**
  * @class Threadpool
@@ -83,14 +92,33 @@ public:
       typename Functor,
       typename... Args,
       typename Result = std::invoke_result_t<Functor, Args...>>
-  std::future<Result> spawn_with_future(Functor &&f, Args &&...args) {
-    auto task = std::make_shared<std::packaged_task<Result()>>(
-        [f = std::forward<Functor>(f), &args...] {
-          return f(std::forward<Args>(args)...);
-        }
-    );
-    spawn(static_cast<std::function<void()>>([task]() { (*task)(); }));
-    return task->get_future();
+  pool_future<Result> spawn_with_future(Functor &&f, Args &&...args)
+    requires(std::is_invocable_v<Functor, Args...>)
+  {
+    // Helper to package and enqueue a bound callable.
+    auto spawn_packaged = [this](auto &&bound) {
+      std::packaged_task<Result()> task(std::forward<decltype(bound)>(bound));
+      pool_future<Result> fut(task.get_future(), *this);
+      spawn(task_type([task = std::move(task)]() mutable { task(); }));
+      return fut;
+    };
+
+    if constexpr (std::is_lvalue_reference_v<Functor>) {
+      // Referenced task: no copy/move of the functor. Caller must keep
+      // `f` alive until the future is ready.
+      auto bound = [&f,
+                    ... args = std::forward<Args>(args)]() mutable -> Result {
+        return f(std::forward<Args>(args)...);
+      };
+      return spawn_packaged(std::move(bound));
+    } else {
+      // Owned task: move the functor into the queue.
+      auto bound = [f = std::forward<Functor>(f),
+                    ... args = std::forward<Args>(args)]() mutable -> Result {
+        return f(std::forward<Args>(args)...);
+      };
+      return spawn_packaged(std::move(bound));
+    }
   }
 
   /**
@@ -98,7 +126,7 @@ public:
    *
    * @param task A callable object representing the task to execute.
    */
-  void spawn(std::function<void()> &&task) {
+  void spawn(task_type &&task) {
     {
       std::unique_lock<std::mutex> lock(mMutex);
       mTasks.emplace(std::move(task));
@@ -126,7 +154,7 @@ public:
         }
     );
 
-    spawn(static_cast<std::function<void()>>([task]() { (*task)(); }));
+    spawn(static_cast<task_type>([task = std::move(task)]() { (*task)(); }));
   }
 
   /**
@@ -139,10 +167,54 @@ public:
 
 private:
   std::vector<std::jthread> mWorkers;
-  std::queue<std::function<void()>> mTasks;
+  std::queue<task_type> mTasks;
   std::mutex mMutex;
   std::condition_variable mCondition;
   bool mRunning = true;
+
+  template <typename R> friend class pool_future;
+};
+
+/** @brief A helper class to retrieve the result of a future from a thread pool.
+ *
+ * This class wraps a std::future and ensures that calling spawn recursively
+ * will not cause a deadlock. It is used internally by the Threadpool class.
+ *
+ * The `get` method is a blocking call that retrieves the result of the future
+ * while executing tasks from the thread pool in the meantime.
+ *
+ * @tparam R The type of the result to retrieve.
+ */
+template <typename R> class pool_future : public std::future<R> {
+public:
+  pool_future(std::future<R> &&future, Threadpool &pool)
+      : std::future<R>(std::move(future)), mPool(pool) {}
+
+  R get() {
+    // Wait until our shared state is ready, executing queued pool tasks in
+    // the meantime. This lets a task block on a child task it spawned
+    // without deadlocking, even with a single worker thread.
+    while (this->wait_for(std::chrono::seconds(0)) !=
+           std::future_status::ready) {
+      task_type task;
+      {
+        std::unique_lock<std::mutex> lock(mPool.mMutex);
+        if (mPool.mTasks.empty()) {
+          lock.unlock();
+          std::this_thread::yield();
+          continue;
+        }
+
+        task = std::move(mPool.mTasks.front());
+        mPool.mTasks.pop();
+      }
+      task();
+    }
+    return std::future<R>::get();
+  }
+
+private:
+  Threadpool &mPool;
 };
 
 /**

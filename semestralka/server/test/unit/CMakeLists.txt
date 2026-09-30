@@ -10,10 +10,16 @@ create_test_executable(net_tests
     CXX_STD 20
 )
 
+create_test_executable(threadpool_tests
+    SOURCES threadpool/threadpool_tests.cpp
+    DEPENDS threadpool utils
+    CXX_STD 23
+)
+
 create_test_executable(utils_tests
     SOURCES utils/serde_tests.cpp
     DEPENDS utils
     CXX_STD 20
 )
 
-add_dependencies(all_tests hive_tests net_tests utils_tests)
+add_dependencies(all_tests hive_tests net_tests threadpool_tests utils_tests)
