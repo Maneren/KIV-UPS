@@ -235,14 +235,19 @@ template <typename T> struct deserializer<std::vector<T>> {
       return std::nullopt;
     }
 
-    ctx.remove_prefix(1 + static_cast<size_t>(size_result.ptr - ctx.begin()));
+    ctx.remove_prefix(static_cast<size_t>(size_result.ptr - ctx.begin()));
 
-    std::println("ctx: {}", ctx.data());
-
-    std::vector<int> result;
+    std::vector<T> result;
 
     if (size == 0) {
+      if (!ctx.empty()) {
+        return std::nullopt;
+      }
       return result;
+    }
+
+    if (!ctx.assert_prefix(",")) {
+      return std::nullopt;
     }
 
     result.reserve(size);
