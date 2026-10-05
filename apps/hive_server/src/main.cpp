@@ -9,8 +9,9 @@ int main() {
   threadpool::Threadpool pool;
 
   try {
-    const auto address = net::IPv4Address::from_string("0.0.0.0:8080").value();
-    // const auto address = net::IPv6Address::from_string("[::]:8080");
+    const auto address = net::SocketAddr::from_string("0.0.0.0:8080").value();
+    // const auto address =
+    //     net::SocketAddr::from_string("[::]:8080").value();
 
     const auto listener = net::TcpListener::bind(address).value();
 

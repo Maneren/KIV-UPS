@@ -22,9 +22,9 @@ public:
   TcpStream &operator=(const TcpStream &) = delete;
   TcpStream &operator=(TcpStream &&other) noexcept;
 
-  static error::result<TcpStream> connect(const Address &addr);
+  static error::result<TcpStream> connect(const SocketAddr &addr);
   static error::result<TcpStream>
-  connect_timeout(const Address &addr, std::chrono::microseconds timeout);
+  connect_timeout(const SocketAddr &addr, std::chrono::microseconds timeout);
 
   static error::result<TcpStream>
   connect_host(const std::string &host, uint16_t port);
@@ -73,10 +73,10 @@ public:
     });
   }
 
-  [[nodiscard]] error::result<Address> local_addr() const {
+  [[nodiscard]] error::result<SocketAddr> local_addr() const {
     return sock.local_addr();
   }
-  [[nodiscard]] error::result<Address> peer_addr() const {
+  [[nodiscard]] error::result<SocketAddr> peer_addr() const {
     return sock.peer_addr();
   }
   [[nodiscard]] error::result<void> shutdown(Shutdown how) const {

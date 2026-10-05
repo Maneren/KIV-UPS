@@ -1,7 +1,8 @@
 #include <cstring>
 #include <format>
 #include <gtest/gtest.h>
-#include <net/address.h>
+#include <net/ip_addr.h>
+#include <net/socket_addr.h>
 
 class AddressTest : public ::testing::Test {
 
@@ -13,152 +14,163 @@ protected:
 
 namespace net {
 
-namespace {
-template <typename T, typename U>
-constexpr bool
-bytes_equals(T a, const std::array<U, sizeof(T) / sizeof(U)> &b) {
-  for (size_t i = 0; i < sizeof(T); i++) {
-    if (static_cast<U>(a >> (i * 8)) != b[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-} // namespace
-
-const IPv4Address addr4({127, 0, 0, 1}, 80);
+const Ipv4Addr ip4(127, 0, 0, 1);
+const SocketAddrV4 addr4(ip4, 80);
 
 TEST_F(AddressTest, IPv4Str) {
-  const auto addr_str = std::format("{}", addr4);
-  ASSERT_EQ(addr_str, "127.0.0.1:80");
+  ASSERT_EQ(std::format("{}", ip4), "127.0.0.1");
+  ASSERT_EQ(std::format("{}", addr4), "127.0.0.1:80");
+  ASSERT_EQ(std::format("{}", SocketAddr(addr4)), "127.0.0.1:80");
 }
 
 TEST_F(AddressTest, IPv4Equals) {
-  ASSERT_EQ(addr4, addr4);
-  const auto other_addr = IPv4Address({127, 0, 0, 2}, 80);
-  ASSERT_NE(addr4, other_addr);
-  const auto other_port = IPv4Address({127, 0, 0, 1}, 81);
-  ASSERT_NE(addr4, other_port);
+  ASSERT_EQ(ip4, ip4);
+  ASSERT_NE(ip4, Ipv4Addr(127, 0, 0, 2));
+  // Ports live on the socket address, not on the IP.
+  ASSERT_EQ(SocketAddrV4(ip4, 80).ip(), SocketAddrV4(ip4, 81).ip());
+  ASSERT_NE(SocketAddrV4(ip4, 80), SocketAddrV4(ip4, 81));
 }
 
 TEST_F(AddressTest, IPv4FromString) {
-  const auto addr = IPv4Address::from_string("127.0.0.1:80");
-  ASSERT_EQ(addr, addr4);
+  ASSERT_EQ(Ipv4Addr::from_string("127.0.0.1"), ip4);
+  // A port suffix belongs to SocketAddrV4.
+  ASSERT_FALSE(Ipv4Addr::from_string("127.0.0.1:80").has_value());
 }
 
-TEST_F(AddressTest, IPv4Sockaddr) {
+TEST_F(AddressTest, SocketAddrV4Sockaddr) {
   const auto sockaddr = addr4.to_sockaddr();
   ASSERT_EQ(sockaddr.sin_family, AF_INET);
-  ASSERT_EQ(sockaddr.sin_port, htons(addr4.port));
+  ASSERT_EQ(sockaddr.sin_port, htons(80));
   ASSERT_TRUE(sockaddr.sin_addr.s_addr == htonl(0x7F000001));
 }
 
-TEST_F(AddressTest, IPv4FromSockaddr) {
+TEST_F(AddressTest, SocketAddrV4FromSockaddr) {
   const auto sockaddr = addr4.to_sockaddr();
-  const auto addr = IPv4Address::from_sockaddr(
+  const auto addr = SocketAddrV4::from_sockaddr(
       reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
   );
   ASSERT_TRUE(addr.has_value());
   ASSERT_EQ(addr.value(), addr4);
 }
 
-TEST_F(AddressTest, IPv4FromSockaddrWrongFamily) {
+TEST_F(AddressTest, SocketAddrV4FromSockaddrWrongFamily) {
   auto sockaddr = addr4.to_sockaddr();
   sockaddr.sin_family = AF_INET6;
 
-  const auto addr = IPv4Address::from_sockaddr(
+  const auto addr = SocketAddrV4::from_sockaddr(
       reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
   );
 
   ASSERT_FALSE(addr.has_value());
 }
 
-TEST_F(AddressTest, IPv4FromSockaddrWrongLen) {
+TEST_F(AddressTest, SocketAddrV4FromSockaddrWrongLen) {
   auto sockaddr = addr4.to_sockaddr();
 
-  const auto addr = IPv4Address::from_sockaddr(
+  const auto addr = SocketAddrV4::from_sockaddr(
       reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr) - 1
   );
 
   ASSERT_FALSE(addr.has_value());
 }
 
-const IPv6Address addr6({1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1}, 80);
+const Ipv6Addr ip6({1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1});
+const SocketAddrV6 addr6(ip6, 80);
 
 TEST_F(AddressTest, IPv6Str) {
-  const auto addr_str = std::format("{}", addr6);
-  ASSERT_EQ(addr_str, "[102:304:506:708:807:605:403:201]:80");
+  ASSERT_EQ(
+      std::format("{}", SocketAddr(addr6)),
+      "[102:304:506:708:807:605:403:201]:80"
+  );
 }
 
 TEST_F(AddressTest, IPv6FromString) {
-  const auto addr =
-      IPv6Address::from_string("[102:304:506:708:807:605:403:201]:80");
-  ASSERT_EQ(addr, addr6);
+  ASSERT_EQ(Ipv6Addr::from_string("102:304:506:708:807:605:403:201"), ip6);
+  // Bracketed + port form belongs to SocketAddrV6.
+  ASSERT_FALSE(Ipv6Addr::from_string("[::1]:80").has_value());
+  ASSERT_EQ(
+      SocketAddrV6::from_string("[102:304:506:708:807:605:403:201]:80"), addr6
+  );
 }
 
 TEST_F(AddressTest, IPv6Equals) {
-  ASSERT_EQ(addr6, addr6);
-  const auto other_addr = IPv6Address({1, 2, 3, 4, 5, 6, 7, 9}, 80, 0, 0);
-  ASSERT_NE(addr6, other_addr);
-  const auto other_port = IPv6Address({1, 2, 3, 4, 5, 6, 7, 8}, 81, 0, 0);
-  ASSERT_NE(addr6, other_port);
+  ASSERT_EQ(ip6, ip6);
+  ASSERT_NE(ip6, Ipv6Addr(std::array<uint8_t, 16>{1, 2, 3, 4, 5, 6, 7, 9}));
+  ASSERT_EQ(SocketAddrV6(ip6, 80).ip(), SocketAddrV6(ip6, 81).ip());
+  ASSERT_NE(SocketAddrV6(ip6, 80), SocketAddrV6(ip6, 81));
 }
 
-TEST_F(AddressTest, IPv6Sockaddr) {
+TEST_F(AddressTest, SocketAddrV6Sockaddr) {
   const auto sockaddr = addr6.to_sockaddr();
   ASSERT_EQ(sockaddr.sin6_family, AF_INET6);
-  ASSERT_EQ(sockaddr.sin6_port, htons(addr6.port));
+  ASSERT_EQ(sockaddr.sin6_port, htons(80));
 
-  ASSERT_EQ(sizeof(sockaddr.sin6_addr.s6_addr), IPv6Address::BYTES);
-  ASSERT_EQ(sockaddr.sin6_scope_id, addr6.scopeid);
-  ASSERT_EQ(sockaddr.sin6_flowinfo, htonl(addr6.flowinfo));
+  ASSERT_EQ(sizeof(sockaddr.sin6_addr.s6_addr), Ipv6Addr::BYTES);
+  ASSERT_EQ(sockaddr.sin6_scope_id, addr6.scope_id());
+  ASSERT_EQ(sockaddr.sin6_flowinfo, htonl(addr6.flowinfo()));
 
   ASSERT_TRUE(
       std::memcmp(
-          sockaddr.sin6_addr.s6_addr, addr6.octets.data(), IPv6Address::BYTES
+          sockaddr.sin6_addr.s6_addr, ip6.octets.data(), Ipv6Addr::BYTES
       ) == 0
   );
 }
 
-TEST_F(AddressTest, IPv4FromStringRejectsBadPorts) {
-  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:99999").has_value());
-  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:-1").has_value());
-  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:80abc").has_value());
-  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:").has_value());
-  ASSERT_TRUE(IPv4Address::from_string("127.0.0.1").has_value());
+TEST_F(AddressTest, SocketAddrV4FromStringRejectsBadPorts) {
+  ASSERT_FALSE(SocketAddrV4::from_string("127.0.0.1:99999").has_value());
+  ASSERT_FALSE(SocketAddrV4::from_string("127.0.0.1:-1").has_value());
+  ASSERT_FALSE(SocketAddrV4::from_string("127.0.0.1:80abc").has_value());
+  ASSERT_FALSE(SocketAddrV4::from_string("127.0.0.1:").has_value());
+  ASSERT_FALSE(SocketAddrV4::from_string("127.0.0.1").has_value());
+  ASSERT_TRUE(Ipv4Addr::from_string("127.0.0.1").has_value());
 }
 
-TEST_F(AddressTest, IPv6FromStringBracketlessHasNoPort) {
-  ASSERT_TRUE(IPv6Address::from_string("::1").has_value());
-  ASSERT_TRUE(IPv6Address::from_string("[::1]").has_value());
-  ASSERT_TRUE(IPv6Address::from_string("[::1]:80").has_value());
-  ASSERT_FALSE(IPv6Address::from_string("[::1]:99999").has_value());
-  ASSERT_FALSE(IPv6Address::from_string("[::1").has_value());
-  ASSERT_FALSE(IPv6Address::from_string("[::1]extra").has_value());
+TEST_F(AddressTest, SocketAddrV6FromStringRequiresBracketsAndPort) {
+  ASSERT_TRUE(Ipv6Addr::from_string("::1").has_value());
+  ASSERT_FALSE(Ipv6Addr::from_string("[::1]").has_value());
+  ASSERT_TRUE(SocketAddrV6::from_string("[::1]:80").has_value());
+  ASSERT_FALSE(SocketAddrV6::from_string("::1").has_value());
+  ASSERT_FALSE(SocketAddrV6::from_string("[::1]").has_value());
+  ASSERT_FALSE(SocketAddrV6::from_string("[::1]:99999").has_value());
+  ASSERT_FALSE(SocketAddrV6::from_string("[::1").has_value());
+  ASSERT_FALSE(SocketAddrV6::from_string("[::1]extra").has_value());
 }
 
-TEST_F(AddressTest, IPv6FromSockaddr) {
+TEST_F(AddressTest, SocketAddrV6FromSockaddr) {
   const auto sockaddr = addr6.to_sockaddr();
-  const auto addr = IPv6Address::from_sockaddr(
+  const auto addr = SocketAddrV6::from_sockaddr(
       reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
   );
   ASSERT_EQ(addr, addr6);
 }
 
-TEST_F(AddressTest, AddressHelpers) {
-  ASSERT_TRUE(IPv4Address::localhost().is_loopback());
-  ASSERT_TRUE(IPv4Address::unspecified().is_unspecified());
-  ASSERT_TRUE(IPv4Address::broadcast().is_broadcast());
-  ASSERT_TRUE(IPv4Address({224, 0, 0, 1}, 0).is_multicast());
-  ASSERT_TRUE(IPv4Address({192, 168, 1, 1}, 0).is_private());
-  ASSERT_TRUE(IPv6Address::localhost().is_loopback());
-  ASSERT_TRUE(IPv6Address::unspecified().is_unspecified());
+TEST_F(AddressTest, SocketAddrPortAccessors) {
+  SocketAddr any = SocketAddrV4(Ipv4Addr::from_string("127.0.0.1").value(), 80);
+  ASSERT_EQ(any.port(), 80);
+  ASSERT_TRUE(any.is_ipv4());
+  ASSERT_FALSE(any.is_ipv6());
+  any.set_port(8080);
+  ASSERT_EQ(any.port(), 8080);
 
-  const Address any = IPv4Address::from_string("127.0.0.1:80").value();
+  const SocketAddr addr(IpAddr(Ipv4Addr::localhost()), 1234);
+  ASSERT_EQ(addr.port(), 1234);
+  ASSERT_EQ(addr.ip(), IpAddr(Ipv4Addr::localhost()));
+}
+
+TEST_F(AddressTest, AddressHelpers) {
+  ASSERT_TRUE(Ipv4Addr::localhost().is_loopback());
+  ASSERT_TRUE(Ipv4Addr::unspecified().is_unspecified());
+  ASSERT_TRUE(Ipv4Addr::broadcast().is_broadcast());
+  ASSERT_TRUE(Ipv4Addr(224, 0, 0, 1).is_multicast());
+  ASSERT_TRUE(Ipv4Addr(192, 168, 1, 1).is_private());
+  ASSERT_TRUE(Ipv6Addr::localhost().is_loopback());
+  ASSERT_TRUE(Ipv6Addr::unspecified().is_unspecified());
+
+  const SocketAddr any = SocketAddr::from_string("127.0.0.1:80").value();
   ASSERT_TRUE(any.is_ipv4());
   ASSERT_FALSE(any.is_ipv6());
 
-  const auto resolved = Address::resolve("127.0.0.1", 80);
+  const auto resolved = SocketAddr::resolve("127.0.0.1", 80);
   ASSERT_TRUE(resolved.has_value());
   ASSERT_FALSE(resolved->empty());
 }

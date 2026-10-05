@@ -8,8 +8,8 @@
 
 namespace net {
 
-const static Address address =
-    IPv4Address::from_string("127.0.0.1:8080").value();
+const static SocketAddr address =
+    SocketAddr::from_string("127.0.0.1:8080").value();
 
 constexpr std::string_view message = "Hello, world!";
 
@@ -86,7 +86,7 @@ TEST_F(StreamTest, ClientConnectsToServer) {
 }
 
 TEST(StreamEphemeralTest, LocalAddrAndExactTransfer) {
-  const auto bind_addr = IPv4Address::localhost(0);
+  const SocketAddr bind_addr = SocketAddrV4(Ipv4Addr::localhost(), 0);
   const auto listener = TcpListener::bind(bind_addr).value();
   const auto server_addr = listener.local_addr().value();
   ASSERT_NE(server_addr.port(), 0);

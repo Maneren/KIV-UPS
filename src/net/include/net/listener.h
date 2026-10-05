@@ -1,7 +1,7 @@
 #pragma once
 
-#include <net/address.h>
 #include <net/socket.h>
+#include <net/socket_addr.h>
 #include <net/stream.h>
 #include <optional>
 #include <ranges>
@@ -13,16 +13,16 @@ class TcpListener {
 
 public:
   TcpListener(Socket &&sock) : sock(std::move(sock)) {}
-  static error::result<TcpListener> bind(const Address &addr);
+  static error::result<TcpListener> bind(const SocketAddr &addr);
   static error::result<TcpListener>
-  bind_with_backlog(const Address &addr, int backlog);
+  bind_with_backlog(const SocketAddr &addr, int backlog);
 
   Socket &socket() { return sock; }
   [[nodiscard]] const Socket &socket() const { return sock; }
 
-  [[nodiscard]] error::result<std::tuple<TcpStream, Address>> accept() const;
+  [[nodiscard]] error::result<std::tuple<TcpStream, SocketAddr>> accept() const;
 
-  [[nodiscard]] error::result<Address> local_addr() const {
+  [[nodiscard]] error::result<SocketAddr> local_addr() const {
     return sock.local_addr();
   }
   [[nodiscard]] error::result<TcpListener> duplicate() const {

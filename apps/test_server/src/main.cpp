@@ -32,7 +32,7 @@ std::optional<int> parse_number(const std::string_view line) {
 
 void send_error(net::TcpIostream &io) { io << "ERROR\n" << std::flush; }
 
-void handle_client(net::TcpStream stream, net::Address address) {
+void handle_client(net::TcpStream stream, net::SocketAddr address) {
   std::println("Accepted connection from {}", address);
 
   net::TcpIostream io{stream};
@@ -90,7 +90,7 @@ int main(const int argc, const char *const *argv) {
 
   try {
     const char *addr_str = args.size() > 1 ? args[1] : "0.0.0.0:8080";
-    const auto address = net::IPv4Address::from_string(addr_str);
+    const auto address = net::SocketAddr::from_string(addr_str);
 
     if (!address) {
       std::println("Invalid address: {}", addr_str);

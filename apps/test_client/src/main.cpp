@@ -5,8 +5,7 @@
 
 int main() {
   try {
-    const auto address =
-        net::IPv4Address::from_string("127.0.0.1:8080").value();
+    const auto address = net::SocketAddr::from_string("127.0.0.1:8080").value();
 
     auto stream = net::TcpStream::connect(address).value();
 

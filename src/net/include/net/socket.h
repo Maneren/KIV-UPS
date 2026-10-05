@@ -1,9 +1,9 @@
 #pragma once
 
 #include <chrono>
-#include <net/address.h>
 #include <net/error.h>
 #include <net/file_descriptor.h>
+#include <net/socket_addr.h>
 #include <optional>
 #include <type_traits>
 #include <utils/functional.h>
@@ -24,7 +24,7 @@ public:
   Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
 
   static error::result<Socket> create(int family, int type);
-  static error::result<Socket> create(const Address &addr, int type) {
+  static error::result<Socket> create(const SocketAddr &addr, int type) {
     return create(addr.family(), type);
   };
 
@@ -65,15 +65,16 @@ public:
         .map([&](auto) { return optval; });
   };
 
-  [[nodiscard]] error::result<void> bind_to(const Address &addr) const;
+  [[nodiscard]] error::result<void> bind_to(const SocketAddr &addr) const;
 
   [[nodiscard]]
   error::result<Socket>
   accept(sockaddr &storage, socklen_t &len, int flags = 0) const;
 
-  [[nodiscard]] error::result<void> connect(const Address &addr) const;
-  [[nodiscard]] error::result<void>
-  connect_timeout(const Address &addr, std::chrono::microseconds timeout) const;
+  [[nodiscard]] error::result<void> connect(const SocketAddr &addr) const;
+  [[nodiscard]] error::result<void> connect_timeout(
+      const SocketAddr &addr, std::chrono::microseconds timeout
+  ) const;
 
   [[nodiscard]] error::result<std::optional<error::IoError>> take_error() const;
 
@@ -88,8 +89,8 @@ public:
   [[nodiscard]] error::result<ssize_t>
   send(const void *buf, size_t len, int flags) const;
 
-  [[nodiscard]] error::result<Address> local_addr() const;
-  [[nodiscard]] error::result<Address> peer_addr() const;
+  [[nodiscard]] error::result<SocketAddr> local_addr() const;
+  [[nodiscard]] error::result<SocketAddr> peer_addr() const;
 
   [[nodiscard]] error::result<void> shutdown(Shutdown how) const;
 

@@ -1,9 +1,9 @@
 #include <cerrno>
 #include <fcntl.h>
 #include <limits>
-#include <net/address.h>
 #include <net/error.h>
 #include <net/socket.h>
+#include <net/socket_addr.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
@@ -22,7 +22,7 @@ error::result<Socket> Socket::create(int family, int type) {
   });
 }
 
-error::result<void> Socket::bind_to(const Address &addr) const {
+error::result<void> Socket::bind_to(const SocketAddr &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
   const auto *const sockaddr =
@@ -45,7 +45,7 @@ Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
   }
 }
 
-error::result<void> Socket::connect(const Address &addr) const {
+error::result<void> Socket::connect(const SocketAddr &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
   const auto *const sockaddr =
@@ -67,7 +67,7 @@ error::result<void> Socket::connect(const Address &addr) const {
 }
 
 error::result<void> Socket::connect_timeout(
-    const Address &addr, std::chrono::microseconds timeout
+    const SocketAddr &addr, std::chrono::microseconds timeout
 ) const {
   if (timeout.count() <= 0) {
     return tl::make_unexpected(
@@ -261,24 +261,24 @@ Socket::send(const void *buf, const size_t len, int flags) const {
   }
 }
 
-error::result<Address> Socket::local_addr() const {
+error::result<SocketAddr> Socket::local_addr() const {
   sockaddr_storage storage{};
   auto len = static_cast<socklen_t>(sizeof(storage));
   if (getsockname(raw_fd(), reinterpret_cast<sockaddr *>(&storage), &len) ==
       -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  return Address::from_sockaddr(storage, len);
+  return SocketAddr::from_sockaddr(storage, len);
 }
 
-error::result<Address> Socket::peer_addr() const {
+error::result<SocketAddr> Socket::peer_addr() const {
   sockaddr_storage storage{};
   auto len = static_cast<socklen_t>(sizeof(storage));
   if (getpeername(raw_fd(), reinterpret_cast<sockaddr *>(&storage), &len) ==
       -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  return Address::from_sockaddr(storage, len);
+  return SocketAddr::from_sockaddr(storage, len);
 }
 
 error::result<void> Socket::shutdown(Shutdown how) const {
