@@ -12,8 +12,6 @@ foreach(CMAKE_FILE ${EXTERNAL_CMAKE_FILES})
     set(SHOULD_PROCESS TRUE)
     foreach(PROCESSED_DIR ${PROCESSED_DIRS})
         # Check if current dir is subdirectory of already processed dir
-        # (trailing slashes ensure sibling dirs sharing a prefix, e.g.
-        # raylib and raylib_cpp, are not mistaken for parent/child)
         string(FIND "${DIR}/" "${PROCESSED_DIR}/" PARENT_MATCH)
         if(PARENT_MATCH EQUAL 0)
             set(SHOULD_PROCESS FALSE)
@@ -28,4 +26,4 @@ foreach(CMAKE_FILE ${EXTERNAL_CMAKE_FILES})
 endforeach()
 
 FetchContent_MakeAvailable(GTest)
-FetchContent_MakeAvailable(expected raylib raylib_cpp)
+FetchContent_MakeAvailable(tl-expected raylib raylib_cpp)
