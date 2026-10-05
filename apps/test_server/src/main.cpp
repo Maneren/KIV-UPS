@@ -114,7 +114,9 @@ int main(const int argc, const char *const *argv) {
 
       auto &[stream, client_address] = *connection;
 
-      handle_client(std::move(stream), client_address);
+      pool.spawn([stream = std::move(stream), client_address] mutable {
+        handle_client(std::move(stream), client_address);
+      });
     }
   } catch (const std::exception &e) {
     std::println(std::cerr, "Unexpected error: {}", e.what());
