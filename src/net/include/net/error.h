@@ -76,7 +76,8 @@ struct SimpleMessage {
   ErrorKind kind;
   std::string msg;
 
-  SimpleMessage(ErrorKind kind, auto &msg) : kind{kind}, msg{msg} {}
+  SimpleMessage(ErrorKind kind, std::string msg)
+      : kind{kind}, msg{std::move(msg)} {}
 
   template <typename... Args>
   SimpleMessage(
@@ -139,12 +140,25 @@ template <> struct std::formatter<net::error::IoError> {
           );
         },
         [&ctx](const net::error::Simple &simple) {
+          if (simple.msg.empty()) {
+            return std::format_to(
+                ctx.out(), "{}", net::error::to_string(simple.kind)
+            );
+          }
           return std::format_to(
-              ctx.out(), "{}", net::error::to_string(simple.kind)
+              ctx.out(),
+              "{}: {}",
+              net::error::to_string(simple.kind),
+              simple.msg
           );
         },
         [&ctx](const net::error::SimpleMessage &simple) {
-          return std::format_to(ctx.out(), "{}", simple.msg);
+          return std::format_to(
+              ctx.out(),
+              "{}: {}",
+              net::error::to_string(simple.kind),
+              simple.msg
+          );
         }
     );
   }
