@@ -5,5 +5,5 @@ auto_create_executable(
     CONSOLE
     OUTPUT_NAME "${APP_NAME}"
     VERSION 1.0.0
-    CXX_STD 20
+    CXX_STD 23
 )
