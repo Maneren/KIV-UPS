@@ -145,4 +145,21 @@ TEST_F(AddressTest, IPv6FromSockaddr) {
   ASSERT_EQ(addr, addr6);
 }
 
+TEST_F(AddressTest, ErrorKindFromErrno) {
+  ASSERT_EQ(
+      net::error::from_errno(ECONNREFUSED),
+      net::error::ErrorKind::ConnectionRefused
+  );
+  ASSERT_EQ(net::error::from_errno(ETIMEDOUT), net::error::ErrorKind::TimedOut);
+  ASSERT_EQ(
+      net::error::IoError(net::error::Os{EACCES}).kind(),
+      net::error::ErrorKind::PermissionDenied
+  );
+  ASSERT_EQ(
+      net::error::IoError(net::error::Simple{net::error::ErrorKind::NotFound})
+          .kind(),
+      net::error::ErrorKind::NotFound
+  );
+}
+
 } // namespace net

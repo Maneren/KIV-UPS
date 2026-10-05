@@ -1,3 +1,4 @@
+#include <cerrno>
 #include <net/error.h>
 
 namespace net::error {
@@ -88,6 +89,105 @@ std::string_view to_string(error::ErrorKind kind) {
     return "operation would block";
   case ErrorKind::WriteZero:
     return "write zero";
+  }
+}
+
+ErrorKind from_errno(int code) {
+  switch (code) {
+  case EACCES:
+  case EPERM:
+    return ErrorKind::PermissionDenied;
+  case EADDRINUSE:
+    return ErrorKind::AddrInUse;
+  case EADDRNOTAVAIL:
+    return ErrorKind::AddrNotAvailable;
+  case EAGAIN:
+#if EWOULDBLOCK != EAGAIN
+  case EWOULDBLOCK:
+#endif
+    return ErrorKind::WouldBlock;
+  case EALREADY:
+  case EINPROGRESS:
+    return ErrorKind::InProgress;
+  case EBUSY:
+    return ErrorKind::ResourceBusy;
+  case ECONNABORTED:
+    return ErrorKind::ConnectionAborted;
+  case ECONNREFUSED:
+    return ErrorKind::ConnectionRefused;
+  case ECONNRESET:
+    return ErrorKind::ConnectionReset;
+  case EDEADLK:
+    return ErrorKind::Deadlock;
+  case EDQUOT:
+    return ErrorKind::QuotaExceeded;
+  case EEXIST:
+    return ErrorKind::AlreadyExists;
+  case EFBIG:
+  case EOVERFLOW:
+    return ErrorKind::FileTooLarge;
+  case EHOSTUNREACH:
+    return ErrorKind::HostUnreachable;
+  case EINTR:
+    return ErrorKind::Interrupted;
+  case EINVAL:
+    return ErrorKind::InvalidInput;
+  case EISDIR:
+    return ErrorKind::IsADirectory;
+  case ELOOP:
+    return ErrorKind::FilesystemLoop;
+  case ENOENT:
+  case ESRCH:
+    return ErrorKind::NotFound;
+  case ENOMEM:
+    return ErrorKind::OutOfMemory;
+  case ENOSPC:
+  case ENFILE:
+  case EMFILE:
+    return ErrorKind::StorageFull;
+  case ENOSYS:
+  case ENOTTY:
+#if defined(EOPNOTSUPP)
+  case EOPNOTSUPP:
+#endif
+#ifdef ENOTSUP
+#if ENOTSUP != EOPNOTSUPP
+  case ENOTSUP:
+#endif
+#endif
+    return ErrorKind::Unsupported;
+  case EMLINK:
+    return ErrorKind::TooManyLinks;
+  case ENAMETOOLONG:
+    return ErrorKind::InvalidFilename;
+  case E2BIG:
+    return ErrorKind::ArgumentListTooLong;
+  case ENETDOWN:
+    return ErrorKind::NetworkDown;
+  case ENETUNREACH:
+    return ErrorKind::NetworkUnreachable;
+  case ENOTCONN:
+    return ErrorKind::NotConnected;
+  case ENOTDIR:
+    return ErrorKind::NotADirectory;
+  case ENOTEMPTY:
+    return ErrorKind::DirectoryNotEmpty;
+  case EPIPE:
+    return ErrorKind::BrokenPipe;
+  case EROFS:
+    return ErrorKind::ReadOnlyFilesystem;
+  case ESPIPE:
+    return ErrorKind::NotSeekable;
+  case ESTALE:
+    return ErrorKind::StaleNetworkFileHandle;
+  case ETIMEDOUT:
+    return ErrorKind::TimedOut;
+  case ETXTBSY:
+    return ErrorKind::ExecutableFileBusy;
+  case EXDEV:
+    return ErrorKind::CrossesDevices;
+  default:
+    return ErrorKind::Uncategorized;
   }
 }
 

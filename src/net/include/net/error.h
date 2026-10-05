@@ -64,6 +64,7 @@ enum class ErrorKind : std::uint8_t {
 };
 
 std::string_view to_string(ErrorKind kind);
+ErrorKind from_errno(int code);
 
 struct Simple {
   ErrorKind kind;
@@ -99,6 +100,15 @@ public:
   IoError(const Simple &simple) : inner{simple} {}
   IoError(const SimpleMessage &simple) : inner{simple} {}
   IoError(SimpleMessage &&simple) : inner{std::move(simple)} {}
+
+  [[nodiscard]] ErrorKind kind() const {
+    return match::match(
+        inner,
+        [](const Os &os) { return from_errno(os.code); },
+        [](const Simple &simple) { return simple.kind; },
+        [](const SimpleMessage &simple) { return simple.kind; }
+    );
+  }
 
   [[nodiscard]] std::optional<int> os_code() const {
     return match::match(
