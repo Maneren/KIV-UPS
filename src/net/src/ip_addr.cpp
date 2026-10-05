@@ -1,7 +1,6 @@
 #include <arpa/inet.h>
 #include <net/ip_addr.h>
 #include <netinet/in.h>
-#include <string>
 
 namespace net {
 
@@ -32,7 +31,22 @@ error::result<Ipv4Addr> Ipv4Addr::from_string(const std::string &str) {
 
 bool Ipv6Addr::is_loopback() const {
   static constexpr std::array<uint8_t, BYTES> loopback{
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
   };
   return octets == loopback;
 }

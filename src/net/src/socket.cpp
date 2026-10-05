@@ -10,12 +10,13 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include <utils/functional.h>
 
 namespace net {
 
 error::result<Socket> Socket::create(int family, int type) {
-  int fd = socket(family, type | SOCK_CLOEXEC, 0);
+  const int fd = socket(family, type | SOCK_CLOEXEC, 0);
 
   return error::from_os(fd).map([](int raw) {
     return Socket(FileDescriptor(raw));

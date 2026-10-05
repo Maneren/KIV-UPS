@@ -147,7 +147,7 @@ ErrorKind from_errno(int code) {
     return ErrorKind::StorageFull;
   case ENOSYS:
   case ENOTTY:
-#if defined(EOPNOTSUPP)
+#ifdef EOPNOTSUPP
   case EOPNOTSUPP:
 #endif
 #ifdef ENOTSUP

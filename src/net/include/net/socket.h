@@ -1,13 +1,15 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <net/error.h>
 #include <net/file_descriptor.h>
 #include <net/socket_addr.h>
 #include <optional>
+#include <sys/socket.h>
 #include <type_traits>
+#include <utility>
 #include <utils/functional.h>
-#include <utils/print.h>
 
 namespace net {
 
@@ -21,7 +23,7 @@ class Socket {
   FileDescriptor fd;
 
 public:
-  Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
+  explicit Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
 
   static error::result<Socket> create(int family, int type);
   static error::result<Socket> create(const SocketAddr &addr, int type) {

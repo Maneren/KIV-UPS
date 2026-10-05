@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <net/error.h>
 #include <net/ip_addr.h>
 #include <netinet/in.h>
 #include <string>
+#include <sys/socket.h>
 #include <tuple>
 #include <utils/match.h>
 #include <variant>
@@ -78,7 +80,11 @@ struct SocketAddrV6 {
 };
 
 struct SocketAddr {
+  // Implicit converting ctors are intentional: SocketAddrV4/V6 convert to
+  // SocketAddr ergonomically
+  // NOLINTNEXTLINE(*explicit-constructor)
   SocketAddr(SocketAddrV4 addr) : inner(addr) {}
+  // NOLINTNEXTLINE(*explicit-constructor)
   SocketAddr(SocketAddrV6 addr) : inner(addr) {}
 
   SocketAddr(const IpAddr &ip, uint16_t port)

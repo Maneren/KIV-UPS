@@ -33,7 +33,7 @@ std::streambuf::int_type TcpStreambuf::underflow() {
     return traits_type::eof();
   }
 
-  ssize_t bytes_read = result.value();
+  const ssize_t bytes_read = result.value();
   if (bytes_read <= 0) {
     return traits_type::eof();
   }
@@ -86,7 +86,7 @@ bool TcpStreambuf::flush_output() {
       return false;
     }
 
-    ssize_t bytes_written = result.value();
+    const ssize_t bytes_written = result.value();
     if (bytes_written == 0) {
       return false;
     }

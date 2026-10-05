@@ -5,6 +5,8 @@
 #include <net/stream.h>
 #include <optional>
 #include <ranges>
+#include <tuple>
+#include <utility>
 
 namespace net {
 
@@ -12,7 +14,7 @@ class TcpListener {
   Socket sock;
 
 public:
-  TcpListener(Socket &&sock) : sock(std::move(sock)) {}
+  explicit TcpListener(Socket &&sock) : sock(std::move(sock)) {}
   static error::result<TcpListener> bind(const SocketAddr &addr);
   static error::result<TcpListener>
   bind_with_backlog(const SocketAddr &addr, int backlog);

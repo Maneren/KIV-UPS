@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 
 namespace net {
 
@@ -13,7 +14,7 @@ class TcpStream {
   Socket sock;
 
 public:
-  TcpStream(Socket &&sock);
+  explicit TcpStream(Socket &&sock);
 
   ~TcpStream();
 

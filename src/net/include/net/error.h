@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <tl/expected.hpp>
 #include <utility>
@@ -15,7 +17,7 @@ namespace net::error {
 struct Os {
   int code;
 
-  Os(int code = errno) : code{code} {}
+  explicit Os(int code = errno) : code{code} {}
 };
 
 enum class ErrorKind : std::uint8_t {
@@ -60,7 +62,7 @@ enum class ErrorKind : std::uint8_t {
   OutOfMemory,
   InProgress,
   Other,
-  Uncategorized
+  Uncategorized,
 };
 
 std::string_view to_string(ErrorKind kind);
@@ -70,7 +72,8 @@ struct Simple {
   ErrorKind kind;
   std::string_view msg;
 
-  Simple(ErrorKind kind, std::string_view msg = {}) : kind{kind}, msg{msg} {}
+  explicit Simple(ErrorKind kind, std::string_view msg = {})
+      : kind{kind}, msg{msg} {}
 };
 
 struct SimpleMessage {
@@ -93,12 +96,20 @@ private:
   Variant inner;
 
 public:
+  // Implicit converting ctors are intentional: tl::expected<T, IoError> relies
+  // on unexpected<Os/Simple/SimpleMessage> converting to IoError.
+  // NOLINTNEXTLINE(*explicit-constructor)
   IoError(Variant data) : inner{std::move(data)} {}
+  // NOLINTNEXTLINE(*explicit-constructor)
   IoError(Variant &&data) : inner{std::move(data)} {}
 
+  // NOLINTNEXTLINE(*explicit-constructor)
   IoError(const Os &os) : inner{os} {}
+  // NOLINTNEXTLINE(*explicit-constructor)
   IoError(const Simple &simple) : inner{simple} {}
+  // NOLINTNEXTLINE(*explicit-constructor)
   IoError(const SimpleMessage &simple) : inner{simple} {}
+  // NOLINTNEXTLINE(*explicit-constructor)
   IoError(SimpleMessage &&simple) : inner{std::move(simple)} {}
 
   [[nodiscard]] ErrorKind kind() const {
@@ -132,7 +143,7 @@ template <typename T> result<T> from_os(T code) {
   return code;
 }
 
-inline IoError last_os_error() { return {Os{errno}}; }
+inline IoError last_os_error() { return IoError{Os{errno}}; }
 
 } // namespace net::error
 

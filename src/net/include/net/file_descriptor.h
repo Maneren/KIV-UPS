@@ -1,7 +1,6 @@
 #pragma once
 
 #include <net/error.h>
-#include <unistd.h>
 
 namespace net {
 

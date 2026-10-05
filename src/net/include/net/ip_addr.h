@@ -8,6 +8,7 @@
 #include <net/error.h>
 #include <netinet/in.h>
 #include <string>
+#include <sys/socket.h>
 #include <utils/match.h>
 #include <variant>
 
@@ -20,8 +21,9 @@ struct Ipv4Addr {
   constexpr Ipv4Addr() = default;
   constexpr Ipv4Addr(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
       : octets{a, b, c, d} {}
-  constexpr Ipv4Addr(std::array<uint8_t, BYTES> octets) : octets(octets) {}
-  Ipv4Addr(uint32_t addr) {
+  explicit constexpr Ipv4Addr(std::array<uint8_t, BYTES> octets)
+      : octets(octets) {}
+  explicit Ipv4Addr(uint32_t addr) {
     auto in_net_endian = htonl(addr);
     std::memcpy(octets.data(), &in_net_endian, BYTES);
   }
@@ -40,6 +42,8 @@ struct Ipv4Addr {
     return ntohl(net_endian);
   }
   [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits) {
+    // NOLINTNEXTLINE(modernize-return-braced-init-list): braced elision
+    // would require a non-explicit converting ctor.
     return Ipv4Addr(bits);
   }
 
@@ -59,9 +63,9 @@ struct Ipv4Addr {
            (octets[0] == 192 && octets[1] == 168);
   }
 
-  static Ipv4Addr localhost() { return Ipv4Addr(127, 0, 0, 1); }
-  static Ipv4Addr unspecified() { return Ipv4Addr(0, 0, 0, 0); }
-  static Ipv4Addr broadcast() { return Ipv4Addr(255, 255, 255, 255); }
+  static Ipv4Addr localhost() { return {127, 0, 0, 1}; }
+  static Ipv4Addr unspecified() { return {0, 0, 0, 0}; }
+  static Ipv4Addr broadcast() { return {255, 255, 255, 255}; }
 
   static error::result<Ipv4Addr> from_string(const std::string &str);
 
@@ -79,8 +83,8 @@ struct Ipv6Addr {
   std::array<uint8_t, BYTES> octets{};
 
   Ipv6Addr() = default;
-  Ipv6Addr(std::array<uint8_t, BYTES> octets) : octets(octets) {}
-  Ipv6Addr(
+  explicit Ipv6Addr(std::array<uint8_t, BYTES> octets) : octets(octets) {}
+  explicit Ipv6Addr(
       // NOLINTNEXTLINE(modernize-avoid-c-arrays)
       const uint8_t octets[BYTES]
   ) {
@@ -90,7 +94,7 @@ struct Ipv6Addr {
     Ipv6Addr addr;
     for (size_t i = 0; i < 8; ++i) {
       addr.octets[2 * i] = static_cast<uint8_t>(segments[i] >> 8);
-      addr.octets[2 * i + 1] = static_cast<uint8_t>(segments[i] & 0xff);
+      addr.octets[(2 * i) + 1] = static_cast<uint8_t>(segments[i] & 0xff);
     }
     return addr;
   }
@@ -107,7 +111,7 @@ struct Ipv6Addr {
     std::array<uint16_t, 8> segs{};
     for (size_t i = 0; i < 8; ++i) {
       segs[i] = static_cast<uint16_t>(
-          (static_cast<uint16_t>(octets[2 * i]) << 8) | octets[2 * i + 1]
+          (static_cast<uint16_t>(octets[2 * i]) << 8) | octets[(2 * i) + 1]
       );
     }
     return segs;
@@ -126,8 +130,8 @@ struct Ipv6Addr {
 };
 
 struct IpAddr {
-  IpAddr(Ipv4Addr addr) : inner(addr) {}
-  IpAddr(Ipv6Addr addr) : inner(addr) {}
+  explicit IpAddr(Ipv4Addr addr) : inner(addr) {}
+  explicit IpAddr(Ipv6Addr addr) : inner(addr) {}
 
   std::variant<Ipv4Addr, Ipv6Addr> inner;
 
@@ -206,7 +210,7 @@ template <> struct std::formatter<net::Ipv6Addr> {
         &raw.sin6_addr.s6_addr, obj.octets.data(), net::Ipv6Addr::BYTES
     );
 
-    const auto result = inet_ntop(
+    const auto *const result = inet_ntop(
         net::Ipv6Addr::FAMILY,
         &raw.sin6_addr,
         buffer.data(),
@@ -217,6 +221,9 @@ template <> struct std::formatter<net::Ipv6Addr> {
       throw std::runtime_error("inet_ntop failed to stringify address");
     }
 
+    // c_str() truncates at the NUL written by inet_ntop; formatting
+    // `buffer` directly would emit padding.
+    // NOLINTNEXTLINE(readability-redundant-string-cstr)
     return std::format_to(ctx.out(), "{}", buffer.c_str());
   }
 };

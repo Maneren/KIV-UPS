@@ -37,7 +37,7 @@ connect_each(const std::vector<SocketAddr> &addrs, auto connect_one) {
 error::result<TcpStream> TcpStream::connect(const SocketAddr &addr) {
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&addr](auto &&sock) {
-        return sock.connect(addr).map([&]() {
+        return sock.connect(addr).map([&] {
           return std::forward<Socket>(sock);
         });
       })
@@ -48,7 +48,7 @@ error::result<TcpStream> TcpStream::connect_timeout(
 ) {
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&addr, timeout](auto &&sock) {
-        return sock.connect_timeout(addr, timeout).map([&]() {
+        return sock.connect_timeout(addr, timeout).map([&] {
           return std::forward<Socket>(sock);
         });
       })
@@ -57,7 +57,7 @@ error::result<TcpStream> TcpStream::connect_timeout(
 
 error::result<TcpStream>
 TcpStream::connect_host(const std::string &host, uint16_t port) {
-  return SocketAddr::resolve(host, port).and_then([](auto addrs) {
+  return SocketAddr::resolve(host, port).and_then([](const auto &addrs) {
     return connect_each(addrs, [](const SocketAddr &addr) {
       return TcpStream::connect(addr);
     });
@@ -67,7 +67,7 @@ TcpStream::connect_host(const std::string &host, uint16_t port) {
 error::result<TcpStream> TcpStream::connect_timeout_host(
     const std::string &host, uint16_t port, std::chrono::microseconds timeout
 ) {
-  return SocketAddr::resolve(host, port).and_then([timeout](auto addrs) {
+  return SocketAddr::resolve(host, port).and_then([timeout](const auto &addrs) {
     return connect_each(addrs, [timeout](const SocketAddr &addr) {
       return TcpStream::connect_timeout(addr, timeout);
     });
@@ -77,7 +77,7 @@ error::result<TcpStream> TcpStream::connect_timeout_host(
 error::result<void> TcpStream::read_exact(std::span<std::byte> buf) const {
   size_t done = 0;
   while (done < buf.size()) {
-    auto chunk = buf.subspan(done);
+    const auto chunk = buf.subspan(done);
     const auto ret = read(chunk);
     if (!ret) {
       return tl::make_unexpected(ret.error());
@@ -97,7 +97,7 @@ error::result<void> TcpStream::read_exact(std::span<std::byte> buf) const {
 error::result<void> TcpStream::write_all(std::span<const std::byte> buf) const {
   size_t done = 0;
   while (done < buf.size()) {
-    auto chunk = buf.subspan(done);
+    const auto chunk = buf.subspan(done);
     const auto ret = write(chunk);
     if (!ret) {
       return tl::make_unexpected(ret.error());
