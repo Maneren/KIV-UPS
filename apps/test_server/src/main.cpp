@@ -89,7 +89,7 @@ int main(const int argc, const char *const *argv) {
   threadpool::Threadpool pool;
 
   try {
-    const char *addr_str = args.size() > 1 ? args.front() : "0.0.0.0:8080";
+    const char *addr_str = args.size() > 1 ? args[1] : "0.0.0.0:8080";
     const auto address = net::IPv4Address::from_string(addr_str);
 
     if (!address) {
