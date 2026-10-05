@@ -1,6 +1,7 @@
 #include <charconv>
 #include <format>
 #include <net/address.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <string>
 #include <string_view>
@@ -276,6 +277,106 @@ void Address::set_port(uint16_t port) {
       [&port](IPv4Address &ipv4) { ipv4.port = port; },
       [&port](IPv6Address &ipv6) { ipv6.port = port; }
   );
+}
+
+bool IPv6Address::is_loopback() const {
+  static constexpr std::array<uint8_t, BYTES> loopback{
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+  };
+  return octets == loopback;
+}
+
+bool IPv6Address::is_unspecified() const {
+  static constexpr std::array<uint8_t, BYTES> unspecified{};
+  return octets == unspecified;
+}
+
+bool IPv6Address::is_multicast() const { return octets[0] == 0xff; }
+
+IPv6Address IPv6Address::localhost(uint16_t port) {
+  return IPv6Address(
+      std::array<uint8_t, BYTES>{
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+      },
+      port
+  );
+}
+
+IPv6Address IPv6Address::unspecified(uint16_t port) {
+  return IPv6Address(std::array<uint8_t, BYTES>{}, port);
+}
+
+error::result<Address> Address::from_string(const std::string &str) {
+  if (const auto v4 = IPv4Address::from_string(str); v4) {
+    return Address(*v4);
+  }
+  if (const auto v6 = IPv6Address::from_string(str); v6) {
+    return Address(*v6);
+  }
+  return tl::make_unexpected(
+      error::SimpleMessage(
+          error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
+      )
+  );
+}
+
+error::result<std::vector<Address>>
+Address::resolve(const std::string &host, uint16_t port) {
+  const std::string service = std::to_string(port);
+
+  struct addrinfo hints{};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  struct addrinfo *list = nullptr;
+  const int code = getaddrinfo(host.c_str(), service.c_str(), &hints, &list);
+  if (code != 0) {
+    return tl::make_unexpected(
+        error::SimpleMessage(
+            error::ErrorKind::InvalidInput,
+            "Failed to resolve {}: {}",
+            host,
+            gai_strerror(code)
+        )
+    );
+  }
+
+  std::vector<Address> out;
+  for (const struct addrinfo *ai = list; ai != nullptr; ai = ai->ai_next) {
+    if (ai->ai_family == AF_INET && ai->ai_addrlen >= sizeof(sockaddr_in)) {
+      const auto *in = reinterpret_cast<const sockaddr_in *>(ai->ai_addr);
+      sockaddr_storage storage{};
+      std::memcpy(&storage, in, sizeof(sockaddr_in));
+      if (auto addr = IPv4Address::from_sockaddr(
+              storage, static_cast<socklen_t>(sizeof(sockaddr_in))
+          );
+          addr) {
+        out.emplace_back(*addr);
+      }
+    } else if (
+        ai->ai_family == AF_INET6 && ai->ai_addrlen >= sizeof(sockaddr_in6)
+    ) {
+      const auto *in6 = reinterpret_cast<const sockaddr_in6 *>(ai->ai_addr);
+      sockaddr_storage storage{};
+      std::memcpy(&storage, in6, sizeof(sockaddr_in6));
+      if (auto addr = IPv6Address::from_sockaddr(
+              storage, static_cast<socklen_t>(sizeof(sockaddr_in6))
+          );
+          addr) {
+        out.emplace_back(*addr);
+      }
+    }
+  }
+  freeaddrinfo(list);
+
+  if (out.empty()) {
+    return tl::make_unexpected(
+        error::SimpleMessage(
+            error::ErrorKind::NotFound, "No addresses found for {}", host
+        )
+    );
+  }
+  return out;
 }
 
 } // namespace net

@@ -145,6 +145,24 @@ TEST_F(AddressTest, IPv6FromSockaddr) {
   ASSERT_EQ(addr, addr6);
 }
 
+TEST_F(AddressTest, AddressHelpers) {
+  ASSERT_TRUE(IPv4Address::localhost().is_loopback());
+  ASSERT_TRUE(IPv4Address::unspecified().is_unspecified());
+  ASSERT_TRUE(IPv4Address::broadcast().is_broadcast());
+  ASSERT_TRUE(IPv4Address({224, 0, 0, 1}, 0).is_multicast());
+  ASSERT_TRUE(IPv4Address({192, 168, 1, 1}, 0).is_private());
+  ASSERT_TRUE(IPv6Address::localhost().is_loopback());
+  ASSERT_TRUE(IPv6Address::unspecified().is_unspecified());
+
+  const Address any = IPv4Address::from_string("127.0.0.1:80").value();
+  ASSERT_TRUE(any.is_ipv4());
+  ASSERT_FALSE(any.is_ipv6());
+
+  const auto resolved = Address::resolve("127.0.0.1", 80);
+  ASSERT_TRUE(resolved.has_value());
+  ASSERT_FALSE(resolved->empty());
+}
+
 TEST_F(AddressTest, ErrorKindFromErrno) {
   ASSERT_EQ(
       net::error::from_errno(ECONNREFUSED),

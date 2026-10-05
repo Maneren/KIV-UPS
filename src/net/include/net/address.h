@@ -3,14 +3,17 @@
 #include <arpa/inet.h>
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <format>
 #include <net/error.h>
 #include <netinet/in.h>
+#include <string>
 #include <tuple>
 #include <utils/match.h>
 #include <variant>
+#include <vector>
 
 namespace net {
 
@@ -33,6 +36,38 @@ struct IPv4Address {
   }
 
   [[nodiscard]] static constexpr int family() { return FAMILY; }
+
+  [[nodiscard]] uint32_t to_uint32() const {
+    uint32_t net_endian = 0;
+    std::memcpy(&net_endian, octets.data(), BYTES);
+    return ntohl(net_endian);
+  }
+
+  [[nodiscard]] constexpr bool is_loopback() const { return octets[0] == 127; }
+  [[nodiscard]] constexpr bool is_unspecified() const {
+    return octets == std::array<uint8_t, BYTES>{0, 0, 0, 0};
+  }
+  [[nodiscard]] constexpr bool is_broadcast() const {
+    return octets == std::array<uint8_t, BYTES>{255, 255, 255, 255};
+  }
+  [[nodiscard]] constexpr bool is_multicast() const {
+    return octets[0] >= 224 && octets[0] <= 239;
+  }
+  [[nodiscard]] constexpr bool is_private() const {
+    return (octets[0] == 10) ||
+           (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31) ||
+           (octets[0] == 192 && octets[1] == 168);
+  }
+
+  static IPv4Address localhost(uint16_t port = 0) {
+    return IPv4Address({127, 0, 0, 1}, port);
+  }
+  static IPv4Address unspecified(uint16_t port = 0) {
+    return IPv4Address({0, 0, 0, 0}, port);
+  }
+  static IPv4Address broadcast(uint16_t port = 0) {
+    return IPv4Address({255, 255, 255, 255}, port);
+  }
 
   [[nodiscard]] sockaddr_in to_sockaddr() const;
 
@@ -76,6 +111,13 @@ struct IPv6Address {
 
   [[nodiscard]] static constexpr int family() { return FAMILY; }
 
+  [[nodiscard]] bool is_loopback() const;
+  [[nodiscard]] bool is_unspecified() const;
+  [[nodiscard]] bool is_multicast() const;
+
+  static IPv6Address localhost(uint16_t port = 0);
+  static IPv6Address unspecified(uint16_t port = 0);
+
   [[nodiscard]] sockaddr_in6 to_sockaddr() const;
 
   static error::result<IPv6Address>
@@ -97,6 +139,23 @@ struct Address {
         [](const IPv6Address &) { return IPv6Address::FAMILY; }
     );
   }
+
+  [[nodiscard]] constexpr bool is_ipv4() const {
+    return std::holds_alternative<IPv4Address>(inner);
+  }
+  [[nodiscard]] constexpr bool is_ipv6() const {
+    return std::holds_alternative<IPv6Address>(inner);
+  }
+
+  [[nodiscard]] constexpr bool operator==(const Address &other) const {
+    return inner == other.inner;
+  }
+
+  static error::result<Address> from_string(const std::string &str);
+
+  /// Resolve a host + port via getaddrinfo (numeric or DNS name).
+  static error::result<std::vector<Address>>
+  resolve(const std::string &host, uint16_t port);
 
   static error::result<Address>
   from_sockaddr(const sockaddr_storage &storage, socklen_t len);
