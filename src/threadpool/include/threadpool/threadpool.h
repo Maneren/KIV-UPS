@@ -148,13 +148,7 @@ public:
   void spawn(Functor &&f, Args &&...args)
     requires(std::is_same_v<std::invoke_result_t<Functor, Args...>, void>)
   {
-    const auto task = std::make_shared<std::packaged_task<void()>>(
-        [f = std::forward<Functor>(f), &args...] {
-          f(std::forward<Args>(args)...);
-        }
-    );
-
-    spawn(static_cast<task_type>([task = std::move(task)]() { (*task)(); }));
+    spawn(task_type{std::forward<Functor>(f), std::forward<Args>(args)...});
   }
 
   /**
