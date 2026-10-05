@@ -1,8 +1,38 @@
+#include <cstring>
 #include <net/stream.h>
+#include <span>
 
 namespace net {
 
 TcpStream::TcpStream(Socket &&sock) : sock(std::move(sock)) {};
+
+namespace {
+
+error::result<TcpStream>
+connect_each(const std::vector<Address> &addrs, auto connect_one) {
+  error::IoError last_error(
+      error::Simple{error::ErrorKind::NotFound, "no addresses to connect to"}
+  );
+  bool attempted = false;
+  for (const auto &addr : addrs) {
+    auto stream = connect_one(addr);
+    if (stream) {
+      return stream;
+    }
+    last_error = stream.error();
+    attempted = true;
+  }
+  if (!attempted) {
+    return tl::make_unexpected(
+        error::SimpleMessage(
+            error::ErrorKind::InvalidInput, "No addresses to connect to"
+        )
+    );
+  }
+  return tl::make_unexpected(last_error);
+}
+
+} // namespace
 
 error::result<TcpStream> TcpStream::connect(const Address &addr) {
   return Socket::create(addr, SOCK_STREAM)
@@ -23,6 +53,65 @@ error::result<TcpStream> TcpStream::connect_timeout(
         });
       })
       .map(functional::Constructor<TcpStream>());
+}
+
+error::result<TcpStream>
+TcpStream::connect_host(const std::string &host, uint16_t port) {
+  return Address::resolve(host, port).and_then([](auto addrs) {
+    return connect_each(addrs, [](const Address &addr) {
+      return TcpStream::connect(addr);
+    });
+  });
+}
+
+error::result<TcpStream> TcpStream::connect_timeout_host(
+    const std::string &host, uint16_t port, std::chrono::microseconds timeout
+) {
+  return Address::resolve(host, port).and_then([timeout](auto addrs) {
+    return connect_each(addrs, [timeout](const Address &addr) {
+      return TcpStream::connect_timeout(addr, timeout);
+    });
+  });
+}
+
+error::result<void> TcpStream::read_exact(std::span<std::byte> buf) const {
+  size_t done = 0;
+  while (done < buf.size()) {
+    auto chunk = buf.subspan(done);
+    const auto ret = read(chunk);
+    if (!ret) {
+      return tl::make_unexpected(ret.error());
+    }
+    if (*ret == 0) {
+      return tl::make_unexpected(
+          error::Simple{
+              error::ErrorKind::UnexpectedEof, "eof while reading exact bytes"
+          }
+      );
+    }
+    done += static_cast<size_t>(*ret);
+  }
+  return {};
+}
+
+error::result<void> TcpStream::write_all(std::span<const std::byte> buf) const {
+  size_t done = 0;
+  while (done < buf.size()) {
+    auto chunk = buf.subspan(done);
+    const auto ret = write(chunk);
+    if (!ret) {
+      return tl::make_unexpected(ret.error());
+    }
+    if (*ret == 0) {
+      return tl::make_unexpected(
+          error::Simple{
+              error::ErrorKind::WriteZero, "failed to write all bytes"
+          }
+      );
+    }
+    done += static_cast<size_t>(*ret);
+  }
+  return {};
 }
 
 TcpStream::~TcpStream() = default;

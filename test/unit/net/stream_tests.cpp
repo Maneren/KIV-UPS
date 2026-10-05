@@ -85,4 +85,31 @@ TEST_F(StreamTest, ClientConnectsToServer) {
   ASSERT_EQ(recvd_message, message);
 }
 
+TEST(StreamEphemeralTest, LocalAddrAndExactTransfer) {
+  const auto bind_addr = IPv4Address::localhost(0);
+  const auto listener = TcpListener::bind(bind_addr).value();
+  const auto server_addr = listener.local_addr().value();
+  ASSERT_NE(server_addr.port(), 0);
+
+  std::jthread server([&] {
+    auto [stream, peer] = listener.accept().value();
+    std::array<std::byte, 4> buf{};
+    ASSERT_TRUE(stream.read_exact(buf).has_value());
+    ASSERT_TRUE(stream.write_all(buf).has_value());
+  });
+
+  auto client = TcpStream::connect(server_addr).value();
+  ASSERT_TRUE(client.peer_addr().has_value());
+  ASSERT_TRUE(client.set_nodelay(true).has_value());
+  ASSERT_TRUE(client.nodelay().value());
+
+  const std::array<std::byte, 4> out{
+      std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4}
+  };
+  ASSERT_TRUE(client.write_all(out).has_value());
+  std::array<std::byte, 4> back{};
+  ASSERT_TRUE(client.read_exact(back).has_value());
+  ASSERT_EQ(back, out);
+}
+
 } // namespace net
