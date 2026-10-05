@@ -65,46 +65,53 @@ error::result<void> Socket::connect(const Address &addr) const {
 error::result<void> Socket::connect_timeout(
     const Address &addr, std::chrono::microseconds timeout
 ) const {
+  if (timeout.count() <= 0) {
+    return tl::make_unexpected(
+        error::SimpleMessage(
+            error::ErrorKind::InvalidInput, "Timeout must be positive"
+        )
+    );
+  }
+
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
-  if (const auto error = set_nonblocking(true); !error) {
-    return error;
+  if (const auto made = set_nonblocking(true); !made) {
+    return tl::make_unexpected(made.error());
   }
+
+  const auto restore_blocking = [this]() -> error::result<void> {
+    return set_nonblocking(false);
+  };
 
   const auto *const sockaddr =
       reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
 
-  const auto result = error::from_os(::connect(raw_fd(), sockaddr, len));
-  if (const auto error = set_nonblocking(false); !error) {
-    return error;
+  const int connect_result = ::connect(raw_fd(), sockaddr, len);
+
+  if (connect_result == 0) {
+    return restore_blocking();
   }
 
-  if (result.has_value()) {
-    // Connection succeeded immediately
-    return {};
-  }
-
-  if (result.error().os_code().value_or(0) != EINPROGRESS) {
-    // Connection failed immediately
-    return result.map(functional::drop);
+  const int connect_errno = errno;
+  if (connect_errno != EINPROGRESS && connect_errno != EINTR) {
+    const auto restore = restore_blocking();
+    if (!restore) {
+      return tl::make_unexpected(restore.error());
+    }
+    return tl::make_unexpected(error::Os{connect_errno});
   }
 
   struct pollfd pfd{.fd = raw_fd(), .events = POLLOUT, .revents = 0};
-
-  if (timeout.count() == 0) {
-    // No timeout
-    return tl::make_unexpected(
-        error::SimpleMessage(
-            error::ErrorKind::InvalidInput, "Timeout can't be zero"
-        )
-    );
-  }
 
   const auto start_time = std::chrono::steady_clock::now();
 
   while (true) {
     const auto elapsed = std::chrono::steady_clock::now() - start_time;
     if (elapsed >= timeout) {
+      const auto restore = restore_blocking();
+      if (!restore) {
+        return tl::make_unexpected(restore.error());
+      }
       return tl::make_unexpected(
           error::SimpleMessage(
               error::ErrorKind::TimedOut, "Connection timed out"
@@ -112,16 +119,18 @@ error::result<void> Socket::connect_timeout(
       );
     }
 
-    const auto remaining_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(timeout - elapsed)
-            .count();
-    int poll_timeout = static_cast<int>(std::min(
-        remaining_time, static_cast<long>(std::numeric_limits<int>::max())
-    ));
-
-    if (poll_timeout == 0) {
-      poll_timeout = 1;
+    const auto remaining = timeout - elapsed;
+    const auto remaining_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(remaining);
+    // Round up so sub-millisecond timeouts still wait.
+    long millis = static_cast<long>(remaining_ms.count());
+    if (remaining > remaining_ms) {
+      ++millis;
     }
+    millis = std::min<long>(
+        millis, static_cast<long>(std::numeric_limits<int>::max())
+    );
+    const int poll_timeout = static_cast<int>(std::max<long>(millis, 1));
 
     const int poll_result = poll(&pfd, 1, poll_timeout);
 
@@ -129,30 +138,36 @@ error::result<void> Socket::connect_timeout(
       if (errno == EINTR) {
         continue;
       }
-      return tl::make_unexpected(error::last_os_error());
+      const int poll_errno = errno;
+      const auto restore = restore_blocking();
+      if (!restore) {
+        return tl::make_unexpected(restore.error());
+      }
+      return tl::make_unexpected(error::Os{poll_errno});
     }
 
     if (poll_result > 0) {
-      if ((pfd.revents & (POLLHUP | POLLERR)) != 0) {
-        const auto error_result = error_state();
-        if (!error_result) {
-          return tl::make_unexpected(error_result.error());
+      // A writable socket may still carry a pending async error, so
+      // always consult SO_ERROR (not only on POLLERR/POLLHUP).
+      const auto error_result = error_state();
+      if (!error_result) {
+        const auto restore = restore_blocking();
+        if (!restore) {
+          return tl::make_unexpected(restore.error());
         }
-
-        const auto &error = error_result.value();
-        if (error) {
-          return tl::make_unexpected(error.value());
-        }
-
-        return tl::make_unexpected(
-            error::SimpleMessage(
-                error::ErrorKind::Uncategorized, "No error set after POLLHUP"
-            )
-        );
+        return tl::make_unexpected(error_result.error());
       }
 
-      // Connection succeeded
-      return {};
+      const auto &pending = error_result.value();
+      if (pending) {
+        const auto restore = restore_blocking();
+        if (!restore) {
+          return tl::make_unexpected(restore.error());
+        }
+        return tl::make_unexpected(pending.value());
+      }
+
+      return restore_blocking();
     }
   }
 }
