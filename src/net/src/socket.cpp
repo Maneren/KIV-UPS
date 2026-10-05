@@ -29,19 +29,26 @@ error::result<void> Socket::bind_to(const Address &addr) const {
 
 error::result<Socket>
 Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
-  return error::from_os(accept4(raw_fd(), &storage, &len, SOCK_CLOEXEC | flags))
-      .map([](int raw) { return Socket(FileDescriptor(raw)); });
+  while (true) {
+    const int raw = accept4(raw_fd(), &storage, &len, SOCK_CLOEXEC | flags);
+    if (raw != -1) {
+      return Socket(FileDescriptor(raw));
+    }
+    if (errno == EINTR) {
+      continue;
+    }
+    return tl::make_unexpected(error::Os{errno});
+  }
 }
 
 error::result<void> Socket::connect(const Address &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
+  const auto *const sockaddr =
+      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
+
   while (true) {
-    const auto result = ::connect(
-        raw_fd(),
-        reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
-        len
-    );
+    const auto result = ::connect(raw_fd(), sockaddr, len);
 
     if (result != -1 || errno == EISCONN) {
       return {};
@@ -63,13 +70,11 @@ error::result<void> Socket::connect_timeout(
   if (const auto error = set_nonblocking(true); !error) {
     return error;
   }
-  const auto result = error::from_os(
-      ::connect(
-          raw_fd(),
-          reinterpret_cast<const struct sockaddr *const>(&sockaddr_union),
-          len
-      )
-  );
+
+  const auto *const sockaddr =
+      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
+
+  const auto result = error::from_os(::connect(raw_fd(), sockaddr, len));
   if (const auto error = set_nonblocking(false); !error) {
     return error;
   }
@@ -169,8 +174,18 @@ error::result<std::optional<error::IoError>> Socket::error_state() const {
 error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   // There is no other way to do this
   // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
-  const auto code = ::fcntl(raw_fd(), F_SETFL, nonblocking ? O_NONBLOCK : 0);
-  return error::from_os(code).map(functional::drop);
+  const int current = ::fcntl(raw_fd(), F_GETFL, 0);
+  if (current == -1) {
+    return tl::make_unexpected(error::Os{errno});
+  }
+  const int updated =
+      nonblocking ? (current | O_NONBLOCK) : (current & ~O_NONBLOCK);
+  if (updated == current) {
+    return {};
+  }
+  // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
+  return error::from_os(::fcntl(raw_fd(), F_SETFL, updated))
+      .map(functional::drop);
 }
 
 ssize_t Socket::read(void *buf, const size_t len) const {
