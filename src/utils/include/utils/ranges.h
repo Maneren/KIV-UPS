@@ -6,6 +6,8 @@
 #include <tuple>
 #include <type_traits>
 
+namespace utils {
+
 namespace ranges {
 namespace detail {
 
@@ -75,23 +77,30 @@ constexpr auto collect(std::ranges::input_range auto &&rng) {
   );
 }
 
+} // namespace ranges
+
 namespace views {
 namespace detail {
-struct enumerate_impl {
+struct enumerate_uz_impl {
   template <std::ranges::input_range Rng>
   constexpr auto operator()(Rng &&rng) const {
-    using diff_t = std::ranges::range_difference_t<std::remove_cvref_t<Rng>>;
-    return std::views::zip(std::views::iota(diff_t{0}), std::forward<Rng>(rng));
+    return std::views::transform(
+        std::views::enumerate(std::forward<Rng>(rng)), [](auto &&p) {
+          return std::make_tuple(
+              static_cast<size_t>(std::get<0>(p)), std::get<1>(p)
+          );
+        }
+    );
   }
 
   friend constexpr auto
-  operator|(std::ranges::input_range auto &&rng, enumerate_impl fn) {
+  operator|(std::ranges::input_range auto &&rng, enumerate_uz_impl fn) {
     return fn(std::forward<decltype(rng)>(rng));
   }
 };
 } // namespace detail
 
-inline constexpr detail::enumerate_impl enumerate;
+inline constexpr detail::enumerate_uz_impl enumerate_uz;
 } // namespace views
 
-} // namespace ranges
+} // namespace utils

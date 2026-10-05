@@ -71,7 +71,7 @@ public:
 
   [[nodiscard]]
   error::result<Socket>
-  accept(sockaddr &storage, socklen_t &len, int flags = 0) const;
+  accept(sockaddr_union &sockaddr, socklen_t &len, int flags = 0) const;
 
   [[nodiscard]] error::result<void> connect(const SocketAddr &addr) const;
   [[nodiscard]] error::result<void> connect_timeout(

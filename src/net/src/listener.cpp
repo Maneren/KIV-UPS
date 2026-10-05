@@ -33,10 +33,10 @@ TcpListener::bind_with_backlog(const SocketAddr &addr, int backlog) {
 }
 
 error::result<std::tuple<TcpStream, SocketAddr>> TcpListener::accept() const {
-  sockaddr_storage storage{};
-  auto len = static_cast<socklen_t>(sizeof(storage));
+  sockaddr_union storage{};
+  auto len = sockaddr_union::SIZE;
 
-  auto sock = this->sock.accept(reinterpret_cast<sockaddr &>(storage), len);
+  auto sock = this->sock.accept(storage, len);
 
   if (!sock) {
     return tl::make_unexpected(sock.error());

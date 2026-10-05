@@ -13,11 +13,26 @@
 
 namespace net {
 
+// Wrapper around BSD sockaddr_storage for easier conversion
+union sockaddr_union {
+  static constexpr socklen_t SIZE = sizeof(sockaddr_storage);
+
+  // Always valid if the union was initialized.
+  sockaddr sa;
+
+  // Socket types
+  sockaddr_in ipv4;
+  sockaddr_in6 ipv6;
+
+  // Reserve space for future socket types
+  sockaddr_storage storage;
+};
+
 struct SocketAddrV4 {
   constexpr static int FAMILY = Ipv4Addr::FAMILY;
+  constexpr static socklen_t SIZE = sizeof(sockaddr_in);
 
-  Ipv4Addr ip_;
-  uint16_t port_;
+  using bsd_type = sockaddr_in;
 
   constexpr SocketAddrV4(Ipv4Addr ip, uint16_t port) : ip_(ip), port_(port) {}
 
@@ -34,19 +49,21 @@ struct SocketAddrV4 {
   [[nodiscard]] sockaddr_in to_sockaddr() const;
 
   static error::result<SocketAddrV4>
-  from_sockaddr(const sockaddr_storage &storage, socklen_t len);
+  from_sockaddr(const sockaddr_union &sockaddr, socklen_t len);
 
   // Parses "127.0.0.1:80"; the port is required.
   static error::result<SocketAddrV4> from_string(const std::string &str);
+
+private:
+  Ipv4Addr ip_;
+  uint16_t port_;
 };
 
 struct SocketAddrV6 {
   constexpr static int FAMILY = Ipv6Addr::FAMILY;
+  constexpr static socklen_t SIZE = sizeof(sockaddr_in6);
 
-  Ipv6Addr ip_;
-  uint16_t port_;
-  uint32_t flowinfo_;
-  uint32_t scope_id_;
+  using bsd_type = sockaddr_in6;
 
   constexpr SocketAddrV6(
       Ipv6Addr ip, uint16_t port, uint32_t flowinfo = 0, uint32_t scope_id = 0
@@ -72,11 +89,17 @@ struct SocketAddrV6 {
   [[nodiscard]] sockaddr_in6 to_sockaddr() const;
 
   static error::result<SocketAddrV6>
-  from_sockaddr(const sockaddr_storage &storage, socklen_t len);
+  from_sockaddr(const sockaddr_union &sockaddr, socklen_t len);
 
   // Parses "[::1]:80" (also "[fe80::1%1]:80" with a numeric scope id);
   // the port is required.
   static error::result<SocketAddrV6> from_string(const std::string &str);
+
+private:
+  Ipv6Addr ip_;
+  uint16_t port_;
+  uint32_t flowinfo_;
+  uint32_t scope_id_;
 };
 
 struct SocketAddr {
@@ -159,12 +182,7 @@ struct SocketAddr {
   resolve(const std::string &host, uint16_t port);
 
   static error::result<SocketAddr>
-  from_sockaddr(const sockaddr_storage &storage, socklen_t len);
-
-  union sockaddr_union {
-    sockaddr_in ipv4;
-    sockaddr_in6 ipv6;
-  };
+  from_sockaddr(const sockaddr_union &sockaddr, socklen_t len);
 
   [[nodiscard]] std::tuple<sockaddr_union, socklen_t> to_sockaddr() const;
 

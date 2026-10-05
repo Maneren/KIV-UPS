@@ -10,6 +10,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <utils/match.h>
+#include <utils/ranges.h>
 #include <variant>
 
 namespace net {
@@ -42,12 +43,12 @@ struct Ipv4Addr {
     return ntohl(net_endian);
   }
   [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits) {
-    // NOLINTNEXTLINE(modernize-return-braced-init-list): braced elision
-    // would require a non-explicit converting ctor.
     return Ipv4Addr(bits);
   }
 
-  [[nodiscard]] constexpr bool is_loopback() const { return octets[0] == 127; }
+  [[nodiscard]] constexpr bool is_loopback() const {
+    return octets.front() == 127;
+  }
   [[nodiscard]] constexpr bool is_unspecified() const {
     return octets == std::array<uint8_t, BYTES>{0, 0, 0, 0};
   }
@@ -55,12 +56,13 @@ struct Ipv4Addr {
     return octets == std::array<uint8_t, BYTES>{255, 255, 255, 255};
   }
   [[nodiscard]] constexpr bool is_multicast() const {
-    return octets[0] >= 224 && octets[0] <= 239;
+    const auto [a, _b, _c, _d] = octets;
+    return a >= 224 && a <= 239;
   }
   [[nodiscard]] constexpr bool is_private() const {
-    return (octets[0] == 10) ||
-           (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31) ||
-           (octets[0] == 192 && octets[1] == 168);
+    const auto [a, b, _c, _d] = octets;
+    return (a == 10) || (a == 172 && b >= 16 && b <= 31) ||
+           (a == 192 && b == 168);
   }
 
   static Ipv4Addr localhost() { return {127, 0, 0, 1}; }
@@ -78,23 +80,21 @@ private:
 
 struct Ipv6Addr {
   constexpr static size_t BYTES = 16;
+  constexpr static size_t SEGMENTS = BYTES / sizeof(uint16_t);
   constexpr static int FAMILY = AF_INET6;
 
-  std::array<uint8_t, BYTES> octets{};
+  using octets_t = std::array<uint8_t, BYTES>;
 
   Ipv6Addr() = default;
-  explicit Ipv6Addr(std::array<uint8_t, BYTES> octets) : octets(octets) {}
-  explicit Ipv6Addr(
-      // NOLINTNEXTLINE(modernize-avoid-c-arrays)
-      const uint8_t octets[BYTES]
-  ) {
+  explicit Ipv6Addr(octets_t octets) : octets(octets) {}
+  explicit Ipv6Addr(const uint8_t octets[BYTES]) {
     std::memcpy(this->octets.data(), octets, BYTES);
   }
-  static Ipv6Addr from_segments(std::array<uint16_t, 8> segments) {
+  static Ipv6Addr from_segments(std::array<uint16_t, SEGMENTS> segments) {
     Ipv6Addr addr;
-    for (size_t i = 0; i < 8; ++i) {
-      addr.octets[2 * i] = static_cast<uint8_t>(segments[i] >> 8);
-      addr.octets[(2 * i) + 1] = static_cast<uint8_t>(segments[i] & 0xff);
+    for (const auto [i, segment] : utils::views::enumerate_uz(segments)) {
+      addr.octets.at(2 * i) = static_cast<uint8_t>(segment >> 8);
+      addr.octets.at((2 * i) + 1) = static_cast<uint8_t>(segment);
     }
     return addr;
   }
@@ -107,14 +107,15 @@ struct Ipv6Addr {
     return octets;
   }
 
-  [[nodiscard]] std::array<uint16_t, 8> segments() const {
-    std::array<uint16_t, 8> segs{};
-    for (size_t i = 0; i < 8; ++i) {
-      segs[i] = static_cast<uint16_t>(
-          (static_cast<uint16_t>(octets[2 * i]) << 8) | octets[(2 * i) + 1]
+  [[nodiscard]] std::array<uint16_t, SEGMENTS> segments() const {
+    std::array<uint16_t, SEGMENTS> segments{};
+    for (const auto [i, segment] : utils::views::enumerate_uz(segments)) {
+      segments.at(i) = static_cast<uint16_t>(
+          (static_cast<uint16_t>(octets.at(2 * i)) << 8) |
+          octets.at((2 * i) + 1)
       );
     }
-    return segs;
+    return segments;
   }
 
   [[nodiscard]] bool is_loopback() const;
@@ -127,6 +128,11 @@ struct Ipv6Addr {
   // Parses a bare literal, e.g. "::1". Bracketed `[ip]:port` forms
   // belong to `SocketAddrV6::from_string`.
   static error::result<Ipv6Addr> from_string(const std::string &str);
+
+private:
+  octets_t octets{};
+
+  friend std::formatter<Ipv6Addr>;
 };
 
 struct IpAddr {

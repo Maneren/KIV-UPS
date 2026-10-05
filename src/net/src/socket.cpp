@@ -26,16 +26,14 @@ error::result<Socket> Socket::create(int family, int type) {
 error::result<void> Socket::bind_to(const SocketAddr &addr) const {
   const auto [sockaddr_union, len] = addr.to_sockaddr();
 
-  const auto *const sockaddr =
-      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
-
-  return error::from_os(bind(raw_fd(), sockaddr, len)).map(functional::drop);
+  return error::from_os(bind(raw_fd(), &sockaddr_union.sa, len))
+      .map(functional::drop);
 }
 
 error::result<Socket>
-Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
+Socket::accept(sockaddr_union &sockaddr, socklen_t &len, int flags) const {
   while (true) {
-    const int raw = accept4(raw_fd(), &storage, &len, SOCK_CLOEXEC | flags);
+    const int raw = accept4(raw_fd(), &sockaddr.sa, &len, SOCK_CLOEXEC | flags);
     if (raw != -1) {
       return Socket(FileDescriptor(raw));
     }
@@ -47,13 +45,10 @@ Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
 }
 
 error::result<void> Socket::connect(const SocketAddr &addr) const {
-  const auto [sockaddr_union, len] = addr.to_sockaddr();
-
-  const auto *const sockaddr =
-      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
+  const auto [sockaddr, len] = addr.to_sockaddr();
 
   while (true) {
-    const auto result = ::connect(raw_fd(), sockaddr, len);
+    const auto result = ::connect(raw_fd(), &sockaddr.sa, len);
 
     if (result != -1 || errno == EISCONN) {
       return {};
@@ -88,10 +83,7 @@ error::result<void> Socket::connect_timeout(
     return set_nonblocking(false);
   };
 
-  const auto *const sockaddr =
-      reinterpret_cast<const struct sockaddr *const>(&sockaddr_union);
-
-  const int connect_result = ::connect(raw_fd(), sockaddr, len);
+  const int connect_result = ::connect(raw_fd(), &sockaddr_union.sa, len);
 
   if (connect_result == 0) {
     return restore_blocking();
@@ -263,23 +255,21 @@ Socket::send(const void *buf, const size_t len, int flags) const {
 }
 
 error::result<SocketAddr> Socket::local_addr() const {
-  sockaddr_storage storage{};
-  auto len = static_cast<socklen_t>(sizeof(storage));
-  if (getsockname(raw_fd(), reinterpret_cast<sockaddr *>(&storage), &len) ==
-      -1) {
+  sockaddr_union sockaddr{};
+  auto len = sockaddr_union::SIZE;
+  if (getsockname(raw_fd(), &sockaddr.sa, &len) == -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  return SocketAddr::from_sockaddr(storage, len);
+  return SocketAddr::from_sockaddr(sockaddr, len);
 }
 
 error::result<SocketAddr> Socket::peer_addr() const {
-  sockaddr_storage storage{};
-  auto len = static_cast<socklen_t>(sizeof(storage));
-  if (getpeername(raw_fd(), reinterpret_cast<sockaddr *>(&storage), &len) ==
-      -1) {
+  sockaddr_union sockaddr{};
+  auto len = sockaddr_union::SIZE;
+  if (getpeername(raw_fd(), &sockaddr.sa, &len) == -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  return SocketAddr::from_sockaddr(storage, len);
+  return SocketAddr::from_sockaddr(sockaddr, len);
 }
 
 error::result<void> Socket::shutdown(Shutdown how) const {

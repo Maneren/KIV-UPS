@@ -57,7 +57,6 @@ error::result<uint32_t> parse_scope_id(const std::string_view scope_part) {
 
 sockaddr_in SocketAddrV4::to_sockaddr() const {
   sockaddr_in addr_in{};
-  std::memset(&addr_in, 0, sizeof(addr_in));
   addr_in.sin_family = AF_INET;
   addr_in.sin_port = htons(port_);
 
@@ -68,34 +67,33 @@ sockaddr_in SocketAddrV4::to_sockaddr() const {
 }
 
 error::result<SocketAddrV4>
-SocketAddrV4::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
-  if (len < static_cast<socklen_t>(sizeof(sockaddr_in))) {
+SocketAddrV4::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
+  if (len < SIZE) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Invalid address length: {} < {}",
             len,
-            sizeof(sockaddr_in)
+            SIZE
         )
     );
   }
 
-  const auto *const addr_in =
-      reinterpret_cast<const sockaddr_in *const>(&storage);
-
-  if (addr_in->sin_family != FAMILY) {
+  if (sockaddr.sa.sa_family != FAMILY) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
-            "Invalid address family for IPv4: {}",
-            addr_in->sin_family
+            "Invalid address family for IPv4: {:x}",
+            sockaddr.sa.sa_family
         )
     );
   }
 
-  static_assert(sizeof(addr_in->sin_addr.s_addr) == Ipv4Addr::BYTES);
+  const auto &ipv4 = sockaddr.ipv4;
+
+  static_assert(sizeof(ipv4.sin_addr.s_addr) == Ipv4Addr::BYTES);
   return SocketAddrV4{
-      Ipv4Addr{ntohl(addr_in->sin_addr.s_addr)}, ntohs(addr_in->sin_port)
+      Ipv4Addr{ntohl(ipv4.sin_addr.s_addr)}, ntohs(ipv4.sin_port)
   };
 }
 
@@ -150,14 +148,16 @@ sockaddr_in6 SocketAddrV6::to_sockaddr() const {
   addr_in6.sin6_scope_id = scope_id_;
 
   static_assert(sizeof(addr_in6.sin6_addr.s6_addr) == Ipv6Addr::BYTES);
-  std::memcpy(&addr_in6.sin6_addr.s6_addr, ip_.octets.data(), Ipv6Addr::BYTES);
+  std::memcpy(
+      &addr_in6.sin6_addr.s6_addr, ip_.to_octets().data(), Ipv6Addr::BYTES
+  );
 
   return addr_in6;
 }
 
 error::result<SocketAddrV6>
-SocketAddrV6::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
-  if (len < static_cast<socklen_t>(sizeof(sockaddr_in6))) {
+SocketAddrV6::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
+  if (len < SIZE) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
@@ -168,25 +168,24 @@ SocketAddrV6::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
     );
   }
 
-  const auto *const addr_in6 =
-      reinterpret_cast<const sockaddr_in6 *const>(&storage);
-
-  if (addr_in6->sin6_family != FAMILY) {
+  if (sockaddr.sa.sa_family != FAMILY) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Invalid address family for IPv6: {}",
-            addr_in6->sin6_family
+            sockaddr.sa.sa_family
         )
     );
   }
 
-  static_assert(sizeof(addr_in6->sin6_addr.s6_addr) == Ipv6Addr::BYTES);
+  const auto &ipv6 = sockaddr.ipv6;
+
+  static_assert(sizeof(ipv6.sin6_addr.s6_addr) == Ipv6Addr::BYTES);
   return SocketAddrV6{
-      Ipv6Addr{static_cast<const uint8_t *>(addr_in6->sin6_addr.s6_addr)},
-      ntohs(addr_in6->sin6_port),
-      ntohl(addr_in6->sin6_flowinfo),
-      addr_in6->sin6_scope_id
+      Ipv6Addr{static_cast<const uint8_t *>(ipv6.sin6_addr.s6_addr)},
+      ntohs(ipv6.sin6_port),
+      ntohl(ipv6.sin6_flowinfo),
+      ipv6.sin6_scope_id
   };
 }
 
@@ -253,27 +252,26 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(const std::string &str) {
 // SocketAddr
 
 error::result<SocketAddr>
-SocketAddr::from_sockaddr(const sockaddr_storage &storage, socklen_t len) {
-  switch (storage.ss_family) {
+SocketAddr::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
+  switch (sockaddr.sa.sa_family) {
   case SocketAddrV4::FAMILY:
-    return SocketAddrV4::from_sockaddr(storage, len)
+    return SocketAddrV4::from_sockaddr(sockaddr, len)
         .map(functional::Constructor<SocketAddr>());
   case SocketAddrV6::FAMILY:
-    return SocketAddrV6::from_sockaddr(storage, len)
+    return SocketAddrV6::from_sockaddr(sockaddr, len)
         .map(functional::Constructor<SocketAddr>());
   default:
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Unrecognized socket family: {}",
-            storage.ss_family
+            sockaddr.sa.sa_family
         )
     );
   }
 }
 
-std::tuple<SocketAddr::sockaddr_union, socklen_t>
-SocketAddr::to_sockaddr() const {
+std::tuple<sockaddr_union, socklen_t> SocketAddr::to_sockaddr() const {
   return match::match(
       inner,
       [](const SocketAddrV4 &v4) {
@@ -328,28 +326,11 @@ SocketAddr::resolve(const std::string &host, uint16_t port) {
 
   std::vector<SocketAddr> out;
   for (const struct addrinfo *ai = list; ai != nullptr; ai = ai->ai_next) {
-    if (ai->ai_family == AF_INET && ai->ai_addrlen >= sizeof(sockaddr_in)) {
-      const auto *in = reinterpret_cast<const sockaddr_in *>(ai->ai_addr);
-      sockaddr_storage storage{};
-      std::memcpy(&storage, in, sizeof(sockaddr_in));
-      if (auto addr = SocketAddrV4::from_sockaddr(
-              storage, static_cast<socklen_t>(sizeof(sockaddr_in))
-          );
-          addr) {
-        out.emplace_back(*addr);
-      }
-    } else if (
-        ai->ai_family == AF_INET6 && ai->ai_addrlen >= sizeof(sockaddr_in6)
-    ) {
-      const auto *in6 = reinterpret_cast<const sockaddr_in6 *>(ai->ai_addr);
-      sockaddr_storage storage{};
-      std::memcpy(&storage, in6, sizeof(sockaddr_in6));
-      if (auto addr = SocketAddrV6::from_sockaddr(
-              storage, static_cast<socklen_t>(sizeof(sockaddr_in6))
-          );
-          addr) {
-        out.emplace_back(*addr);
-      }
+
+    const sockaddr_union sockaddr{.sa = *ai->ai_addr};
+
+    if (auto addr = SocketAddr::from_sockaddr(sockaddr, ai->ai_addrlen); addr) {
+      out.emplace_back(*addr);
     }
   }
   freeaddrinfo(list);

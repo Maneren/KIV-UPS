@@ -10,5 +10,7 @@ Checks: >-
   -readability-identifier-length,
   -modernize-use-trailing-return-type,
   -cppcoreguidelines-avoid-c-arrays,
+  -modernize-avoid-c-arrays,
+  -cppcoreguidelines-pro-type-union-access,
   -misc-no-recursion,
 FormatStyle: file

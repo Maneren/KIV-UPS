@@ -46,9 +46,9 @@ TEST_F(AddressTest, SocketAddrV4Sockaddr) {
 
 TEST_F(AddressTest, SocketAddrV4FromSockaddr) {
   const auto sockaddr = addr4.to_sockaddr();
-  const auto addr = SocketAddrV4::from_sockaddr(
-      reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
-  );
+  const sockaddr_union addr4_storage = {.ipv4 = sockaddr};
+  const auto addr =
+      SocketAddrV4::from_sockaddr(addr4_storage, sizeof(sockaddr));
   ASSERT_TRUE(addr.has_value());
   ASSERT_EQ(addr.value(), addr4);
 }
@@ -57,19 +57,19 @@ TEST_F(AddressTest, SocketAddrV4FromSockaddrWrongFamily) {
   auto sockaddr = addr4.to_sockaddr();
   sockaddr.sin_family = AF_INET6;
 
-  const auto addr = SocketAddrV4::from_sockaddr(
-      reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
-  );
+  const sockaddr_union addr4_storage = {.ipv4 = sockaddr};
+  const auto addr =
+      SocketAddrV4::from_sockaddr(addr4_storage, sizeof(sockaddr));
 
   ASSERT_FALSE(addr.has_value());
 }
 
 TEST_F(AddressTest, SocketAddrV4FromSockaddrWrongLen) {
   auto sockaddr = addr4.to_sockaddr();
+  const sockaddr_union addr4_storage = {.ipv4 = sockaddr};
 
-  const auto addr = SocketAddrV4::from_sockaddr(
-      reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr) - 1
-  );
+  const auto addr =
+      SocketAddrV4::from_sockaddr(addr4_storage, sizeof(sockaddr) - 1);
 
   ASSERT_FALSE(addr.has_value());
 }
@@ -111,7 +111,7 @@ TEST_F(AddressTest, SocketAddrV6Sockaddr) {
 
   ASSERT_TRUE(
       std::memcmp(
-          sockaddr.sin6_addr.s6_addr, ip6.octets.data(), Ipv6Addr::BYTES
+          sockaddr.sin6_addr.s6_addr, ip6.to_octets().data(), Ipv6Addr::BYTES
       ) == 0
   );
 }
@@ -138,9 +138,9 @@ TEST_F(AddressTest, SocketAddrV6FromStringRequiresBracketsAndPort) {
 
 TEST_F(AddressTest, SocketAddrV6FromSockaddr) {
   const auto sockaddr = addr6.to_sockaddr();
-  const auto addr = SocketAddrV6::from_sockaddr(
-      reinterpret_cast<const sockaddr_storage &>(sockaddr), sizeof(sockaddr)
-  );
+  const sockaddr_union storage = {.ipv6 = sockaddr};
+  const auto addr =
+      SocketAddr::from_sockaddr(storage, sizeof(sockaddr)).value();
   ASSERT_EQ(addr, addr6);
 }
 
