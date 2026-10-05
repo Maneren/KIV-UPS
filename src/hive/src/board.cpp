@@ -84,7 +84,7 @@ std::generator<Move> Board::moves_for_piece(TilePointer pos, Piece piece) {
           &Board::beetle_moves,
           &Board::grasshopper_moves,
           &Board::ant_moves
-      };
+  };
 
   const auto &handler =
       PIECE_HANDLERS.at(static_cast<std::uint8_t>(piece.kind));

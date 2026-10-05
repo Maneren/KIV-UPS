@@ -128,8 +128,9 @@ TEST_F(ThreadPoolTest, RecursiveSpawnDoesNotDeadlock) {
 
   for (auto [i, outer] : std::views::enumerate(outers)) {
     ASSERT_EQ(
-      outer.wait_for(std::chrono::seconds(10)), std::future_status::ready
-    ) << "deadlock: outer task " << i << " not ready within 10s";
+        outer.wait_for(std::chrono::seconds(10)), std::future_status::ready
+    ) << "deadlock: outer task "
+      << i << " not ready within 10s";
     EXPECT_EQ(outer.get(), i * 2);
   }
 }

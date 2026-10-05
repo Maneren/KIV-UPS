@@ -3,6 +3,7 @@
 # SHA fails.
 FetchContent_Declare(
     raylib_cpp
-    URL https://github.com/RobLoach/raylib-cpp/archive/8e01c1dd8fbbe12199fc1256c3bc801d5745ad48.tar.gz
+    URL
+        https://github.com/RobLoach/raylib-cpp/archive/8e01c1dd8fbbe12199fc1256c3bc801d5745ad48.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP ON
 )
