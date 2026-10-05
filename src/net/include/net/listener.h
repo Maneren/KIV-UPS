@@ -13,8 +13,11 @@ class TcpListener {
 public:
   TcpListener(Socket &&sock) : sock(std::move(sock)) {}
   static error::result<TcpListener> bind(const Address &addr);
+  static error::result<TcpListener>
+  bind_with_backlog(const Address &addr, int backlog);
 
   Socket &socket() { return sock; }
+  [[nodiscard]] const Socket &socket() const { return sock; }
 
   [[nodiscard]] error::result<std::tuple<TcpStream, Address>> accept() const;
 

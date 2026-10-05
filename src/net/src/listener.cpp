@@ -8,18 +8,29 @@ namespace net {
 constexpr int BACKLOG = 32;
 
 error::result<TcpListener> TcpListener::bind(const Address &addr) {
-  auto sock = Socket::create(addr, SOCK_STREAM).value();
-  if (const auto result = sock.setopts(SOL_SOCKET, SO_REUSEADDR, 1); !result) {
-    return tl::make_unexpected(result.error());
-  }
+  return bind_with_backlog(addr, BACKLOG);
+}
 
-  if (const auto result = sock.bind_to(addr); !result) {
-    return tl::make_unexpected(result.error());
-  }
+error::result<TcpListener>
+TcpListener::bind_with_backlog(const Address &addr, int backlog) {
+  return Socket::create(addr, SOCK_STREAM)
+      .and_then([&addr, backlog](Socket sock) -> error::result<TcpListener> {
+        if (const auto result = sock.setopts(SOL_SOCKET, SO_REUSEADDR, 1);
+            !result) {
+          return tl::make_unexpected(result.error());
+        }
 
-  return error::from_os(listen(sock.raw_fd(), BACKLOG)).map([&](auto) {
-    return TcpListener(std::move(sock));
-  });
+        if (const auto result = sock.bind_to(addr); !result) {
+          return tl::make_unexpected(result.error());
+        }
+
+        if (const auto result = error::from_os(listen(sock.raw_fd(), backlog));
+            !result) {
+          return tl::make_unexpected(result.error());
+        }
+
+        return TcpListener(std::move(sock));
+      });
 }
 
 error::result<std::tuple<TcpStream, Address>> TcpListener::accept() const {
