@@ -10,7 +10,7 @@ class FileDescriptor {
 
 public:
   FileDescriptor();
-  FileDescriptor(int fd);
+  explicit FileDescriptor(int fd);
   ~FileDescriptor();
 
   FileDescriptor(const FileDescriptor &) = delete;
@@ -22,10 +22,17 @@ public:
   FileDescriptor(FileDescriptor &&other) noexcept : fd(other.fd) {
     other.fd = -1;
   }
-  FileDescriptor &operator=(FileDescriptor &&other) noexcept {
-    this->fd = other.fd;
-    other.fd = -1;
-    return *this;
+  FileDescriptor &operator=(FileDescriptor &&other) noexcept;
+
+  void close() noexcept;
+
+  [[nodiscard]] constexpr bool valid() const { return fd != -1; }
+
+  /// Release ownership without closing. Returns the raw fd, or -1.
+  int release() noexcept {
+    const int raw = fd;
+    fd = -1;
+    return raw;
   }
 
   [[nodiscard]]

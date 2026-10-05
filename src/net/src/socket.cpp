@@ -13,7 +13,9 @@ namespace net {
 error::result<Socket> Socket::create(int family, int type) {
   int fd = socket(family, type | SOCK_CLOEXEC, 0);
 
-  return error::from_os(fd).map(functional::Constructor<Socket>());
+  return error::from_os(fd).map([](int raw) {
+    return Socket(FileDescriptor(raw));
+  });
 }
 
 error::result<void> Socket::bind_to(const Address &addr) const {
@@ -28,7 +30,7 @@ error::result<void> Socket::bind_to(const Address &addr) const {
 error::result<Socket>
 Socket::accept(sockaddr &storage, socklen_t &len, int flags) const {
   return error::from_os(accept4(raw_fd(), &storage, &len, SOCK_CLOEXEC | flags))
-      .map(functional::Constructor<Socket>());
+      .map([](int raw) { return Socket(FileDescriptor(raw)); });
 }
 
 error::result<void> Socket::connect(const Address &addr) const {
