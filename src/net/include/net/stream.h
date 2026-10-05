@@ -32,33 +32,33 @@ public:
       const std::string &host, uint16_t port, std::chrono::microseconds timeout
   );
 
-  template <typename T>
-  [[nodiscard]] error::result<ssize_t> read(std::span<T> buf) const {
+  template <typename T, size_t Extent>
+  [[nodiscard]] error::result<ssize_t> read(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.read(byte_buf.data(), byte_buf.size());
   };
-  template <typename T>
-  [[nodiscard]] error::result<ssize_t> write(std::span<T> buf) const {
+  template <typename T, size_t Extent>
+  [[nodiscard]] error::result<ssize_t> write(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_bytes(buf);
     return sock.write(byte_buf.data(), byte_buf.size());
   };
 
-  template <typename T>
+  template <typename T, size_t Extent>
   [[nodiscard]] error::result<ssize_t>
-  recv(std::span<T> buf, int flags = 0) const {
+  recv(std::span<T, Extent> buf, int flags = 0) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.recv(byte_buf.data(), byte_buf.size(), flags);
   };
-  template <typename T>
+  template <typename T, size_t Extent>
   [[nodiscard]] error::result<ssize_t>
-  send(std::span<T> buf, int flags = 0) const {
+  send(std::span<T, Extent> buf, int flags = 0) const {
     const auto byte_buf = std::as_bytes(buf);
     return sock.send(byte_buf.data(), byte_buf.size(), flags);
   };
 
   // Peek at incoming data without consuming it (MSG_PEEK).
-  template <typename T>
-  [[nodiscard]] error::result<ssize_t> peek(std::span<T> buf) const {
+  template <typename T, size_t Extent>
+  [[nodiscard]] error::result<ssize_t> peek(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.recv(byte_buf.data(), byte_buf.size(), MSG_PEEK);
   }
