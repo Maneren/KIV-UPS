@@ -110,7 +110,7 @@ TEST_F(AddressTest, IPv6Sockaddr) {
   ASSERT_EQ(sockaddr.sin6_port, htons(addr6.port));
 
   ASSERT_EQ(sizeof(sockaddr.sin6_addr.s6_addr), IPv6Address::BYTES);
-  ASSERT_EQ(sockaddr.sin6_scope_id, htonl(addr6.scopeid));
+  ASSERT_EQ(sockaddr.sin6_scope_id, addr6.scopeid);
   ASSERT_EQ(sockaddr.sin6_flowinfo, htonl(addr6.flowinfo));
 
   ASSERT_TRUE(
@@ -118,6 +118,23 @@ TEST_F(AddressTest, IPv6Sockaddr) {
           sockaddr.sin6_addr.s6_addr, addr6.octets.data(), IPv6Address::BYTES
       ) == 0
   );
+}
+
+TEST_F(AddressTest, IPv4FromStringRejectsBadPorts) {
+  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:99999").has_value());
+  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:-1").has_value());
+  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:80abc").has_value());
+  ASSERT_FALSE(IPv4Address::from_string("127.0.0.1:").has_value());
+  ASSERT_TRUE(IPv4Address::from_string("127.0.0.1").has_value());
+}
+
+TEST_F(AddressTest, IPv6FromStringBracketlessHasNoPort) {
+  ASSERT_TRUE(IPv6Address::from_string("::1").has_value());
+  ASSERT_TRUE(IPv6Address::from_string("[::1]").has_value());
+  ASSERT_TRUE(IPv6Address::from_string("[::1]:80").has_value());
+  ASSERT_FALSE(IPv6Address::from_string("[::1]:99999").has_value());
+  ASSERT_FALSE(IPv6Address::from_string("[::1").has_value());
+  ASSERT_FALSE(IPv6Address::from_string("[::1]extra").has_value());
 }
 
 TEST_F(AddressTest, IPv6FromSockaddr) {

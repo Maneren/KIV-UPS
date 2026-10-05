@@ -99,14 +99,14 @@ struct Address {
   }
 
   static error::result<Address>
-  from_sockaddr(sockaddr_storage &storage, size_t len);
+  from_sockaddr(const sockaddr_storage &storage, socklen_t len);
 
   union sockaddr_union {
     sockaddr_in ipv4;
     sockaddr_in6 ipv6;
   };
 
-  [[nodiscard]] std::tuple<sockaddr_union, int> to_sockaddr() const;
+  [[nodiscard]] std::tuple<sockaddr_union, socklen_t> to_sockaddr() const;
 
   [[nodiscard]] uint16_t port() const;
   void set_port(uint16_t port);
