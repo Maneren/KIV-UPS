@@ -1,7 +1,6 @@
 #pragma once
 
 #include <hive/types.h>
-#include <stdexcept>
 #include <utility>
 #include <utils/format.h>
 #include <utils/generator.h>
@@ -9,12 +8,8 @@
 
 namespace hive {
 
-inline Direction rotate_left(Direction dir) {
-  return {dir.first + dir.second, -dir.first};
-}
-inline Direction rotate_right(Direction dir) {
-  return {-dir.second, dir.first + dir.second};
-}
+Direction rotate_left(Direction dir);
+Direction rotate_right(Direction dir);
 
 class Board {
 public:
@@ -25,10 +20,9 @@ public:
     Piece piece;
 
   public:
-    LiftPiece(TilePointer ptr, Board *board)
-        : ptr(ptr), board(board), piece(board->remove_piece(ptr)) {}
+    LiftPiece(TilePointer ptr, Board *board);
 
-    ~LiftPiece() { board->add_piece(ptr, piece); }
+    ~LiftPiece();
 
     LiftPiece(const LiftPiece &) = delete;
     LiftPiece(LiftPiece &&) noexcept = default;
@@ -36,23 +30,12 @@ public:
     LiftPiece &operator=(LiftPiece &&) noexcept = default;
   };
 
-  [[nodiscard]] const std::vector<Piece> &get(TilePointer ptr) const {
-    return data.at(ptr);
-  }
+  [[nodiscard]] const std::vector<Piece> &get(TilePointer ptr) const;
 
-  [[nodiscard]] Piece get_top(TilePointer ptr) const {
-    const auto &pieces = get(ptr);
-    if (pieces.empty()) {
-      throw std::runtime_error("No pieces at position");
-    }
-    return pieces.back();
-  }
+  [[nodiscard]] Piece get_top(TilePointer ptr) const;
 
-  [[nodiscard]] bool is_empty() const { return data.empty(); }
-  [[nodiscard]] bool is_empty(TilePointer ptr) const {
-    auto it = data.find(ptr);
-    return it == data.end() || it->second.empty();
-  }
+  [[nodiscard]] bool is_empty() const;
+  [[nodiscard]] bool is_empty(TilePointer ptr) const;
 
   [[nodiscard]] bool has_placed(Player player) const;
   [[nodiscard]] bool has_placed_queen(Player player) const;
@@ -85,10 +68,7 @@ public:
 
   [[nodiscard]] std::unordered_set<TilePointer> tiles_around_hive() const;
 
-  bool can_player_move(Player player, TilePointer ptr) {
-    return !is_empty(ptr) && has_placed_queen(player) &&
-           get_top(ptr).owner == player && !moving_breaks_hive(ptr);
-  }
+  bool can_player_move(Player player, TilePointer ptr);
 
   bool can_player_place(Player player, PieceKind kind) const;
 
@@ -123,30 +103,9 @@ public:
 
   [[nodiscard]] std::generator<Move> ant_moves(TilePointer ant);
 
-  void apply_move(Move move, Player player) {
-    if (move.from == move.to) {
-      auto &available = player_pieces.at(player).at(move.piece_kind);
+  void apply_move(Move move, Player player);
 
-      if (available == 0) {
-        throw std::runtime_error("Attempted to add piece when no pieces left");
-      }
-
-      const auto piece = Piece{.kind = move.piece_kind, .owner = player};
-      add_piece(move.from, piece);
-      --available;
-      return;
-    }
-
-    const auto piece = remove_piece(move.from);
-    if (piece.kind != move.piece_kind) {
-      throw std::runtime_error("Tried to move piece of different kind");
-    }
-    add_piece(move.to, piece);
-  };
-
-  const std::map<Player, PlayerPiecesMap> &get_player_pieces() const {
-    return player_pieces;
-  }
+  const std::map<Player, PlayerPiecesMap> &get_player_pieces() const;
 
 private:
   std::unordered_map<TilePointer, std::vector<Piece>> data;

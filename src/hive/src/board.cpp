@@ -4,6 +4,7 @@
 #include <queue>
 #include <ranges>
 #include <stack>
+#include <stdexcept>
 #include <unordered_set>
 #include <utility>
 
@@ -136,6 +137,68 @@ Board::players_tiles(Player player) const {
 
     co_yield {pos, tile.back()};
   }
+}
+
+Direction rotate_left(Direction dir) {
+  return {dir.first + dir.second, -dir.first};
+}
+
+Direction rotate_right(Direction dir) {
+  return {-dir.second, dir.first + dir.second};
+}
+
+Board::LiftPiece::LiftPiece(TilePointer ptr, Board *board)
+    : ptr(ptr), board(board), piece(board->remove_piece(ptr)) {}
+
+Board::LiftPiece::~LiftPiece() { board->add_piece(ptr, piece); }
+
+const std::vector<Piece> &Board::get(TilePointer ptr) const {
+  return data.at(ptr);
+}
+
+Piece Board::get_top(TilePointer ptr) const {
+  const auto &pieces = get(ptr);
+  if (pieces.empty()) {
+    throw std::runtime_error("No pieces at position");
+  }
+  return pieces.back();
+}
+
+bool Board::is_empty() const { return data.empty(); }
+
+bool Board::is_empty(TilePointer ptr) const {
+  const auto it = data.find(ptr);
+  return it == data.end() || it->second.empty();
+}
+
+bool Board::can_player_move(Player player, TilePointer ptr) {
+  return !is_empty(ptr) && has_placed_queen(player) &&
+         get_top(ptr).owner == player && !moving_breaks_hive(ptr);
+}
+
+void Board::apply_move(Move move, Player player) {
+  if (move.from == move.to) {
+    auto &available = player_pieces.at(player).at(move.piece_kind);
+
+    if (available == 0) {
+      throw std::runtime_error("Attempted to add piece when no pieces left");
+    }
+
+    const auto piece = Piece{.kind = move.piece_kind, .owner = player};
+    add_piece(move.from, piece);
+    --available;
+    return;
+  }
+
+  const auto piece = remove_piece(move.from);
+  if (piece.kind != move.piece_kind) {
+    throw std::runtime_error("Tried to move piece of different kind");
+  }
+  add_piece(move.to, piece);
+}
+
+const std::map<Player, PlayerPiecesMap> &Board::get_player_pieces() const {
+  return player_pieces;
 }
 
 void Board::add_piece(TilePointer ptr, Piece piece) {

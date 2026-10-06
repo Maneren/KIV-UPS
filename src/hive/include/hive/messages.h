@@ -25,14 +25,12 @@ class MoveMessage : Message {
   Player _player;
 
 public:
-  MoveMessage(Move move, Player player) : _move(move), _player(player) {}
+  MoveMessage(Move move, Player player);
 
-  bool operator==(const MoveMessage &other) const {
-    return _move == other._move && _player == other._player;
-  }
+  bool operator==(const MoveMessage &other) const;
 
-  [[nodiscard]] Move move() const { return _move; }
-  [[nodiscard]] Player player() const { return _player; }
+  [[nodiscard]] Move move() const;
+  [[nodiscard]] Player player() const;
 };
 
 class OkMessage : Message {
