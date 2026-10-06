@@ -1,10 +1,30 @@
 #include <arpa/inet.h>
+#include <cstring>
 #include <net/ip_addr.h>
 #include <netinet/in.h>
+#include <utils/match.h>
+#include <utils/ranges.h>
 
 namespace net {
 
 // Ipv4Addr
+
+Ipv4Addr::Ipv4Addr(uint32_t addr) {
+  const auto in_net_endian = htonl(addr);
+  std::memcpy(octets.data(), &in_net_endian, BYTES);
+}
+
+uint32_t Ipv4Addr::to_bits() const {
+  uint32_t net_endian = 0;
+  std::memcpy(&net_endian, octets.data(), BYTES);
+  return ntohl(net_endian);
+}
+
+Ipv4Addr Ipv4Addr::from_bits(uint32_t bits) { return Ipv4Addr(bits); }
+
+Ipv4Addr Ipv4Addr::localhost() { return {127, 0, 0, 1}; }
+Ipv4Addr Ipv4Addr::unspecified() { return {0, 0, 0, 0}; }
+Ipv4Addr Ipv4Addr::broadcast() { return {255, 255, 255, 255}; }
 
 error::result<Ipv4Addr> Ipv4Addr::from_string(const std::string &str) {
   if (str.empty() || str.find(':') != std::string::npos) {
@@ -28,6 +48,31 @@ error::result<Ipv4Addr> Ipv4Addr::from_string(const std::string &str) {
 }
 
 // Ipv6Addr
+
+Ipv6Addr::Ipv6Addr(octets_t octets) : octets(octets) {}
+
+Ipv6Addr::Ipv6Addr(const uint8_t octets[BYTES]) {
+  std::memcpy(this->octets.data(), octets, BYTES);
+}
+
+Ipv6Addr Ipv6Addr::from_segments(std::array<uint16_t, SEGMENTS> segments) {
+  Ipv6Addr addr;
+  for (const auto [i, segment] : utils::views::enumerate_uz(segments)) {
+    addr.octets.at(2 * i) = static_cast<uint8_t>(segment >> 8);
+    addr.octets.at((2 * i) + 1) = static_cast<uint8_t>(segment);
+  }
+  return addr;
+}
+
+std::array<uint16_t, Ipv6Addr::SEGMENTS> Ipv6Addr::segments() const {
+  std::array<uint16_t, SEGMENTS> segs{};
+  for (size_t i = 0; i < SEGMENTS; ++i) {
+    segs.at(i) = static_cast<uint16_t>(
+        (static_cast<uint16_t>(octets.at(2 * i)) << 8) | octets.at((2 * i) + 1)
+    );
+  }
+  return segs;
+}
 
 bool Ipv6Addr::is_loopback() const {
   static constexpr std::array<uint8_t, BYTES> loopback{
@@ -90,6 +135,30 @@ error::result<Ipv6Addr> Ipv6Addr::from_string(const std::string &str) {
 }
 
 // IpAddr
+
+bool IpAddr::is_loopback() const {
+  return match::match(
+      inner,
+      [](const Ipv4Addr &a) { return a.is_loopback(); },
+      [](const Ipv6Addr &a) { return a.is_loopback(); }
+  );
+}
+
+bool IpAddr::is_unspecified() const {
+  return match::match(
+      inner,
+      [](const Ipv4Addr &a) { return a.is_unspecified(); },
+      [](const Ipv6Addr &a) { return a.is_unspecified(); }
+  );
+}
+
+bool IpAddr::is_multicast() const {
+  return match::match(
+      inner,
+      [](const Ipv4Addr &a) { return a.is_multicast(); },
+      [](const Ipv6Addr &a) { return a.is_multicast(); }
+  );
+}
 
 error::result<IpAddr> IpAddr::from_string(const std::string &str) {
   if (const auto v4 = Ipv4Addr::from_string(str); v4) {

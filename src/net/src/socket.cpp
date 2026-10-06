@@ -11,9 +11,19 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <utility>
 #include <utils/functional.h>
 
 namespace net {
+
+Socket::Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
+
+Socket::Socket(Socket &&other) noexcept : fd(std::move(other.fd)) {}
+
+Socket &Socket::operator=(Socket &&other) noexcept {
+  this->fd = std::move(other.fd);
+  return *this;
+}
 
 error::result<Socket> Socket::create(int family, int type) {
   const int fd = socket(family, type | SOCK_CLOEXEC, 0);
@@ -21,6 +31,14 @@ error::result<Socket> Socket::create(int family, int type) {
   return error::from_os(fd).map([](int raw) {
     return Socket(FileDescriptor(raw));
   });
+}
+
+error::result<Socket> Socket::create(const SocketAddr &addr, int type) {
+  return create(addr.family(), type);
+}
+
+error::result<Socket> Socket::duplicate() const {
+  return fd.duplicate().map(functional::Constructor<Socket>());
 }
 
 error::result<void> Socket::bind_to(const SocketAddr &addr) const {

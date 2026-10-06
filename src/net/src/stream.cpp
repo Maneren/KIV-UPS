@@ -114,8 +114,65 @@ error::result<void> TcpStream::write_all(std::span<const std::byte> buf) const {
   return {};
 }
 
-TcpStream::~TcpStream() = default;
+error::result<TcpStream> TcpStream::try_clone() const {
+  return sock.duplicate().map([](Socket s) { return TcpStream(std::move(s)); });
+}
 
+error::result<SocketAddr> TcpStream::local_addr() const {
+  return sock.local_addr();
+}
+
+error::result<SocketAddr> TcpStream::peer_addr() const {
+  return sock.peer_addr();
+}
+
+error::result<void> TcpStream::shutdown(Shutdown how) const {
+  return sock.shutdown(how);
+}
+
+error::result<void> TcpStream::set_nonblocking(bool nonblocking) const {
+  return sock.set_nonblocking(nonblocking);
+}
+
+error::result<std::optional<error::IoError>> TcpStream::take_error() const {
+  return sock.take_error();
+}
+
+error::result<void> TcpStream::set_nodelay(bool nodelay) const {
+  return sock.set_nodelay(nodelay);
+}
+
+error::result<bool> TcpStream::nodelay() const { return sock.nodelay(); }
+
+error::result<void> TcpStream::set_ttl(uint32_t ttl) const {
+  return sock.set_ttl(ttl);
+}
+
+error::result<uint32_t> TcpStream::ttl() const { return sock.ttl(); }
+
+error::result<void> TcpStream::set_read_timeout(
+    std::optional<std::chrono::microseconds> timeout
+) const {
+  return sock.set_read_timeout(timeout);
+}
+
+error::result<std::optional<std::chrono::microseconds>>
+TcpStream::read_timeout() const {
+  return sock.read_timeout();
+}
+
+error::result<void> TcpStream::set_write_timeout(
+    std::optional<std::chrono::microseconds> timeout
+) const {
+  return sock.set_write_timeout(timeout);
+}
+
+error::result<std::optional<std::chrono::microseconds>>
+TcpStream::write_timeout() const {
+  return sock.write_timeout();
+}
+
+TcpStream::~TcpStream() = default;
 TcpStream::TcpStream(TcpStream &&other) noexcept
     : sock(std::move(other.sock)) {}
 

@@ -23,21 +23,16 @@ class Socket {
   FileDescriptor fd;
 
 public:
-  explicit Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
+  explicit Socket(FileDescriptor &&fd);
 
   static error::result<Socket> create(int family, int type);
-  static error::result<Socket> create(const SocketAddr &addr, int type) {
-    return create(addr.family(), type);
-  };
+  static error::result<Socket> create(const SocketAddr &addr, int type);
 
   Socket(const Socket &) = delete;
   Socket &operator=(const Socket &) = delete;
 
-  Socket(Socket &&other) noexcept : fd(std::move(other.fd)) {}
-  Socket &operator=(Socket &&other) noexcept {
-    this->fd = std::move(other.fd);
-    return *this;
-  }
+  Socket(Socket &&other) noexcept;
+  Socket &operator=(Socket &&other) noexcept;
 
   ~Socket() = default;
 
@@ -96,9 +91,7 @@ public:
 
   [[nodiscard]] error::result<void> shutdown(Shutdown how) const;
 
-  [[nodiscard]] error::result<Socket> duplicate() const {
-    return fd.duplicate().map(functional::Constructor<Socket>());
-  }
+  [[nodiscard]] error::result<Socket> duplicate() const;
 
   [[nodiscard]] error::result<void> set_reuseaddr(bool reuse) const;
   [[nodiscard]] error::result<void> set_nodelay(bool nodelay) const;

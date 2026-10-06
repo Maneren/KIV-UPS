@@ -80,8 +80,7 @@ struct SimpleMessage {
   ErrorKind kind;
   std::string msg;
 
-  SimpleMessage(ErrorKind kind, std::string msg)
-      : kind{kind}, msg{std::move(msg)} {}
+  SimpleMessage(ErrorKind kind, std::string msg);
 
   template <typename... Args>
   SimpleMessage(
@@ -112,22 +111,9 @@ public:
   // NOLINTNEXTLINE(*explicit-constructor)
   IoError(SimpleMessage &&simple) : inner{std::move(simple)} {}
 
-  [[nodiscard]] ErrorKind kind() const {
-    return match::match(
-        inner,
-        [](const Os &os) { return from_errno(os.code); },
-        [](const Simple &simple) { return simple.kind; },
-        [](const SimpleMessage &simple) { return simple.kind; }
-    );
-  }
+  [[nodiscard]] ErrorKind kind() const;
 
-  [[nodiscard]] std::optional<int> os_code() const {
-    return match::match(
-        inner,
-        [](const Os &os) -> std::optional<int> { return os.code; },
-        [](const auto &) -> std::optional<int> { return std::nullopt; }
-    );
-  }
+  [[nodiscard]] std::optional<int> os_code() const;
 
   [[nodiscard]] const Variant &data() const { return inner; }
   [[nodiscard]] Variant &data() { return inner; }
@@ -143,8 +129,7 @@ template <typename T> result<T> from_os(T code) {
   return code;
 }
 
-inline IoError last_os_error() { return IoError{Os{errno}}; }
-
+IoError last_os_error();
 } // namespace net::error
 
 template <> struct std::formatter<net::error::IoError> {

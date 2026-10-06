@@ -68,52 +68,25 @@ public:
   [[nodiscard]] error::result<void>
   write_all(std::span<const std::byte> buf) const;
 
-  [[nodiscard]] error::result<TcpStream> try_clone() const {
-    return sock.duplicate().map([](Socket s) {
-      return TcpStream(std::move(s));
-    });
-  }
+  [[nodiscard]] error::result<TcpStream> try_clone() const;
 
-  [[nodiscard]] error::result<SocketAddr> local_addr() const {
-    return sock.local_addr();
-  }
-  [[nodiscard]] error::result<SocketAddr> peer_addr() const {
-    return sock.peer_addr();
-  }
-  [[nodiscard]] error::result<void> shutdown(Shutdown how) const {
-    return sock.shutdown(how);
-  }
-  [[nodiscard]] error::result<void> set_nonblocking(bool nonblocking) const {
-    return sock.set_nonblocking(nonblocking);
-  }
-  [[nodiscard]] error::result<std::optional<error::IoError>>
-  take_error() const {
-    return sock.take_error();
-  }
-  [[nodiscard]] error::result<void> set_nodelay(bool nodelay) const {
-    return sock.set_nodelay(nodelay);
-  }
-  [[nodiscard]] error::result<bool> nodelay() const { return sock.nodelay(); }
-  [[nodiscard]] error::result<void> set_ttl(uint32_t ttl) const {
-    return sock.set_ttl(ttl);
-  }
-  [[nodiscard]] error::result<uint32_t> ttl() const { return sock.ttl(); }
+  [[nodiscard]] error::result<SocketAddr> local_addr() const;
+  [[nodiscard]] error::result<SocketAddr> peer_addr() const;
+  [[nodiscard]] error::result<void> shutdown(Shutdown how) const;
+  [[nodiscard]] error::result<void> set_nonblocking(bool nonblocking) const;
+  [[nodiscard]] error::result<std::optional<error::IoError>> take_error() const;
+  [[nodiscard]] error::result<void> set_nodelay(bool nodelay) const;
+  [[nodiscard]] error::result<bool> nodelay() const;
+  [[nodiscard]] error::result<void> set_ttl(uint32_t ttl) const;
+  [[nodiscard]] error::result<uint32_t> ttl() const;
   [[nodiscard]] error::result<void>
-  set_read_timeout(std::optional<std::chrono::microseconds> timeout) const {
-    return sock.set_read_timeout(timeout);
-  }
+  set_read_timeout(std::optional<std::chrono::microseconds> timeout) const;
   [[nodiscard]] error::result<std::optional<std::chrono::microseconds>>
-  read_timeout() const {
-    return sock.read_timeout();
-  }
+  read_timeout() const;
   [[nodiscard]] error::result<void>
-  set_write_timeout(std::optional<std::chrono::microseconds> timeout) const {
-    return sock.set_write_timeout(timeout);
-  }
+  set_write_timeout(std::optional<std::chrono::microseconds> timeout) const;
   [[nodiscard]] error::result<std::optional<std::chrono::microseconds>>
-  write_timeout() const {
-    return sock.write_timeout();
-  }
+  write_timeout() const;
 
   [[nodiscard]] const Socket &socket() const { return sock; }
 };

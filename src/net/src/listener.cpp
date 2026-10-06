@@ -1,10 +1,13 @@
 #include <net/listener.h>
 #include <sys/socket.h>
 #include <tl/expected.hpp>
+#include <utility>
 
 namespace net {
 
 constexpr int BACKLOG = 32;
+
+TcpListener::TcpListener(Socket &&sock) : sock(std::move(sock)) {}
 
 error::result<TcpListener> TcpListener::bind(const SocketAddr &addr) {
   return bind_with_backlog(addr, BACKLOG);
@@ -50,5 +53,29 @@ error::result<std::tuple<TcpStream, SocketAddr>> TcpListener::accept() const {
 
   return std::make_tuple(TcpStream(std::move(sock.value())), addr.value());
 }
+
+error::result<SocketAddr> TcpListener::local_addr() const {
+  return sock.local_addr();
+}
+
+error::result<TcpListener> TcpListener::duplicate() const {
+  return sock.duplicate().map([](Socket s) {
+    return TcpListener(std::move(s));
+  });
+}
+
+error::result<void> TcpListener::set_nonblocking(bool nonblocking) const {
+  return sock.set_nonblocking(nonblocking);
+}
+
+error::result<std::optional<error::IoError>> TcpListener::take_error() const {
+  return sock.take_error();
+}
+
+error::result<void> TcpListener::set_ttl(uint32_t ttl) const {
+  return sock.set_ttl(ttl);
+}
+
+error::result<uint32_t> TcpListener::ttl() const { return sock.ttl(); }
 
 } // namespace net

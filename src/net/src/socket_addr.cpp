@@ -6,6 +6,8 @@
 #include <string>
 #include <string_view>
 #include <utils/functional.h>
+#include <utils/match.h>
+#include <variant>
 
 namespace net {
 
@@ -250,6 +252,55 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(const std::string &str) {
 }
 
 // SocketAddr
+
+SocketAddr::SocketAddr(const IpAddr &ip, uint16_t port)
+    : inner(SocketAddrV4(Ipv4Addr(), port)) {
+  match::match(
+      ip.inner,
+      [port, this](const Ipv4Addr &v4) { inner = SocketAddrV4(v4, port); },
+      [port, this](const Ipv6Addr &v6) { inner = SocketAddrV6(v6, port); }
+  );
+}
+
+IpAddr SocketAddr::ip() const {
+  return match::match(
+      inner,
+      [](const SocketAddrV4 &v4) { return IpAddr(v4.ip()); },
+      [](const SocketAddrV6 &v6) { return IpAddr(v6.ip()); }
+  );
+}
+
+void SocketAddr::set_ip(const IpAddr &ip) {
+  match::match(
+      inner,
+      [&ip](SocketAddrV4 &v4) {
+        if (const auto *v = std::get_if<Ipv4Addr>(&ip.inner)) {
+          v4.set_ip(*v);
+        }
+      },
+      [&ip](SocketAddrV6 &v6) {
+        if (const auto *v = std::get_if<Ipv6Addr>(&ip.inner)) {
+          v6.set_ip(*v);
+        }
+      }
+  );
+}
+
+uint16_t SocketAddr::port() const {
+  return match::match(
+      inner,
+      [](const SocketAddrV4 &v4) { return v4.port(); },
+      [](const SocketAddrV6 &v6) { return v6.port(); }
+  );
+}
+
+void SocketAddr::set_port(uint16_t port) {
+  match::match(
+      inner,
+      [port](SocketAddrV4 &v4) { v4.set_port(port); },
+      [port](SocketAddrV6 &v6) { v6.set_port(port); }
+  );
+}
 
 error::result<SocketAddr>
 SocketAddr::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {

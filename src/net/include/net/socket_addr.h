@@ -110,52 +110,13 @@ struct SocketAddr {
   // NOLINTNEXTLINE(*explicit-constructor)
   SocketAddr(SocketAddrV6 addr) : inner(addr) {}
 
-  SocketAddr(const IpAddr &ip, uint16_t port)
-      : inner(SocketAddrV4(Ipv4Addr(), port)) {
-    match::match(
-        ip.inner,
-        [port, this](const Ipv4Addr &v4) { inner = SocketAddrV4(v4, port); },
-        [port, this](const Ipv6Addr &v6) { inner = SocketAddrV6(v6, port); }
-    );
-  }
+  SocketAddr(const IpAddr &ip, uint16_t port);
 
-  [[nodiscard]] IpAddr ip() const {
-    return match::match(
-        inner,
-        [](const SocketAddrV4 &v4) { return IpAddr(v4.ip()); },
-        [](const SocketAddrV6 &v6) { return IpAddr(v6.ip()); }
-    );
-  }
-  void set_ip(const IpAddr &ip) {
-    match::match(
-        inner,
-        [&ip](SocketAddrV4 &v4) {
-          if (const auto *v = std::get_if<Ipv4Addr>(&ip.inner)) {
-            v4.set_ip(*v);
-          }
-        },
-        [&ip](SocketAddrV6 &v6) {
-          if (const auto *v = std::get_if<Ipv6Addr>(&ip.inner)) {
-            v6.set_ip(*v);
-          }
-        }
-    );
-  }
+  [[nodiscard]] IpAddr ip() const;
+  void set_ip(const IpAddr &ip);
 
-  [[nodiscard]] uint16_t port() const {
-    return match::match(
-        inner,
-        [](const SocketAddrV4 &v4) { return v4.port(); },
-        [](const SocketAddrV6 &v6) { return v6.port(); }
-    );
-  }
-  void set_port(uint16_t port) {
-    match::match(
-        inner,
-        [port](SocketAddrV4 &v4) { v4.set_port(port); },
-        [port](SocketAddrV6 &v6) { v6.set_port(port); }
-    );
-  }
+  [[nodiscard]] uint16_t port() const;
+  void set_port(uint16_t port);
 
   [[nodiscard]] constexpr int family() const {
     return match::match(

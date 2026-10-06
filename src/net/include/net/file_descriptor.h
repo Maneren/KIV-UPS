@@ -18,9 +18,7 @@ public:
   [[nodiscard]]
   error::result<FileDescriptor> duplicate() const;
 
-  FileDescriptor(FileDescriptor &&other) noexcept : fd(other.fd) {
-    other.fd = -1;
-  }
+  FileDescriptor(FileDescriptor &&other) noexcept;
   FileDescriptor &operator=(FileDescriptor &&other) noexcept;
 
   void close() noexcept;
@@ -28,11 +26,7 @@ public:
   [[nodiscard]] constexpr bool valid() const { return fd != -1; }
 
   /// Release ownership without closing. Returns the raw fd, or -1.
-  int release() noexcept {
-    const int raw = fd;
-    fd = -1;
-    return raw;
-  }
+  int release() noexcept;
 
   [[nodiscard]]
   constexpr int raw() const {

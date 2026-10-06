@@ -9,6 +9,16 @@ FileDescriptor::FileDescriptor() : fd(-1) {}
 FileDescriptor::FileDescriptor(int fd) : fd(fd) {}
 FileDescriptor::~FileDescriptor() { close(); }
 
+FileDescriptor::FileDescriptor(FileDescriptor &&other) noexcept : fd(other.fd) {
+  other.fd = -1;
+}
+
+int FileDescriptor::release() noexcept {
+  const int raw = fd;
+  fd = -1;
+  return raw;
+}
+
 FileDescriptor &FileDescriptor::operator=(FileDescriptor &&other) noexcept {
   if (this != &other) {
     close();

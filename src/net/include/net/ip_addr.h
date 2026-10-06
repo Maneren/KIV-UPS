@@ -10,7 +10,6 @@
 #include <string>
 #include <sys/socket.h>
 #include <utils/match.h>
-#include <utils/ranges.h>
 #include <variant>
 
 namespace net {
@@ -24,10 +23,7 @@ struct Ipv4Addr {
       : octets{a, b, c, d} {}
   explicit constexpr Ipv4Addr(std::array<uint8_t, BYTES> octets)
       : octets(octets) {}
-  explicit Ipv4Addr(uint32_t addr) {
-    auto in_net_endian = htonl(addr);
-    std::memcpy(octets.data(), &in_net_endian, BYTES);
-  }
+  explicit Ipv4Addr(uint32_t addr);
 
   constexpr bool operator==(const Ipv4Addr &other) const = default;
 
@@ -37,14 +33,8 @@ struct Ipv4Addr {
     return octets;
   }
 
-  [[nodiscard]] uint32_t to_bits() const {
-    uint32_t net_endian = 0;
-    std::memcpy(&net_endian, octets.data(), BYTES);
-    return ntohl(net_endian);
-  }
-  [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits) {
-    return Ipv4Addr(bits);
-  }
+  [[nodiscard]] uint32_t to_bits() const;
+  [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits);
 
   [[nodiscard]] constexpr bool is_loopback() const {
     return octets.front() == 127;
@@ -65,9 +55,9 @@ struct Ipv4Addr {
            (a == 192 && b == 168);
   }
 
-  static Ipv4Addr localhost() { return {127, 0, 0, 1}; }
-  static Ipv4Addr unspecified() { return {0, 0, 0, 0}; }
-  static Ipv4Addr broadcast() { return {255, 255, 255, 255}; }
+  static Ipv4Addr localhost();
+  static Ipv4Addr unspecified();
+  static Ipv4Addr broadcast();
 
   static error::result<Ipv4Addr> from_string(const std::string &str);
 
@@ -86,18 +76,9 @@ struct Ipv6Addr {
   using octets_t = std::array<uint8_t, BYTES>;
 
   Ipv6Addr() = default;
-  explicit Ipv6Addr(octets_t octets) : octets(octets) {}
-  explicit Ipv6Addr(const uint8_t octets[BYTES]) {
-    std::memcpy(this->octets.data(), octets, BYTES);
-  }
-  static Ipv6Addr from_segments(std::array<uint16_t, SEGMENTS> segments) {
-    Ipv6Addr addr;
-    for (const auto [i, segment] : utils::views::enumerate_uz(segments)) {
-      addr.octets.at(2 * i) = static_cast<uint8_t>(segment >> 8);
-      addr.octets.at((2 * i) + 1) = static_cast<uint8_t>(segment);
-    }
-    return addr;
-  }
+  explicit Ipv6Addr(octets_t octets);
+  explicit Ipv6Addr(const uint8_t octets[BYTES]);
+  static Ipv6Addr from_segments(std::array<uint16_t, SEGMENTS> segments);
 
   constexpr bool operator==(const Ipv6Addr &other) const = default;
 
@@ -107,21 +88,11 @@ struct Ipv6Addr {
     return octets;
   }
 
-  [[nodiscard]] std::array<uint16_t, SEGMENTS> segments() const {
-    std::array<uint16_t, SEGMENTS> segments{};
-    for (const auto [i, segment] : utils::views::enumerate_uz(segments)) {
-      segments.at(i) = static_cast<uint16_t>(
-          (static_cast<uint16_t>(octets.at(2 * i)) << 8) |
-          octets.at((2 * i) + 1)
-      );
-    }
-    return segments;
-  }
+  [[nodiscard]] std::array<uint16_t, SEGMENTS> segments() const;
 
   [[nodiscard]] bool is_loopback() const;
   [[nodiscard]] bool is_unspecified() const;
   [[nodiscard]] bool is_multicast() const;
-
   static Ipv6Addr localhost();
   static Ipv6Addr unspecified();
 
@@ -156,27 +127,9 @@ struct IpAddr {
     return std::holds_alternative<Ipv6Addr>(inner);
   }
 
-  [[nodiscard]] bool is_loopback() const {
-    return match::match(
-        inner,
-        [](const Ipv4Addr &a) { return a.is_loopback(); },
-        [](const Ipv6Addr &a) { return a.is_loopback(); }
-    );
-  }
-  [[nodiscard]] bool is_unspecified() const {
-    return match::match(
-        inner,
-        [](const Ipv4Addr &a) { return a.is_unspecified(); },
-        [](const Ipv6Addr &a) { return a.is_unspecified(); }
-    );
-  }
-  [[nodiscard]] bool is_multicast() const {
-    return match::match(
-        inner,
-        [](const Ipv4Addr &a) { return a.is_multicast(); },
-        [](const Ipv6Addr &a) { return a.is_multicast(); }
-    );
-  }
+  [[nodiscard]] bool is_loopback() const;
+  [[nodiscard]] bool is_unspecified() const;
+  [[nodiscard]] bool is_multicast() const;
 
   [[nodiscard]] constexpr bool operator==(const IpAddr &other) const = default;
 
