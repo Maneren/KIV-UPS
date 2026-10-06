@@ -26,22 +26,24 @@ Ipv4Addr Ipv4Addr::localhost() { return {127, 0, 0, 1}; }
 Ipv4Addr Ipv4Addr::unspecified() { return {0, 0, 0, 0}; }
 Ipv4Addr Ipv4Addr::broadcast() { return {255, 255, 255, 255}; }
 
-error::result<Ipv4Addr> Ipv4Addr::from_string(const std::string &str) {
-  if (str.empty() || str.find(':') != std::string::npos) {
+error::result<Ipv4Addr> Ipv4Addr::from_string(std::string_view str) {
+  static constexpr auto invalid_ipv4 = [](std::string_view str) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid IPv4 address: {}", str
         )
     );
+  };
+
+  if (str.empty()) {
+    return invalid_ipv4(str);
   }
 
+  std::string null_terminated{str};
+
   struct in_addr addr{};
-  if (inet_pton(AF_INET, str.c_str(), &addr) != 1) {
-    return tl::make_unexpected(
-        error::SimpleMessage(
-            error::ErrorKind::InvalidInput, "Invalid IPv4 address: {}", str
-        )
-    );
+  if (inet_pton(AF_INET, null_terminated.c_str(), &addr) != 1) {
+    return invalid_ipv4(str);
   }
 
   return Ipv4Addr{ntohl(addr.s_addr)};
@@ -101,7 +103,7 @@ bool Ipv6Addr::is_unspecified() const {
   return octets == unspecified;
 }
 
-bool Ipv6Addr::is_multicast() const { return octets[0] == 0xff; }
+bool Ipv6Addr::is_multicast() const { return octets.front() == 0xff; }
 
 Ipv6Addr Ipv6Addr::localhost() {
   return Ipv6Addr(
@@ -113,7 +115,7 @@ Ipv6Addr Ipv6Addr::unspecified() {
   return Ipv6Addr(std::array<uint8_t, BYTES>{});
 }
 
-error::result<Ipv6Addr> Ipv6Addr::from_string(const std::string &str) {
+error::result<Ipv6Addr> Ipv6Addr::from_string(std::string_view str) {
   if (str.empty() || str.starts_with('[')) {
     return tl::make_unexpected(
         error::SimpleMessage(
@@ -122,8 +124,10 @@ error::result<Ipv6Addr> Ipv6Addr::from_string(const std::string &str) {
     );
   }
 
+  std::string null_terminated{str};
+
   struct in6_addr addr{};
-  if (inet_pton(AF_INET6, str.c_str(), &addr) != 1) {
+  if (inet_pton(AF_INET6, null_terminated.c_str(), &addr) != 1) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
@@ -160,7 +164,7 @@ bool IpAddr::is_multicast() const {
   );
 }
 
-error::result<IpAddr> IpAddr::from_string(const std::string &str) {
+error::result<IpAddr> IpAddr::from_string(std::string_view str) {
   if (const auto v4 = Ipv4Addr::from_string(str); v4) {
     return IpAddr(*v4);
   }

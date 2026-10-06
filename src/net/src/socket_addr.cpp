@@ -99,7 +99,7 @@ SocketAddrV4::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
   };
 }
 
-error::result<SocketAddrV4> SocketAddrV4::from_string(const std::string &str) {
+error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
   if (str.empty()) {
     return tl::make_unexpected(
         error::SimpleMessage(
@@ -119,8 +119,8 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(const std::string &str) {
     );
   }
 
-  const std::string ip_part = str.substr(0, colon_pos);
-  const std::string port_part = str.substr(colon_pos + 1);
+  const auto ip_part = str.substr(0, colon_pos);
+  const auto port_part = str.substr(colon_pos + 1);
 
   const auto ip = Ipv4Addr::from_string(ip_part);
   if (!ip) {
@@ -191,8 +191,8 @@ SocketAddrV6::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
   };
 }
 
-error::result<SocketAddrV6> SocketAddrV6::from_string(const std::string &str) {
-  if (str.empty() || !str.starts_with('[')) {
+error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
+  if (!str.starts_with('[')) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
@@ -200,7 +200,7 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(const std::string &str) {
     );
   }
 
-  const size_t bracket_pos = str.find(']');
+  const size_t bracket_pos = str.find(']', 1);
   if (bracket_pos == std::string::npos) {
     return tl::make_unexpected(
         error::SimpleMessage(
@@ -209,9 +209,9 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(const std::string &str) {
     );
   }
 
-  std::string ip_part = str.substr(1, bracket_pos - 1);
-  const std::string rest = str.substr(bracket_pos + 1);
-  if (rest.empty() || !rest.starts_with(':')) {
+  auto ip_part = str.substr(1, bracket_pos - 1);
+  const auto rest = str.substr(bracket_pos + 1);
+  if (!rest.starts_with(':')) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
@@ -220,12 +220,12 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(const std::string &str) {
         )
     );
   }
-  const std::string port_part = rest.substr(1);
+  const auto port_part = rest.substr(1);
 
   uint32_t scope_id = 0;
   const size_t percent_pos = ip_part.find('%');
   if (percent_pos != std::string::npos) {
-    const std::string scope_part = ip_part.substr(percent_pos + 1);
+    const auto scope_part = ip_part.substr(percent_pos + 1);
     ip_part = ip_part.substr(0, percent_pos);
     const auto parsed_scope = parse_scope_id(scope_part);
     if (!parsed_scope) {
@@ -340,7 +340,7 @@ std::tuple<sockaddr_union, socklen_t> SocketAddr::to_sockaddr() const {
   );
 }
 
-error::result<SocketAddr> SocketAddr::from_string(const std::string &str) {
+error::result<SocketAddr> SocketAddr::from_string(std::string_view str) {
   if (const auto v4 = SocketAddrV4::from_string(str); v4) {
     return SocketAddr(*v4);
   }

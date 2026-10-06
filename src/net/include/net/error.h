@@ -98,11 +98,6 @@ public:
   // Implicit converting ctors are intentional: tl::expected<T, IoError> relies
   // on unexpected<Os/Simple/SimpleMessage> converting to IoError.
   // NOLINTNEXTLINE(*explicit-constructor)
-  IoError(Variant data) : inner{std::move(data)} {}
-  // NOLINTNEXTLINE(*explicit-constructor)
-  IoError(Variant &&data) : inner{std::move(data)} {}
-
-  // NOLINTNEXTLINE(*explicit-constructor)
   IoError(const Os &os) : inner{os} {}
   // NOLINTNEXTLINE(*explicit-constructor)
   IoError(const Simple &simple) : inner{simple} {}

@@ -52,7 +52,7 @@ struct SocketAddrV4 {
   from_sockaddr(const sockaddr_union &sockaddr, socklen_t len);
 
   // Parses "127.0.0.1:80"; the port is required.
-  static error::result<SocketAddrV4> from_string(const std::string &str);
+  static error::result<SocketAddrV4> from_string(std::string_view str);
 
 private:
   Ipv4Addr ip_;
@@ -93,7 +93,7 @@ struct SocketAddrV6 {
 
   // Parses "[::1]:80" (also "[fe80::1%1]:80" with a numeric scope id);
   // the port is required.
-  static error::result<SocketAddrV6> from_string(const std::string &str);
+  static error::result<SocketAddrV6> from_string(std::string_view str);
 
 private:
   Ipv6Addr ip_;
@@ -136,7 +136,7 @@ struct SocketAddr {
   [[nodiscard]] constexpr bool
   operator==(const SocketAddr &other) const = default;
 
-  static error::result<SocketAddr> from_string(const std::string &str);
+  static error::result<SocketAddr> from_string(std::string_view str);
 
   /// Resolve a host + port via getaddrinfo (numeric or DNS name).
   static error::result<std::vector<SocketAddr>>

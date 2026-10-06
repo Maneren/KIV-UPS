@@ -18,11 +18,12 @@ struct Ipv4Addr {
   constexpr static size_t BYTES = 4;
   constexpr static int FAMILY = AF_INET;
 
+  using octets_t = std::array<uint8_t, BYTES>;
+
   constexpr Ipv4Addr() = default;
   constexpr Ipv4Addr(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
       : octets{a, b, c, d} {}
-  explicit constexpr Ipv4Addr(std::array<uint8_t, BYTES> octets)
-      : octets(octets) {}
+  explicit constexpr Ipv4Addr(octets_t octets) : octets(octets) {}
   explicit Ipv4Addr(uint32_t addr);
 
   constexpr bool operator==(const Ipv4Addr &other) const = default;
@@ -40,10 +41,10 @@ struct Ipv4Addr {
     return octets.front() == 127;
   }
   [[nodiscard]] constexpr bool is_unspecified() const {
-    return octets == std::array<uint8_t, BYTES>{0, 0, 0, 0};
+    return octets == octets_t{0, 0, 0, 0};
   }
   [[nodiscard]] constexpr bool is_broadcast() const {
-    return octets == std::array<uint8_t, BYTES>{255, 255, 255, 255};
+    return octets == octets_t{255, 255, 255, 255};
   }
   [[nodiscard]] constexpr bool is_multicast() const {
     const auto [a, _b, _c, _d] = octets;
@@ -59,10 +60,10 @@ struct Ipv4Addr {
   static Ipv4Addr unspecified();
   static Ipv4Addr broadcast();
 
-  static error::result<Ipv4Addr> from_string(const std::string &str);
+  static error::result<Ipv4Addr> from_string(std::string_view str);
 
 private:
-  std::array<uint8_t, BYTES> octets{};
+  octets_t octets{};
 
   friend std::formatter<Ipv4Addr>;
   friend struct SocketAddrV4;
@@ -98,7 +99,7 @@ struct Ipv6Addr {
 
   // Parses a bare literal, e.g. "::1". Bracketed `[ip]:port` forms
   // belong to `SocketAddrV6::from_string`.
-  static error::result<Ipv6Addr> from_string(const std::string &str);
+  static error::result<Ipv6Addr> from_string(std::string_view str);
 
 private:
   octets_t octets{};
@@ -133,7 +134,7 @@ struct IpAddr {
 
   [[nodiscard]] constexpr bool operator==(const IpAddr &other) const = default;
 
-  static error::result<IpAddr> from_string(const std::string &str);
+  static error::result<IpAddr> from_string(std::string_view str);
 };
 
 } // namespace net
