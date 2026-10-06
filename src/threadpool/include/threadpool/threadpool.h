@@ -41,7 +41,7 @@ public:
   /**
    * @brief Destroy the Threadpool object and joins all worker threads.
    */
-  ~Threadpool() { join(); }
+  ~Threadpool();
 
   /**
    * @brief Delete copy constructor.
@@ -57,9 +57,7 @@ public:
    * @brief Move construct a new Threadpool object.
    * @param other The other Threadpool to move from.
    */
-  Threadpool(Threadpool &&other) noexcept
-      : mWorkers(std::move(other.mWorkers)), mTasks(std::move(other.mTasks)),
-        mRunning(other.mRunning) {}
+  Threadpool(Threadpool &&other) noexcept;
 
   /**
    * @brief Move assign a Threadpool object.
@@ -68,12 +66,7 @@ public:
    *
    * @return Threadpool& Reference to this Threadpool.
    */
-  Threadpool &operator=(Threadpool &&other) noexcept {
-    mWorkers = std::move(other.mWorkers);
-    mTasks = std::move(other.mTasks);
-    mRunning = other.mRunning;
-    return *this;
-  }
+  Threadpool &operator=(Threadpool &&other) noexcept;
 
   /**
    * @brief Spawn a task and returns a future to retrieve its result.
@@ -126,13 +119,7 @@ public:
    *
    * @param task A callable object representing the task to execute.
    */
-  void spawn(task_type &&task) {
-    {
-      std::unique_lock<std::mutex> lock(mMutex);
-      mTasks.emplace(std::move(task));
-    }
-    mCondition.notify_one();
-  }
+  void spawn(task_type &&task);
 
   /**
    * @brief Spawn a background task inside the thread pool.
