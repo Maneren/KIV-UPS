@@ -26,4 +26,18 @@ create_test_executable(
     CXX_STD 23
 )
 
-add_dependencies(all_tests hive_tests net_tests threadpool_tests utils_tests)
+create_test_executable(
+    cli_tests
+    SOURCES cli/cli_tests.cpp
+    DEPENDS cli
+    CXX_STD 23
+)
+
+add_dependencies(
+    all_tests
+    hive_tests
+    net_tests
+    threadpool_tests
+    utils_tests
+    cli_tests
+)
