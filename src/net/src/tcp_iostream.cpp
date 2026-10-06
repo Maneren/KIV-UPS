@@ -1,5 +1,7 @@
 #include <net/tcp_iostream.h>
 
+#include <utility>
+
 namespace net {
 
 TcpStreambuf::TcpStreambuf(TcpStream *stream)
@@ -79,7 +81,7 @@ bool TcpStreambuf::flush_output() {
   );
 
   size_t total_written = 0;
-  while (total_written < static_cast<size_t>(bytes_to_write)) {
+  while (std::cmp_less(total_written, bytes_to_write)) {
     const auto remaining_buf = buf.subspan(total_written);
     const auto result = stream_->write(remaining_buf);
     if (!result) {
@@ -96,7 +98,7 @@ bool TcpStreambuf::flush_output() {
 
   // Reset the put area
   char *output_begin = output_buffer_.data();
-  char *output_end = output_begin + output_buffer_.size() - 1;
+  char *output_end = &*output_buffer_.end();
   setp(output_begin, output_end);
 
   return true;

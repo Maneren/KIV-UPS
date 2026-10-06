@@ -108,8 +108,8 @@ private:
 };
 
 struct IpAddr {
-  explicit IpAddr(Ipv4Addr addr) : inner(addr) {}
-  explicit IpAddr(Ipv6Addr addr) : inner(addr) {}
+  IpAddr(Ipv4Addr addr) : inner(addr) {}
+  IpAddr(Ipv6Addr addr) : inner(addr) {}
 
   std::variant<Ipv4Addr, Ipv6Addr> inner;
 
