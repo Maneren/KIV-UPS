@@ -1,7 +1,5 @@
 #include <net/tcp_iostream.h>
 
-#include <utility>
-
 namespace net {
 
 TcpStreambuf::TcpStreambuf(TcpStream *stream)
@@ -18,7 +16,10 @@ TcpStreambuf::TcpStreambuf(TcpStream *stream)
   setg(input_begin, input_begin, input_begin);
 }
 
-TcpStreambuf::~TcpStreambuf() { sync(); }
+TcpStreambuf::~TcpStreambuf() {
+  // Destructor cannot propagate errors; best effort flush.
+  (void)sync();
+}
 
 std::streambuf::int_type TcpStreambuf::underflow() {
   if (gptr() < egptr()) {
@@ -26,9 +27,7 @@ std::streambuf::int_type TcpStreambuf::underflow() {
   }
 
   // Read more data from the stream
-  const std::span<std::byte> buf(
-      reinterpret_cast<std::byte *>(input_buffer_.data()), input_buffer_.size()
-  );
+  const std::span<char> buf(input_buffer_.data(), input_buffer_.size());
 
   const auto result = stream_->read(buf);
   if (!result) {
@@ -41,26 +40,26 @@ std::streambuf::int_type TcpStreambuf::underflow() {
   }
 
   // Set up the get area
-  char *buffer_begin = input_buffer_.data();
-  setg(buffer_begin, buffer_begin, buffer_begin + bytes_read);
+  const std::span<char> read(
+      input_buffer_.data(), static_cast<size_t>(bytes_read)
+  );
+  setg(read.data(), read.data(), &*read.end());
 
   return traits_type::to_int_type(*gptr());
 }
 
 std::streambuf::int_type TcpStreambuf::overflow(int_type ch) {
   if (ch != traits_type::eof()) {
+    if (pptr() == epptr()) {
+      if (!flush_output()) {
+        return traits_type::eof();
+      }
+    }
     *pptr() = traits_type::to_char_type(ch);
     pbump(1);
   }
 
-  if (pptr() == pbase()) {
-    return traits_type::not_eof(ch);
-  }
-
   if (!flush_output()) {
-    if (this->pptr() > this->epptr()) {
-      this->pbump(-1);
-    }
     return traits_type::eof();
   }
 
@@ -76,50 +75,21 @@ bool TcpStreambuf::flush_output() {
   }
   const auto bytes_to_write = static_cast<size_t>(pending);
 
-  const std::span<const std::byte> buf(
-      reinterpret_cast<const std::byte *>(pbase()), bytes_to_write
-  );
-
-  size_t total_written = 0;
-  while (std::cmp_less(total_written, bytes_to_write)) {
-    const auto remaining_buf = buf.subspan(total_written);
-    const auto result = stream_->write(remaining_buf);
-    if (!result) {
-      return false;
-    }
-
-    const ssize_t bytes_written = result.value();
-    if (bytes_written == 0) {
-      return false;
-    }
-
-    total_written += static_cast<size_t>(bytes_written);
+  const std::span<const char> chars(pbase(), bytes_to_write);
+  if (!stream_->write_all(std::as_bytes(chars)).has_value()) {
+    return false;
   }
 
-  // Reset the put area
-  char *output_begin = output_buffer_.data();
-  char *output_end = &*output_buffer_.end();
-  setp(output_begin, output_end);
+  // Reset the put area, keeping one slot reserved so overflow can
+  // always store its character before flushing (matches the ctor).
+  const std::span<char> buf(output_buffer_.data(), output_buffer_.size() - 1);
+  setp(buf.data(), &*buf.end());
 
   return true;
 }
 
 TcpIostream::TcpIostream(TcpStream &stream)
     : std::iostream(&streambuf_), streambuf_(&stream) {}
-
-TcpIostream::TcpIostream(TcpIostream &&other) noexcept
-    : std::iostream(&streambuf_), streambuf_(std::move(other.streambuf_)) {
-
-  rdbuf(&streambuf_);
-}
-
-TcpIostream &TcpIostream::operator=(TcpIostream &&other) noexcept {
-  if (this != &other) {
-    streambuf_ = std::move(other.streambuf_);
-    rdbuf(&streambuf_);
-  }
-  return *this;
-}
 
 void TcpIostream::flush_output() { streambuf_.flush_output(); }
 

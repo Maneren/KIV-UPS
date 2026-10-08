@@ -18,13 +18,12 @@ public:
   explicit TcpStreambuf(TcpStream *stream);
   ~TcpStreambuf() override;
 
-  // Disable copy
+  // Non-owning pointer into user-owned TcpStream; streambuf is neither
+  // copyable nor movable (get/put pointers would dangle).
   TcpStreambuf(const TcpStreambuf &) = delete;
   TcpStreambuf &operator=(const TcpStreambuf &) = delete;
-
-  // Allow move
-  TcpStreambuf(TcpStreambuf &&) noexcept = default;
-  TcpStreambuf &operator=(TcpStreambuf &&) noexcept = default;
+  TcpStreambuf(TcpStreambuf &&) = delete;
+  TcpStreambuf &operator=(TcpStreambuf &&) = delete;
 
 protected:
   // Input (reading)
@@ -47,13 +46,11 @@ public:
   explicit TcpIostream(TcpStream &stream);
   ~TcpIostream() override = default;
 
-  // Disable copy
+  // Tied to the embedded streambuf; neither copyable nor movable.
   TcpIostream(const TcpIostream &) = delete;
   TcpIostream &operator=(const TcpIostream &) = delete;
-
-  // Allow move
-  TcpIostream(TcpIostream &&other) noexcept;
-  TcpIostream &operator=(TcpIostream &&other) noexcept;
+  TcpIostream(TcpIostream &&) = delete;
+  TcpIostream &operator=(TcpIostream &&) = delete;
 
   // Flush the output buffer
   void flush_output();
