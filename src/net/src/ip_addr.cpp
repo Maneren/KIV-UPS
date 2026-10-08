@@ -2,7 +2,6 @@
 #include <cstring>
 #include <net/ip_addr.h>
 #include <netinet/in.h>
-#include <utils/ranges.h>
 
 namespace net {
 
@@ -10,12 +9,12 @@ namespace net {
 
 Ipv4Addr::Ipv4Addr(uint32_t addr) noexcept {
   const auto in_net_endian = htonl(addr);
-  std::memcpy(octets.data(), &in_net_endian, BYTES);
+  std::memcpy(octets_.data(), &in_net_endian, BYTES);
 }
 
 uint32_t Ipv4Addr::to_bits() const noexcept {
   uint32_t net_endian = 0;
-  std::memcpy(&net_endian, octets.data(), BYTES);
+  std::memcpy(&net_endian, octets_.data(), BYTES);
   return ntohl(net_endian);
 }
 
@@ -34,14 +33,15 @@ error::result<Ipv4Addr> Ipv4Addr::from_string(std::string_view str) {
     );
   };
 
-  if (str.empty()) {
+  if (str.empty() || str.size() >= INET_ADDRSTRLEN) {
     return invalid_ipv4(str);
   }
 
-  const std::string null_terminated{str};
+  std::array<char, INET_ADDRSTRLEN> null_terminated{};
+  std::memcpy(null_terminated.data(), str.data(), str.size());
 
   struct in_addr addr{};
-  if (inet_pton(AF_INET, null_terminated.c_str(), &addr) != 1) {
+  if (inet_pton(AF_INET, null_terminated.data(), &addr) != 1) {
     return invalid_ipv4(str);
   }
 
@@ -50,19 +50,18 @@ error::result<Ipv4Addr> Ipv4Addr::from_string(std::string_view str) {
 
 // Ipv6Addr
 
-Ipv6Addr::Ipv6Addr(octets_t octets) noexcept : octets(octets) {}
-
 Ipv6Addr::Ipv6Addr(const uint8_t octets[BYTES]) noexcept {
   std::memcpy(this->octets.data(), octets, BYTES);
 }
 
-Ipv6Addr
+constexpr Ipv6Addr
 Ipv6Addr::from_segments(std::array<uint16_t, SEGMENTS> segments) noexcept {
   Ipv6Addr addr;
-  for (const auto [i, segment] : utils::views::enumerate_uz(segments)) {
-    addr.octets.at(2 * i) =
+  for (size_t i = 0; i < SEGMENTS; ++i) {
+    const auto segment = segments[i];
+    addr.octets[2 * i] =
         static_cast<uint8_t>(static_cast<unsigned>(segment) >> 8U);
-    addr.octets.at((2 * i) + 1) = static_cast<uint8_t>(segment);
+    addr.octets[(2 * i) + 1] = static_cast<uint8_t>(segment);
   }
   return addr;
 }
@@ -70,55 +69,40 @@ Ipv6Addr::from_segments(std::array<uint16_t, SEGMENTS> segments) noexcept {
 std::array<uint16_t, Ipv6Addr::SEGMENTS> Ipv6Addr::segments() const noexcept {
   std::array<uint16_t, SEGMENTS> segs{};
   for (size_t i = 0; i < SEGMENTS; ++i) {
-    segs.at(i) = static_cast<uint16_t>(
-        (static_cast<unsigned>(octets.at(2 * i)) << 8U) |
-        static_cast<unsigned>(octets.at((2 * i) + 1))
+    segs[i] = static_cast<uint16_t>(
+        (static_cast<unsigned>(octets[2 * i]) << 8U) |
+        static_cast<unsigned>(octets[(2 * i) + 1])
     );
   }
   return segs;
 }
 
-bool Ipv6Addr::is_loopback() const noexcept {
-  static constexpr std::array<uint8_t, BYTES> loopback{
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
+constexpr bool Ipv6Addr::is_loopback() const noexcept {
+  static constexpr octets_t loopback{
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
   };
   return octets == loopback;
 }
 
-bool Ipv6Addr::is_unspecified() const noexcept {
-  static constexpr std::array<uint8_t, BYTES> unspecified{};
+constexpr bool Ipv6Addr::is_unspecified() const noexcept {
+  static constexpr octets_t unspecified{};
   return octets == unspecified;
 }
 
-bool Ipv6Addr::is_multicast() const noexcept { return octets.front() == 0xff; }
+constexpr bool Ipv6Addr::is_multicast() const noexcept {
+  return octets.front() == 0xff;
+}
 
 Ipv6Addr Ipv6Addr::localhost() noexcept {
-  return Ipv6Addr(
-      std::array<uint8_t, BYTES>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
-  );
+  octets_t octets{};
+  octets.back() = 1;
+  return Ipv6Addr(octets);
 }
 
-Ipv6Addr Ipv6Addr::unspecified() noexcept {
-  return Ipv6Addr(std::array<uint8_t, BYTES>{});
-}
+Ipv6Addr Ipv6Addr::unspecified() noexcept { return {}; }
 
 error::result<Ipv6Addr> Ipv6Addr::from_string(std::string_view str) {
-  if (str.empty() || str.starts_with('[')) {
+  if (str.empty() || str.starts_with('[') || str.size() >= INET6_ADDRSTRLEN) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
@@ -126,10 +110,11 @@ error::result<Ipv6Addr> Ipv6Addr::from_string(std::string_view str) {
     );
   }
 
-  const std::string null_terminated{str};
+  std::array<char, INET6_ADDRSTRLEN> null_terminated{};
+  std::memcpy(null_terminated.data(), str.data(), str.size());
 
   struct in6_addr addr{};
-  if (inet_pton(AF_INET6, null_terminated.c_str(), &addr) != 1) {
+  if (inet_pton(AF_INET6, null_terminated.data(), &addr) != 1) {
     return tl::make_unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
@@ -137,38 +122,36 @@ error::result<Ipv6Addr> Ipv6Addr::from_string(std::string_view str) {
     );
   }
 
-  return Ipv6Addr{static_cast<uint8_t *>(addr.s6_addr)};
+  octets_t octets{};
+  std::memcpy(octets.data(), static_cast<std::uint8_t *>(addr.s6_addr), BYTES);
+  return Ipv6Addr{octets};
 }
 
 // IpAddr
 
 bool IpAddr::is_loopback() const {
-  return visit(
-      [](const Ipv4Addr &a) { return a.is_loopback(); },
-      [](const Ipv6Addr &a) { return a.is_loopback(); }
-  );
+  return visit([](const auto &a) { return a.is_loopback(); });
 }
 
 bool IpAddr::is_unspecified() const {
-  return visit(
-      [](const Ipv4Addr &a) { return a.is_unspecified(); },
-      [](const Ipv6Addr &a) { return a.is_unspecified(); }
-  );
+  return visit([](const auto &a) { return a.is_unspecified(); });
 }
 
 bool IpAddr::is_multicast() const {
-  return visit(
-      [](const Ipv4Addr &a) { return a.is_multicast(); },
-      [](const Ipv6Addr &a) { return a.is_multicast(); }
-  );
+  return visit([](const auto &a) { return a.is_multicast(); });
 }
 
 error::result<IpAddr> IpAddr::from_string(std::string_view str) {
-  if (const auto v4 = Ipv4Addr::from_string(str); v4) {
-    return IpAddr(*v4);
-  }
-  if (const auto v6 = Ipv6Addr::from_string(str); v6) {
-    return IpAddr(*v6);
+  // ':' only appears in IPv6 literals; dispatch on shape so only one
+  // branch is ever constructed.
+  if (str.contains(':')) {
+    if (auto v6 = Ipv6Addr::from_string(str); v6) {
+      return IpAddr(*v6);
+    }
+  } else {
+    if (auto v4 = Ipv4Addr::from_string(str); v4) {
+      return IpAddr(*v4);
+    }
   }
   return tl::make_unexpected(
       error::SimpleMessage(

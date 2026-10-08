@@ -61,7 +61,7 @@ sockaddr_in SocketAddrV4::to_sockaddr() const noexcept {
   addr_in.sin_port = htons(port_);
 
   static_assert(sizeof(addr_in.sin_addr.s_addr) == Ipv4Addr::BYTES);
-  std::memcpy(&addr_in.sin_addr.s_addr, ip_.octets.data(), Ipv4Addr::BYTES);
+  std::memcpy(&addr_in.sin_addr.s_addr, ip_.octets().data(), Ipv4Addr::BYTES);
 
   return addr_in;
 }

@@ -7,7 +7,6 @@
 #include <format>
 #include <net/error.h>
 #include <netinet/in.h>
-#include <string>
 #include <sys/socket.h>
 #include <utility>
 #include <utils/match.h>
@@ -23,37 +22,36 @@ struct Ipv4Addr {
 
   constexpr Ipv4Addr() noexcept = default;
   constexpr Ipv4Addr(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept
-      : octets{a, b, c, d} {}
-  explicit constexpr Ipv4Addr(octets_t octets) noexcept : octets(octets) {}
+      : octets_{a, b, c, d} {}
+  explicit constexpr Ipv4Addr(octets_t octets) noexcept : octets_(octets) {}
   explicit Ipv4Addr(uint32_t addr) noexcept;
 
   constexpr bool operator==(const Ipv4Addr &other) const noexcept = default;
 
   [[nodiscard]] static constexpr int family() noexcept { return FAMILY; }
 
-  [[nodiscard]] constexpr std::array<uint8_t, BYTES>
-  to_octets() const noexcept {
-    return octets;
+  [[nodiscard]] constexpr const octets_t &octets() const noexcept {
+    return octets_;
   }
 
   [[nodiscard]] uint32_t to_bits() const noexcept;
   [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits) noexcept;
 
   [[nodiscard]] constexpr bool is_loopback() const noexcept {
-    return octets.front() == 127;
+    return octets_.front() == 127;
   }
   [[nodiscard]] constexpr bool is_unspecified() const noexcept {
-    return octets == octets_t{0, 0, 0, 0};
+    return octets_ == octets_t{0, 0, 0, 0};
   }
   [[nodiscard]] constexpr bool is_broadcast() const noexcept {
-    return octets == octets_t{255, 255, 255, 255};
+    return octets_ == octets_t{255, 255, 255, 255};
   }
   [[nodiscard]] constexpr bool is_multicast() const noexcept {
-    const auto [a, _b, _c, _d] = octets;
+    const auto [a, _b, _c, _d] = octets_;
     return a >= 224 && a <= 239;
   }
   [[nodiscard]] constexpr bool is_private() const noexcept {
-    const auto [a, b, _c, _d] = octets;
+    const auto [a, b, _c, _d] = octets_;
     return (a == 10) || (a == 172 && b >= 16 && b <= 31) ||
            (a == 192 && b == 168);
   }
@@ -65,7 +63,7 @@ struct Ipv4Addr {
   static error::result<Ipv4Addr> from_string(std::string_view str);
 
 private:
-  octets_t octets{};
+  octets_t octets_{};
 
   friend std::formatter<Ipv4Addr>;
   friend struct SocketAddrV4;
@@ -78,10 +76,10 @@ struct Ipv6Addr {
 
   using octets_t = std::array<uint8_t, BYTES>;
 
-  Ipv6Addr() noexcept = default;
-  explicit Ipv6Addr(octets_t octets) noexcept;
+  constexpr Ipv6Addr() noexcept = default;
+  explicit constexpr Ipv6Addr(octets_t octets) noexcept;
   explicit Ipv6Addr(const uint8_t octets[BYTES]) noexcept;
-  static Ipv6Addr
+  static constexpr Ipv6Addr
   from_segments(std::array<uint16_t, SEGMENTS> segments) noexcept;
 
   constexpr bool operator==(const Ipv6Addr &other) const noexcept = default;
@@ -93,11 +91,34 @@ struct Ipv6Addr {
     return octets;
   }
 
-  [[nodiscard]] std::array<uint16_t, SEGMENTS> segments() const noexcept;
-
-  [[nodiscard]] bool is_loopback() const noexcept;
-  [[nodiscard]] bool is_unspecified() const noexcept;
-  [[nodiscard]] bool is_multicast() const noexcept;
+  [[nodiscard]] constexpr bool is_loopback() const noexcept {
+    static constexpr octets_t loopback{
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+    };
+    return octets == loopback;
+  }
+  [[nodiscard]] constexpr bool is_unspecified() const noexcept {
+    static constexpr octets_t unspecified{};
+    return octets == unspecified;
+  }
+  [[nodiscard]] constexpr bool is_multicast() const noexcept {
+    return octets.front() == 0xff;
+  }
   static Ipv6Addr localhost() noexcept;
   static Ipv6Addr unspecified() noexcept;
 
@@ -134,10 +155,7 @@ struct IpAddr {
   }
 
   [[nodiscard]] constexpr int family() const {
-    return visit(
-        [](const Ipv4Addr &) { return Ipv4Addr::FAMILY; },
-        [](const Ipv6Addr &) { return Ipv6Addr::FAMILY; }
-    );
+    return is_ipv4() ? Ipv4Addr::FAMILY : Ipv6Addr::FAMILY;
   }
 
   [[nodiscard]] constexpr bool is_ipv4() const noexcept {
@@ -166,15 +184,9 @@ template <> struct std::formatter<net::Ipv4Addr> {
     return ctx.begin();
   }
 
-  static auto format(auto &obj, std::format_context &ctx) {
-    return std::format_to(
-        ctx.out(),
-        "{}.{}.{}.{}",
-        obj.octets[0],
-        obj.octets[1],
-        obj.octets[2],
-        obj.octets[3]
-    );
+  static auto format(const net::Ipv4Addr &obj, std::format_context &ctx) {
+    const auto [a, b, c, d] = obj.octets_;
+    return std::format_to(ctx.out(), "{}.{}.{}.{}", a, b, c, d);
   }
 };
 
@@ -183,30 +195,22 @@ template <> struct std::formatter<net::Ipv6Addr> {
     return ctx.begin();
   }
 
-  static auto format(auto &obj, std::format_context &ctx) {
-    std::string buffer(INET6_ADDRSTRLEN, '\0');
-
-    sockaddr_in6 raw{};
-    std::memset(&raw, 0, sizeof(raw));
-    std::memcpy(
-        &raw.sin6_addr.s6_addr, obj.octets.data(), net::Ipv6Addr::BYTES
-    );
+  static auto format(const net::Ipv6Addr &obj, std::format_context &ctx) {
+    // Stack buffer: no heap allocation per format.
+    char buffer[INET6_ADDRSTRLEN]{};
 
     const auto *const result = inet_ntop(
         net::Ipv6Addr::FAMILY,
-        &raw.sin6_addr,
-        buffer.data(),
-        static_cast<socklen_t>(buffer.size())
+        obj.octets.data(),
+        static_cast<char *const>(buffer),
+        static_cast<socklen_t>(sizeof(buffer))
     );
 
     if (result == nullptr) {
       throw std::runtime_error("inet_ntop failed to stringify address");
     }
 
-    // c_str() truncates at the NUL written by inet_ntop; formatting
-    // `buffer` directly would emit padding.
-    // NOLINTNEXTLINE(readability-redundant-string-cstr)
-    return std::format_to(ctx.out(), "{}", buffer.c_str());
+    return std::format_to(ctx.out(), "{}", buffer);
   }
 };
 
@@ -215,14 +219,9 @@ template <> struct std::formatter<net::IpAddr> {
     return ctx.begin();
   }
 
-  static auto format(auto &obj, std::format_context &ctx) {
-    return obj.visit(
-        [&ctx](const net::Ipv4Addr &addr) {
-          return std::format_to(ctx.out(), "{}", addr);
-        },
-        [&ctx](const net::Ipv6Addr &addr) {
-          return std::format_to(ctx.out(), "{}", addr);
-        }
-    );
+  static auto format(const net::IpAddr &obj, std::format_context &ctx) {
+    return obj.visit([&ctx](const auto &addr) {
+      return std::format_to(ctx.out(), "{}", addr);
+    });
   }
 };
