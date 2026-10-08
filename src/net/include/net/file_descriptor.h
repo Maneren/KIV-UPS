@@ -6,6 +6,7 @@ namespace net {
 
 class FileDescriptor {
   int fd;
+  constexpr static int INVALID_FD = -1;
 
 public:
   FileDescriptor();
@@ -23,15 +24,12 @@ public:
 
   void close() noexcept;
 
-  [[nodiscard]] constexpr bool valid() const noexcept { return fd != -1; }
+  [[nodiscard]] bool valid() const noexcept { return fd != INVALID_FD; }
 
   /// Release ownership without closing. Returns the raw fd, or -1.
   [[nodiscard]] int release() noexcept;
 
-  [[nodiscard]]
-  constexpr int raw() const noexcept {
-    return this->fd;
-  }
+  [[nodiscard]] int raw() const noexcept { return fd; }
 };
 
 } // namespace net
