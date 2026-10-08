@@ -1,5 +1,7 @@
 #include <charconv>
+#include <concepts>
 #include <cstring>
+#include <memory>
 #include <net/socket_addr.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -11,44 +13,23 @@ namespace net {
 
 namespace {
 
-error::result<uint16_t> parse_port(const std::string_view port_part) {
-  if (port_part.empty()) {
+template <std::unsigned_integral T>
+error::result<T> parse_number(std::string_view string, std::string_view what) {
+  if (string.empty()) {
+    return tl::make_unexpected(
+        error::SimpleMessage(error::ErrorKind::InvalidInput, "Missing {}", what)
+    );
+  }
+  T value = 0;
+  const auto [ptr, ec] = std::from_chars(string.begin(), string.end(), value);
+  if (ec != std::errc{} || ptr != string.end()) {
     return tl::make_unexpected(
         error::SimpleMessage(
-            error::ErrorKind::InvalidInput, "Missing port number"
+            error::ErrorKind::InvalidInput, "Invalid {}: {}", what, string
         )
     );
   }
-  unsigned long value = 0;
-  const auto [ptr, ec] =
-      std::from_chars(port_part.begin(), port_part.end(), value);
-  if (ec != std::errc{} || ptr != port_part.end() || value > UINT16_MAX) {
-    return tl::make_unexpected(
-        error::SimpleMessage(
-            error::ErrorKind::InvalidInput, "Invalid port number: {}", port_part
-        )
-    );
-  }
-  return static_cast<uint16_t>(value);
-}
-
-error::result<uint32_t> parse_scope_id(const std::string_view scope_part) {
-  if (scope_part.empty()) {
-    return tl::make_unexpected(
-        error::SimpleMessage(error::ErrorKind::InvalidInput, "Missing scope id")
-    );
-  }
-  unsigned long value = 0;
-  const auto [ptr, ec] =
-      std::from_chars(scope_part.begin(), scope_part.end(), value);
-  if (ec != std::errc{} || ptr != scope_part.end() || value > UINT32_MAX) {
-    return tl::make_unexpected(
-        error::SimpleMessage(
-            error::ErrorKind::InvalidInput, "Invalid scope id: {}", scope_part
-        )
-    );
-  }
-  return static_cast<uint32_t>(value);
+  return value;
 }
 
 } // namespace
@@ -129,9 +110,9 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
     );
   }
 
-  const auto port = parse_port(port_part);
+  const auto port = parse_number<uint16_t>(port_part, "port number");
   if (!port) {
-    return tl::make_unexpected(port.error());
+    return tl::make_unexpected(std::move(port).error());
   }
 
   return SocketAddrV4{*ip, *port};
@@ -141,7 +122,6 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
 
 sockaddr_in6 SocketAddrV6::to_sockaddr() const noexcept {
   sockaddr_in6 addr_in6{};
-  std::memset(&addr_in6, 0, sizeof(addr_in6));
   addr_in6.sin6_family = AF_INET6;
   addr_in6.sin6_port = htons(port_);
   addr_in6.sin6_flowinfo = htonl(flowinfo_);
@@ -163,7 +143,7 @@ SocketAddrV6::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
             error::ErrorKind::InvalidInput,
             "Invalid IPv6 address length: {} < {}",
             len,
-            sizeof(sockaddr_in6)
+            SIZE
         )
     );
   }
@@ -225,9 +205,9 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
   if (percent_pos != std::string::npos) {
     const auto scope_part = ip_part.substr(percent_pos + 1);
     ip_part = ip_part.substr(0, percent_pos);
-    const auto parsed_scope = parse_scope_id(scope_part);
+    const auto parsed_scope = parse_number<uint32_t>(scope_part, "scope id");
     if (!parsed_scope) {
-      return tl::make_unexpected(parsed_scope.error());
+      return tl::make_unexpected(std::move(parsed_scope).error());
     }
     scope_id = *parsed_scope;
   }
@@ -241,9 +221,9 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
     );
   }
 
-  const auto port = parse_port(port_part);
+  const auto port = parse_number<uint16_t>(port_part, "port number");
   if (!port) {
-    return tl::make_unexpected(port.error());
+    return tl::make_unexpected(std::move(port).error());
   }
 
   return SocketAddrV6{*ip, *port, 0, scope_id};
@@ -252,53 +232,25 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
 // SocketAddr
 
 SocketAddr::SocketAddr(const IpAddr &ip, uint16_t port)
-    : inner(SocketAddrV4(Ipv4Addr(), port)) {
-  ip.visit(
-      [port, this](const Ipv4Addr &v4) { inner = SocketAddrV4(v4, port); },
-      [port, this](const Ipv6Addr &v6) { inner = SocketAddrV6(v6, port); }
-  );
-}
+    : inner(ip.visit(
+          [port](const Ipv4Addr &v4) -> Inner {
+            return SocketAddrV4(v4, port);
+          },
+          [port](const Ipv6Addr &v6) -> Inner { return SocketAddrV6(v6, port); }
+      )) {}
 
 IpAddr SocketAddr::ip() const {
-  return visit(
-      [](const SocketAddrV4 &v4) { return IpAddr(v4.ip()); },
-      [](const SocketAddrV6 &v6) { return IpAddr(v6.ip()); }
-  );
+  return visit([](const auto &addr) { return IpAddr(addr.ip()); });
 }
 
-void SocketAddr::set_ip(const IpAddr &ip) {
-  visit(
-      [&ip, this](SocketAddrV4 &v4) {
-        ip.visit(
-            [&v4](const Ipv4Addr &addr) { v4.set_ip(addr); },
-            [&v4, this](const Ipv6Addr &addr) {
-              inner = SocketAddrV6(addr, v4.port());
-            }
-        );
-      },
-      [&ip, this](SocketAddrV6 &v6) {
-        ip.visit(
-            [&v6](const Ipv6Addr &addr) { v6.set_ip(addr); },
-            [&v6, this](const Ipv4Addr &addr) {
-              inner = SocketAddrV4(addr, v6.port());
-            }
-        );
-      }
-  );
-}
+void SocketAddr::set_ip(const IpAddr &ip) { *this = SocketAddr(ip, port()); }
 
 uint16_t SocketAddr::port() const {
-  return visit(
-      [](const SocketAddrV4 &v4) { return v4.port(); },
-      [](const SocketAddrV6 &v6) { return v6.port(); }
-  );
+  return visit([](const auto &addr) { return addr.port(); });
 }
 
 void SocketAddr::set_port(uint16_t port) {
-  visit(
-      [port](SocketAddrV4 &v4) { v4.set_port(port); },
-      [port](SocketAddrV6 &v6) { v6.set_port(port); }
-  );
+  visit([port](auto &addr) { addr.set_port(port); });
 }
 
 error::result<SocketAddr>
@@ -322,16 +274,13 @@ SocketAddr::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
 }
 
 std::tuple<sockaddr_union, socklen_t> SocketAddr::to_sockaddr() const {
+  using result_type = std::tuple<sockaddr_union, socklen_t>;
   return visit(
-      [](const SocketAddrV4 &v4) {
-        return std::make_tuple(
-            sockaddr_union{.ipv4 = v4.to_sockaddr()}, SocketAddrV4::SIZE
-        );
+      [](const SocketAddrV4 &v4) -> result_type {
+        return {sockaddr_union{.ipv4 = v4.to_sockaddr()}, SocketAddrV4::SIZE};
       },
-      [](const SocketAddrV6 &v6) {
-        return std::make_tuple(
-            sockaddr_union{.ipv6 = v6.to_sockaddr()}, SocketAddrV6::SIZE
-        );
+      [](const SocketAddrV6 &v6) -> result_type {
+        return {sockaddr_union{.ipv6 = v6.to_sockaddr()}, SocketAddrV6::SIZE};
       }
   );
 }
@@ -369,6 +318,10 @@ SocketAddr::resolve(const std::string &host, uint16_t port) {
     );
   }
 
+  const std::unique_ptr<struct addrinfo, decltype(&freeaddrinfo)> guard(
+      list, &freeaddrinfo
+  );
+
   std::vector<SocketAddr> out;
   for (const struct addrinfo *ai = list; ai != nullptr; ai = ai->ai_next) {
     const sockaddr_union sockaddr{.sa = *ai->ai_addr};
@@ -378,7 +331,6 @@ SocketAddr::resolve(const std::string &host, uint16_t port) {
       out.emplace_back(*addr);
     }
   }
-  freeaddrinfo(list);
 
   if (out.empty()) {
     return tl::make_unexpected(

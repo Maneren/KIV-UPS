@@ -148,10 +148,7 @@ struct SocketAddr {
   void set_port(uint16_t port);
 
   [[nodiscard]] constexpr int family() const {
-    return visit(
-        [](const SocketAddrV4 &) { return SocketAddrV4::family(); },
-        [](const SocketAddrV6 &) { return SocketAddrV6::family(); }
-    );
+    return is_ipv4() ? SocketAddrV4::family() : SocketAddrV6::family();
   }
 
   [[nodiscard]] constexpr bool is_ipv4() const noexcept {
@@ -176,7 +173,8 @@ struct SocketAddr {
   [[nodiscard]] std::tuple<sockaddr_union, socklen_t> to_sockaddr() const;
 
 private:
-  std::variant<SocketAddrV4, SocketAddrV6> inner;
+  using Inner = std::variant<SocketAddrV4, SocketAddrV6>;
+  Inner inner;
 
   friend std::formatter<SocketAddr>;
 };
@@ -188,7 +186,7 @@ template <> struct std::formatter<net::SocketAddrV4> {
     return ctx.begin();
   }
 
-  static auto format(auto &obj, std::format_context &ctx) {
+  static auto format(const net::SocketAddrV4 &obj, std::format_context &ctx) {
     return std::format_to(ctx.out(), "{}:{}", obj.ip(), obj.port());
   }
 };
@@ -198,7 +196,7 @@ template <> struct std::formatter<net::SocketAddrV6> {
     return ctx.begin();
   }
 
-  static auto format(auto &obj, std::format_context &ctx) {
+  static auto format(const net::SocketAddrV6 &obj, std::format_context &ctx) {
     if (obj.scope_id() != 0) {
       return std::format_to(
           ctx.out(), "[{}%{}]:{}", obj.ip(), obj.scope_id(), obj.port()
@@ -213,14 +211,9 @@ template <> struct std::formatter<net::SocketAddr> {
     return ctx.begin();
   }
 
-  static auto format(auto &obj, std::format_context &ctx) {
-    return obj.visit(
-        [&ctx](const net::SocketAddrV4 &addr) {
-          return std::format_to(ctx.out(), "{}", addr);
-        },
-        [&ctx](const net::SocketAddrV6 &addr) {
-          return std::format_to(ctx.out(), "{}", addr);
-        }
-    );
+  static auto format(const net::SocketAddr &obj, std::format_context &ctx) {
+    return obj.visit([&ctx](const auto &addr) {
+      return std::format_to(ctx.out(), "{}", addr);
+    });
   }
 };
