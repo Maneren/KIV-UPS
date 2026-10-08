@@ -54,45 +54,6 @@ Ipv6Addr::Ipv6Addr(const uint8_t octets[BYTES]) noexcept {
   std::memcpy(this->octets.data(), octets, BYTES);
 }
 
-constexpr Ipv6Addr
-Ipv6Addr::from_segments(std::array<uint16_t, SEGMENTS> segments) noexcept {
-  Ipv6Addr addr;
-  for (size_t i = 0; i < SEGMENTS; ++i) {
-    const auto segment = segments[i];
-    addr.octets[2 * i] =
-        static_cast<uint8_t>(static_cast<unsigned>(segment) >> 8U);
-    addr.octets[(2 * i) + 1] = static_cast<uint8_t>(segment);
-  }
-  return addr;
-}
-
-std::array<uint16_t, Ipv6Addr::SEGMENTS> Ipv6Addr::segments() const noexcept {
-  std::array<uint16_t, SEGMENTS> segs{};
-  for (size_t i = 0; i < SEGMENTS; ++i) {
-    segs[i] = static_cast<uint16_t>(
-        (static_cast<unsigned>(octets[2 * i]) << 8U) |
-        static_cast<unsigned>(octets[(2 * i) + 1])
-    );
-  }
-  return segs;
-}
-
-constexpr bool Ipv6Addr::is_loopback() const noexcept {
-  static constexpr octets_t loopback{
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
-  };
-  return octets == loopback;
-}
-
-constexpr bool Ipv6Addr::is_unspecified() const noexcept {
-  static constexpr octets_t unspecified{};
-  return octets == unspecified;
-}
-
-constexpr bool Ipv6Addr::is_multicast() const noexcept {
-  return octets.front() == 0xff;
-}
-
 Ipv6Addr Ipv6Addr::localhost() noexcept {
   octets_t octets{};
   octets.back() = 1;

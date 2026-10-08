@@ -71,16 +71,13 @@ private:
 
 struct Ipv6Addr {
   constexpr static size_t BYTES = 16;
-  constexpr static size_t SEGMENTS = BYTES / sizeof(uint16_t);
   constexpr static int FAMILY = AF_INET6;
 
   using octets_t = std::array<uint8_t, BYTES>;
 
   constexpr Ipv6Addr() noexcept = default;
-  explicit constexpr Ipv6Addr(octets_t octets) noexcept;
+  explicit constexpr Ipv6Addr(octets_t octets) noexcept : octets(octets) {}
   explicit Ipv6Addr(const uint8_t octets[BYTES]) noexcept;
-  static constexpr Ipv6Addr
-  from_segments(std::array<uint16_t, SEGMENTS> segments) noexcept;
 
   constexpr bool operator==(const Ipv6Addr &other) const noexcept = default;
 
