@@ -201,7 +201,7 @@ error::result<void> Socket::connect_timeout(
 }
 
 error::result<std::optional<error::IoError>> Socket::take_error() const {
-  const auto result = getopts<int>(SOL_SOCKET, SO_ERROR);
+  const auto result = getopt<int>(SOL_SOCKET, SO_ERROR);
 
   if (!result) {
     return tl::make_unexpected(result.error());
@@ -336,16 +336,16 @@ error::result<void> Socket::shutdown(Shutdown how) const {
 
 error::result<void> Socket::set_reuseaddr(bool reuse) const {
   const int opt = reuse ? 1 : 0;
-  return setopts(SOL_SOCKET, SO_REUSEADDR, opt);
+  return setopt(SOL_SOCKET, SO_REUSEADDR, opt);
 }
 
 error::result<void> Socket::set_nodelay(bool nodelay) const {
   const int opt = nodelay ? 1 : 0;
-  return setopts(IPPROTO_TCP, TCP_NODELAY, opt);
+  return setopt(IPPROTO_TCP, TCP_NODELAY, opt);
 }
 
 error::result<bool> Socket::nodelay() const {
-  return getopts<int>(IPPROTO_TCP, TCP_NODELAY).map([](int opt) {
+  return getopt<int>(IPPROTO_TCP, TCP_NODELAY).map([](int opt) {
     return opt != 0;
   });
 }
@@ -354,29 +354,29 @@ error::result<void> Socket::set_ttl(uint32_t ttl) const {
   const int opt = static_cast<int>(ttl);
   // Try IPv4 first, fall back to IPv6 unicast hops so unbound or
   // either-family sockets work without the caller caring.
-  if (const auto v4 = setopts(IPPROTO_IP, IP_TTL, opt); v4) {
+  if (const auto v4 = setopt(IPPROTO_IP, IP_TTL, opt); v4) {
     return {};
   }
   const int opt6 = static_cast<int>(ttl);
-  return setopts(IPPROTO_IPV6, IPV6_UNICAST_HOPS, opt6);
+  return setopt(IPPROTO_IPV6, IPV6_UNICAST_HOPS, opt6);
 }
 
 error::result<uint32_t> Socket::ttl() const {
   if (const auto addr = local_addr(); addr) {
     if (addr->family() == AF_INET6) {
-      return getopts<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS).map([](int opt) {
+      return getopt<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS).map([](int opt) {
         return static_cast<uint32_t>(opt);
       });
     }
-    return getopts<int>(IPPROTO_IP, IP_TTL).map([](int opt) {
+    return getopt<int>(IPPROTO_IP, IP_TTL).map([](int opt) {
       return static_cast<uint32_t>(opt);
     });
   }
   // Unbound: try v4, then v6.
-  if (auto v4 = getopts<int>(IPPROTO_IP, IP_TTL); v4) {
+  if (auto v4 = getopt<int>(IPPROTO_IP, IP_TTL); v4) {
     return static_cast<uint32_t>(*v4);
   }
-  return getopts<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS).map([](int opt) {
+  return getopt<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS).map([](int opt) {
     return static_cast<uint32_t>(opt);
   });
 }
@@ -404,12 +404,12 @@ error::result<void> set_socket_timeout(
     tv.tv_sec = secs.count();
     tv.tv_usec = usecs.count();
   }
-  return sock.setopts(SOL_SOCKET, optname, tv);
+  return sock.setopt(SOL_SOCKET, optname, tv);
 }
 
 error::result<std::optional<std::chrono::microseconds>>
 get_socket_timeout(const Socket &sock, int optname) {
-  return sock.getopts<struct timeval>(SOL_SOCKET, optname)
+  return sock.getopt<struct timeval>(SOL_SOCKET, optname)
       .map([](struct timeval tv) -> std::optional<std::chrono::microseconds> {
         if (tv.tv_sec == 0 && tv.tv_usec == 0) {
           return std::nullopt;

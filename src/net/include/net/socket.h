@@ -38,13 +38,11 @@ public:
   [[nodiscard]] const FileDescriptor &file_descriptor() const noexcept {
     return fd;
   }
-  [[nodiscard]] constexpr int raw_fd() const noexcept { return fd.raw(); };
+  [[nodiscard]] int raw_fd() const noexcept { return fd.raw(); };
 
   template <typename T>
-  error::result<void> setopts(int level, int optname, const T &optval) const {
-    static_assert(
-        std::is_trivially_copyable_v<T>, "sockopt value must be trivial"
-    );
+    requires std::is_trivially_copyable_v<T>
+  error::result<void> setopt(int level, int optname, const T &optval) const {
     const auto code = setsockopt(
         raw_fd(), level, optname, &optval, static_cast<socklen_t>(sizeof(T))
     );
@@ -52,15 +50,16 @@ public:
     return error::from_os(code).map(functional::drop);
   };
 
-  template <typename T> error::result<T> getopts(int level, int optname) const {
-    static_assert(
-        std::is_trivially_copyable_v<T>, "sockopt value must be trivial"
-    );
+  template <typename T>
+    requires std::is_trivially_copyable_v<T>
+  error::result<T> getopt(int level, int optname) const {
     T optval{};
     auto len = static_cast<socklen_t>(sizeof(T));
 
     return error::from_os(getsockopt(raw_fd(), level, optname, &optval, &len))
-        .map([&](auto) { return optval; });
+        .map([val = std::move(optval)](auto) mutable {
+          return std::move(val);
+        });
   };
 
   [[nodiscard]] error::result<void> bind_to(const SocketAddr &addr) const;
@@ -76,7 +75,7 @@ public:
 
   [[nodiscard]] error::result<std::optional<error::IoError>> take_error() const;
 
-  [[nodiscard]] error::result<void> set_nonblocking(bool blocking) const;
+  [[nodiscard]] error::result<void> set_nonblocking(bool nonblocking) const;
 
   // Single syscalls with EINTR retry. Errors come back as result.
   [[nodiscard]] error::result<ssize_t> read(void *buf, size_t len) const;

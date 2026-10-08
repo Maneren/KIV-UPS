@@ -39,7 +39,7 @@ error::result<TcpListener>
 TcpListener::bind_with_backlog(const SocketAddr &addr, int backlog) {
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&addr, backlog](Socket sock) -> error::result<TcpListener> {
-        if (const auto result = sock.setopts(SOL_SOCKET, SO_REUSEADDR, 1);
+        if (const auto result = sock.setopt(SOL_SOCKET, SO_REUSEADDR, 1);
             !result) {
           return tl::make_unexpected(result.error());
         }
