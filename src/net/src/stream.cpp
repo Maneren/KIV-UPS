@@ -8,16 +8,12 @@ TcpStream::TcpStream(Socket &&sock) : sock(std::move(sock)) {};
 
 namespace {
 
-template <typename F, std::ranges::input_range I>
-error::result<TcpStream> connect_each(I &addrs, F connect_one)
-  requires(
-      std::is_invocable_v<F, const SocketAddr &> &&
-      std::is_convertible_v<
-          std::invoke_result_t<F, const SocketAddr &>,
-          error::result<TcpStream>> &&
-      std::is_same_v<typename I::value_type, SocketAddr>
-  )
-{
+template <typename F, std::ranges::input_range R>
+  requires std::invocable<F, const SocketAddr &> &&
+           std::convertible_to<
+               std::invoke_result_t<F, const SocketAddr &>,
+               error::result<TcpStream>>
+error::result<TcpStream> connect_each(const R &addrs, F connect_one) {
   std::optional<error::IoError> last_error;
 
   for (const auto &addr : addrs) {
@@ -25,34 +21,49 @@ error::result<TcpStream> connect_each(I &addrs, F connect_one)
     if (stream) {
       return stream;
     }
-    last_error = stream.error();
+    last_error = std::move(stream).error();
   }
 
   if (last_error) {
-    return tl::make_unexpected(*last_error);
+    return tl::make_unexpected(std::move(*last_error));
   }
 
   return tl::make_unexpected(
-      error::SimpleMessage(
+      error::Simple{
           error::ErrorKind::InvalidInput, "could not connect to any address"
-      )
+      }
   );
+}
+
+template <typename Span, typename Op>
+error::result<void>
+pump_all(Span buf, Op op, error::ErrorKind empty_kind, std::string_view msg) {
+  size_t done = 0;
+  while (done < buf.size()) {
+    auto ret = op(buf.subspan(done));
+    if (!ret) {
+      return tl::make_unexpected(std::move(ret).error());
+    }
+    if (*ret == 0) {
+      return tl::make_unexpected(error::Simple{empty_kind, msg});
+    }
+    done += static_cast<size_t>(*ret);
+  }
+  return {};
 }
 
 } // namespace
 
 error::result<TcpStream> TcpStream::connect(const SocketAddr &addr) {
   return Socket::create(addr, SOCK_STREAM)
-      .and_then([&addr](auto &&sock) {
-        return sock.connect(addr).map([&] {
-          return std::forward<Socket>(sock);
-        });
+      .and_then([&](auto &&sock) {
+        return sock.connect(addr).map([&] { return std::move(sock); });
       })
       .map(functional::Constructor<TcpStream>());
 }
 
 error::result<TcpStream> TcpStream::connect(std::span<const SocketAddr> addrs) {
-  return connect_each(addrs, [](auto addr) {
+  return connect_each(addrs, [](const auto &addr) {
     return TcpStream::connect(addr);
   });
 }
@@ -63,7 +74,7 @@ error::result<TcpStream> TcpStream::connect_timeout(
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&addr, timeout](auto &&sock) {
         return sock.connect_timeout(addr, timeout).map([&] {
-          return std::forward<Socket>(sock);
+          return std::move(sock);
         });
       })
       .map(functional::Constructor<TcpStream>());
@@ -72,7 +83,7 @@ error::result<TcpStream> TcpStream::connect_timeout(
 error::result<TcpStream> TcpStream::connect_timeout(
     std::span<const SocketAddr> addrs, std::chrono::microseconds timeout
 ) {
-  return connect_each(addrs, [timeout](auto addr) {
+  return connect_each(addrs, [timeout](const auto &addr) {
     return TcpStream::connect_timeout(addr, timeout);
   });
 }
@@ -93,43 +104,21 @@ error::result<TcpStream> TcpStream::connect_timeout_host(
 }
 
 error::result<void> TcpStream::read_exact(std::span<std::byte> buf) const {
-  size_t done = 0;
-  while (done < buf.size()) {
-    const auto chunk = buf.subspan(done);
-    const auto ret = read(chunk);
-    if (!ret) {
-      return tl::make_unexpected(ret.error());
-    }
-    if (*ret == 0) {
-      return tl::make_unexpected(
-          error::Simple{
-              error::ErrorKind::UnexpectedEof, "eof while reading exact bytes"
-          }
-      );
-    }
-    done += static_cast<size_t>(*ret);
-  }
-  return {};
+  return pump_all(
+      buf,
+      [this](auto chunk) { return read(chunk); },
+      error::ErrorKind::UnexpectedEof,
+      "eof while reading exact bytes"
+  );
 }
 
 error::result<void> TcpStream::write_all(std::span<const std::byte> buf) const {
-  size_t done = 0;
-  while (done < buf.size()) {
-    const auto chunk = buf.subspan(done);
-    const auto ret = write(chunk);
-    if (!ret) {
-      return tl::make_unexpected(ret.error());
-    }
-    if (*ret == 0) {
-      return tl::make_unexpected(
-          error::Simple{
-              error::ErrorKind::WriteZero, "failed to write all bytes"
-          }
-      );
-    }
-    done += static_cast<size_t>(*ret);
-  }
-  return {};
+  return pump_all(
+      buf,
+      [this](auto chunk) { return write(chunk); },
+      error::ErrorKind::WriteZero,
+      "failed to write all bytes"
+  );
 }
 
 error::result<TcpStream> TcpStream::try_clone() const {
@@ -188,15 +177,6 @@ error::result<void> TcpStream::set_write_timeout(
 error::result<std::optional<std::chrono::microseconds>>
 TcpStream::write_timeout() const {
   return sock.write_timeout();
-}
-
-TcpStream::~TcpStream() = default;
-TcpStream::TcpStream(TcpStream &&other) noexcept
-    : sock(std::move(other.sock)) {}
-
-TcpStream &TcpStream::operator=(TcpStream &&other) noexcept {
-  this->sock = std::move(other.sock);
-  return *this;
 }
 
 } // namespace net

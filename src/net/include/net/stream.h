@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <type_traits>
 
 namespace net {
 
@@ -15,12 +16,12 @@ class TcpStream {
 public:
   explicit TcpStream(Socket &&sock);
 
-  ~TcpStream();
+  ~TcpStream() = default;
 
   TcpStream(const TcpStream &) = delete;
-  TcpStream(TcpStream &&other) noexcept;
+  TcpStream(TcpStream &&other) noexcept = default;
   TcpStream &operator=(const TcpStream &) = delete;
-  TcpStream &operator=(TcpStream &&other) noexcept;
+  TcpStream &operator=(TcpStream &&other) noexcept = default;
 
   static error::result<TcpStream> connect(const SocketAddr &addr);
   static error::result<TcpStream> connect(std::span<const SocketAddr> addrs);
@@ -37,31 +38,37 @@ public:
   );
 
   template <typename T, size_t Extent>
+    requires std::is_trivially_copyable_v<T>
   [[nodiscard]] error::result<ssize_t> read(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.read(byte_buf.data(), byte_buf.size());
   };
   template <typename T, size_t Extent>
-  [[nodiscard]] error::result<ssize_t> write(std::span<T, Extent> buf) const {
+    requires std::is_trivially_copyable_v<T>
+  [[nodiscard]] error::result<ssize_t>
+  write(std::span<const T, Extent> buf) const {
     const auto byte_buf = std::as_bytes(buf);
     return sock.write(byte_buf.data(), byte_buf.size());
   };
 
   template <typename T, size_t Extent>
+    requires std::is_trivially_copyable_v<T>
   [[nodiscard]] error::result<ssize_t>
   recv(std::span<T, Extent> buf, int flags = 0) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.recv(byte_buf.data(), byte_buf.size(), flags);
   };
   template <typename T, size_t Extent>
+    requires std::is_trivially_copyable_v<T>
   [[nodiscard]] error::result<ssize_t>
-  send(std::span<T, Extent> buf, int flags = 0) const {
+  send(std::span<const T, Extent> buf, int flags = 0) const {
     const auto byte_buf = std::as_bytes(buf);
     return sock.send(byte_buf.data(), byte_buf.size(), flags);
   };
 
   // Peek at incoming data without consuming it (MSG_PEEK).
   template <typename T, size_t Extent>
+    requires std::is_trivially_copyable_v<T>
   [[nodiscard]] error::result<ssize_t> peek(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.recv(byte_buf.data(), byte_buf.size(), MSG_PEEK);
