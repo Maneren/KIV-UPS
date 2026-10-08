@@ -26,7 +26,13 @@ Socket &Socket::operator=(Socket &&other) noexcept {
 }
 
 error::result<Socket> Socket::create(int family, int type) {
-  const int fd = socket(family, type | SOCK_CLOEXEC, 0);
+  const int fd = socket(
+      family,
+      static_cast<int>(
+          static_cast<unsigned>(type) | static_cast<unsigned>(SOCK_CLOEXEC)
+      ),
+      0
+  );
 
   return error::from_os(fd).map([](int raw) {
     return Socket(FileDescriptor(raw));
@@ -51,7 +57,14 @@ error::result<void> Socket::bind_to(const SocketAddr &addr) const {
 error::result<Socket>
 Socket::accept(sockaddr_union &sockaddr, socklen_t &len, int flags) const {
   while (true) {
-    const int raw = accept4(raw_fd(), &sockaddr.sa, &len, SOCK_CLOEXEC | flags);
+    const int raw = accept4(
+        raw_fd(),
+        &sockaddr.sa,
+        &len,
+        static_cast<int>(
+            static_cast<unsigned>(SOCK_CLOEXEC) | static_cast<unsigned>(flags)
+        )
+    );
     if (raw != -1) {
       return Socket(FileDescriptor(raw));
     }
@@ -97,7 +110,7 @@ error::result<void> Socket::connect_timeout(
     return tl::make_unexpected(made.error());
   }
 
-  const auto restore_blocking = [this]() -> error::result<void> {
+  const auto restore_blocking = [this] -> error::result<void> {
     return set_nonblocking(false);
   };
 
@@ -208,8 +221,14 @@ error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   if (current == -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  const int updated =
-      nonblocking ? (current | O_NONBLOCK) : (current & ~O_NONBLOCK);
+  const int updated = nonblocking ? static_cast<int>(
+                                        static_cast<unsigned>(current) |
+                                        static_cast<unsigned>(O_NONBLOCK)
+                                    )
+                                  : static_cast<int>(
+                                        static_cast<unsigned>(current) &
+                                        ~static_cast<unsigned>(O_NONBLOCK)
+                                    );
   if (updated == current) {
     return {};
   }

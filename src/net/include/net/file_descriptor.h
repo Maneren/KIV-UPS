@@ -23,13 +23,13 @@ public:
 
   void close() noexcept;
 
-  [[nodiscard]] constexpr bool valid() const { return fd != -1; }
+  [[nodiscard]] constexpr bool valid() const noexcept { return fd != -1; }
 
   /// Release ownership without closing. Returns the raw fd, or -1.
-  int release() noexcept;
+  [[nodiscard]] int release() noexcept;
 
   [[nodiscard]]
-  constexpr int raw() const {
+  constexpr int raw() const noexcept {
     return this->fd;
   }
 };

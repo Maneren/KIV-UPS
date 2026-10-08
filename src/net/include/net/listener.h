@@ -19,8 +19,8 @@ public:
   static error::result<TcpListener>
   bind_with_backlog(const SocketAddr &addr, int backlog);
 
-  Socket &socket() { return sock; }
-  [[nodiscard]] const Socket &socket() const { return sock; }
+  Socket &socket() noexcept { return sock; }
+  [[nodiscard]] const Socket &socket() const noexcept { return sock; }
 
   [[nodiscard]] error::result<std::tuple<TcpStream, SocketAddr>> accept() const;
 

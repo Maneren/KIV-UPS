@@ -23,8 +23,8 @@ public:
   TcpStreambuf &operator=(const TcpStreambuf &) = delete;
 
   // Allow move
-  TcpStreambuf(TcpStreambuf &&) = default;
-  TcpStreambuf &operator=(TcpStreambuf &&) = default;
+  TcpStreambuf(TcpStreambuf &&) noexcept = default;
+  TcpStreambuf &operator=(TcpStreambuf &&) noexcept = default;
 
 protected:
   // Input (reading)

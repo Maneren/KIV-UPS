@@ -8,7 +8,6 @@
 #include <optional>
 #include <sys/socket.h>
 #include <type_traits>
-#include <utility>
 #include <utils/functional.h>
 
 namespace net {
@@ -36,8 +35,10 @@ public:
 
   ~Socket() = default;
 
-  [[nodiscard]] const FileDescriptor &file_descriptor() const { return fd; }
-  [[nodiscard]] constexpr int raw_fd() const { return fd.raw(); };
+  [[nodiscard]] const FileDescriptor &file_descriptor() const noexcept {
+    return fd;
+  }
+  [[nodiscard]] constexpr int raw_fd() const noexcept { return fd.raw(); };
 
   template <typename T>
   error::result<void> setopts(int level, int optname, const T &optval) const {

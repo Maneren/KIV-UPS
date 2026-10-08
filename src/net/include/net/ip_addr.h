@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <string>
 #include <sys/socket.h>
+#include <utility>
 #include <utils/match.h>
 #include <variant>
 
@@ -20,45 +21,46 @@ struct Ipv4Addr {
 
   using octets_t = std::array<uint8_t, BYTES>;
 
-  constexpr Ipv4Addr() = default;
-  constexpr Ipv4Addr(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
+  constexpr Ipv4Addr() noexcept = default;
+  constexpr Ipv4Addr(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept
       : octets{a, b, c, d} {}
-  explicit constexpr Ipv4Addr(octets_t octets) : octets(octets) {}
-  explicit Ipv4Addr(uint32_t addr);
+  explicit constexpr Ipv4Addr(octets_t octets) noexcept : octets(octets) {}
+  explicit Ipv4Addr(uint32_t addr) noexcept;
 
-  constexpr bool operator==(const Ipv4Addr &other) const = default;
+  constexpr bool operator==(const Ipv4Addr &other) const noexcept = default;
 
-  [[nodiscard]] static constexpr int family() { return FAMILY; }
+  [[nodiscard]] static constexpr int family() noexcept { return FAMILY; }
 
-  [[nodiscard]] constexpr std::array<uint8_t, BYTES> to_octets() const {
+  [[nodiscard]] constexpr std::array<uint8_t, BYTES>
+  to_octets() const noexcept {
     return octets;
   }
 
-  [[nodiscard]] uint32_t to_bits() const;
-  [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits);
+  [[nodiscard]] uint32_t to_bits() const noexcept;
+  [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits) noexcept;
 
-  [[nodiscard]] constexpr bool is_loopback() const {
+  [[nodiscard]] constexpr bool is_loopback() const noexcept {
     return octets.front() == 127;
   }
-  [[nodiscard]] constexpr bool is_unspecified() const {
+  [[nodiscard]] constexpr bool is_unspecified() const noexcept {
     return octets == octets_t{0, 0, 0, 0};
   }
-  [[nodiscard]] constexpr bool is_broadcast() const {
+  [[nodiscard]] constexpr bool is_broadcast() const noexcept {
     return octets == octets_t{255, 255, 255, 255};
   }
-  [[nodiscard]] constexpr bool is_multicast() const {
+  [[nodiscard]] constexpr bool is_multicast() const noexcept {
     const auto [a, _b, _c, _d] = octets;
     return a >= 224 && a <= 239;
   }
-  [[nodiscard]] constexpr bool is_private() const {
+  [[nodiscard]] constexpr bool is_private() const noexcept {
     const auto [a, b, _c, _d] = octets;
     return (a == 10) || (a == 172 && b >= 16 && b <= 31) ||
            (a == 192 && b == 168);
   }
 
-  static Ipv4Addr localhost();
-  static Ipv4Addr unspecified();
-  static Ipv4Addr broadcast();
+  static Ipv4Addr localhost() noexcept;
+  static Ipv4Addr unspecified() noexcept;
+  static Ipv4Addr broadcast() noexcept;
 
   static error::result<Ipv4Addr> from_string(std::string_view str);
 
@@ -76,26 +78,28 @@ struct Ipv6Addr {
 
   using octets_t = std::array<uint8_t, BYTES>;
 
-  Ipv6Addr() = default;
-  explicit Ipv6Addr(octets_t octets);
-  explicit Ipv6Addr(const uint8_t octets[BYTES]);
-  static Ipv6Addr from_segments(std::array<uint16_t, SEGMENTS> segments);
+  Ipv6Addr() noexcept = default;
+  explicit Ipv6Addr(octets_t octets) noexcept;
+  explicit Ipv6Addr(const uint8_t octets[BYTES]) noexcept;
+  static Ipv6Addr
+  from_segments(std::array<uint16_t, SEGMENTS> segments) noexcept;
 
-  constexpr bool operator==(const Ipv6Addr &other) const = default;
+  constexpr bool operator==(const Ipv6Addr &other) const noexcept = default;
 
-  [[nodiscard]] static constexpr int family() { return FAMILY; }
+  [[nodiscard]] static constexpr int family() noexcept { return FAMILY; }
 
-  [[nodiscard]] constexpr std::array<uint8_t, BYTES> to_octets() const {
+  [[nodiscard]] constexpr std::array<uint8_t, BYTES>
+  to_octets() const noexcept {
     return octets;
   }
 
-  [[nodiscard]] std::array<uint16_t, SEGMENTS> segments() const;
+  [[nodiscard]] std::array<uint16_t, SEGMENTS> segments() const noexcept;
 
-  [[nodiscard]] bool is_loopback() const;
-  [[nodiscard]] bool is_unspecified() const;
-  [[nodiscard]] bool is_multicast() const;
-  static Ipv6Addr localhost();
-  static Ipv6Addr unspecified();
+  [[nodiscard]] bool is_loopback() const noexcept;
+  [[nodiscard]] bool is_unspecified() const noexcept;
+  [[nodiscard]] bool is_multicast() const noexcept;
+  static Ipv6Addr localhost() noexcept;
+  static Ipv6Addr unspecified() noexcept;
 
   // Parses a bare literal, e.g. "::1". Bracketed `[ip]:port` forms
   // belong to `SocketAddrV6::from_string`.
@@ -108,23 +112,38 @@ private:
 };
 
 struct IpAddr {
-  IpAddr(Ipv4Addr addr) : inner(addr) {}
-  IpAddr(Ipv6Addr addr) : inner(addr) {}
+  // Implicit converting ctors are intentional: IpAddrV4/V6 convert to IpAddr
+  // ergonomically
+  // NOLINTNEXTLINE(*explicit-constructor)
+  IpAddr(Ipv4Addr addr) noexcept : inner(addr) {}
+  // NOLINTNEXTLINE(*explicit-constructor)
+  IpAddr(Ipv6Addr addr) noexcept : inner(addr) {}
 
-  std::variant<Ipv4Addr, Ipv6Addr> inner;
+  template <typename... Fs>
+  constexpr decltype(auto) visit(Fs &&...fs) const noexcept(
+      noexcept(match::match(inner, std::forward<Fs>(fs)...))
+  ) {
+    return match::match(inner, std::forward<Fs>(fs)...);
+  }
+
+  template <typename... Fs>
+  constexpr decltype(auto) visit(Fs &&...fs) noexcept(
+      noexcept(match::match(inner, std::forward<Fs>(fs)...))
+  ) {
+    return match::match(inner, std::forward<Fs>(fs)...);
+  }
 
   [[nodiscard]] constexpr int family() const {
-    return match::match(
-        inner,
+    return visit(
         [](const Ipv4Addr &) { return Ipv4Addr::FAMILY; },
         [](const Ipv6Addr &) { return Ipv6Addr::FAMILY; }
     );
   }
 
-  [[nodiscard]] constexpr bool is_ipv4() const {
+  [[nodiscard]] constexpr bool is_ipv4() const noexcept {
     return std::holds_alternative<Ipv4Addr>(inner);
   }
-  [[nodiscard]] constexpr bool is_ipv6() const {
+  [[nodiscard]] constexpr bool is_ipv6() const noexcept {
     return std::holds_alternative<Ipv6Addr>(inner);
   }
 
@@ -135,6 +154,9 @@ struct IpAddr {
   [[nodiscard]] constexpr bool operator==(const IpAddr &other) const = default;
 
   static error::result<IpAddr> from_string(std::string_view str);
+
+private:
+  std::variant<Ipv4Addr, Ipv6Addr> inner;
 };
 
 } // namespace net
@@ -194,8 +216,7 @@ template <> struct std::formatter<net::IpAddr> {
   }
 
   static auto format(auto &obj, std::format_context &ctx) {
-    return match::match(
-        obj.inner,
+    return obj.visit(
         [&ctx](const net::Ipv4Addr &addr) {
           return std::format_to(ctx.out(), "{}", addr);
         },

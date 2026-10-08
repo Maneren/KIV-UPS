@@ -6,8 +6,6 @@
 #include <string>
 #include <string_view>
 #include <utils/functional.h>
-#include <utils/match.h>
-#include <variant>
 
 namespace net {
 
@@ -57,7 +55,7 @@ error::result<uint32_t> parse_scope_id(const std::string_view scope_part) {
 
 // SocketAddrV4
 
-sockaddr_in SocketAddrV4::to_sockaddr() const {
+sockaddr_in SocketAddrV4::to_sockaddr() const noexcept {
   sockaddr_in addr_in{};
   addr_in.sin_family = AF_INET;
   addr_in.sin_port = htons(port_);
@@ -141,7 +139,7 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
 
 // SocketAddrV6
 
-sockaddr_in6 SocketAddrV6::to_sockaddr() const {
+sockaddr_in6 SocketAddrV6::to_sockaddr() const noexcept {
   sockaddr_in6 addr_in6{};
   std::memset(&addr_in6, 0, sizeof(addr_in6));
   addr_in6.sin6_family = AF_INET6;
@@ -255,48 +253,49 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
 
 SocketAddr::SocketAddr(const IpAddr &ip, uint16_t port)
     : inner(SocketAddrV4(Ipv4Addr(), port)) {
-  match::match(
-      ip.inner,
+  ip.visit(
       [port, this](const Ipv4Addr &v4) { inner = SocketAddrV4(v4, port); },
       [port, this](const Ipv6Addr &v6) { inner = SocketAddrV6(v6, port); }
   );
 }
 
 IpAddr SocketAddr::ip() const {
-  return match::match(
-      inner,
+  return visit(
       [](const SocketAddrV4 &v4) { return IpAddr(v4.ip()); },
       [](const SocketAddrV6 &v6) { return IpAddr(v6.ip()); }
   );
 }
 
 void SocketAddr::set_ip(const IpAddr &ip) {
-  match::match(
-      inner,
-      [&ip](SocketAddrV4 &v4) {
-        if (const auto *v = std::get_if<Ipv4Addr>(&ip.inner)) {
-          v4.set_ip(*v);
-        }
+  visit(
+      [&ip, this](SocketAddrV4 &v4) {
+        ip.visit(
+            [&v4](const Ipv4Addr &addr) { v4.set_ip(addr); },
+            [&v4, this](const Ipv6Addr &addr) {
+              inner = SocketAddrV6(addr, v4.port());
+            }
+        );
       },
-      [&ip](SocketAddrV6 &v6) {
-        if (const auto *v = std::get_if<Ipv6Addr>(&ip.inner)) {
-          v6.set_ip(*v);
-        }
+      [&ip, this](SocketAddrV6 &v6) {
+        ip.visit(
+            [&v6](const Ipv6Addr &addr) { v6.set_ip(addr); },
+            [&v6, this](const Ipv4Addr &addr) {
+              inner = SocketAddrV4(addr, v6.port());
+            }
+        );
       }
   );
 }
 
 uint16_t SocketAddr::port() const {
-  return match::match(
-      inner,
+  return visit(
       [](const SocketAddrV4 &v4) { return v4.port(); },
       [](const SocketAddrV6 &v6) { return v6.port(); }
   );
 }
 
 void SocketAddr::set_port(uint16_t port) {
-  match::match(
-      inner,
+  visit(
       [port](SocketAddrV4 &v4) { v4.set_port(port); },
       [port](SocketAddrV6 &v6) { v6.set_port(port); }
   );
@@ -323,18 +322,15 @@ SocketAddr::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
 }
 
 std::tuple<sockaddr_union, socklen_t> SocketAddr::to_sockaddr() const {
-  return match::match(
-      inner,
+  return visit(
       [](const SocketAddrV4 &v4) {
         return std::make_tuple(
-            sockaddr_union{.ipv4 = v4.to_sockaddr()},
-            static_cast<socklen_t>(sizeof(sockaddr_in))
+            sockaddr_union{.ipv4 = v4.to_sockaddr()}, SocketAddrV4::SIZE
         );
       },
       [](const SocketAddrV6 &v6) {
         return std::make_tuple(
-            sockaddr_union{.ipv6 = v6.to_sockaddr()},
-            static_cast<socklen_t>(sizeof(sockaddr_in6))
+            sockaddr_union{.ipv6 = v6.to_sockaddr()}, SocketAddrV6::SIZE
         );
       }
   );

@@ -15,9 +15,11 @@
 namespace net::error {
 
 struct Os {
+  // Plain error payload, intentionally aggregate-like.
+  // NOLINTNEXTLINE(*non-private-member-variables-in-classes)
   int code;
 
-  explicit Os(int code = errno) : code{code} {}
+  explicit Os(int code = errno) noexcept : code{code} {}
 };
 
 enum class ErrorKind : std::uint8_t {
@@ -69,18 +71,24 @@ std::string_view to_string(ErrorKind kind);
 ErrorKind from_errno(int code);
 
 struct Simple {
+  // Plain error payload, intentionally aggregate-like.
+  // NOLINTNEXTLINE(*non-private-member-variables-in-classes)
   ErrorKind kind;
+  // NOLINTNEXTLINE(*non-private-member-variables-in-classes)
   std::string_view msg;
 
-  explicit Simple(ErrorKind kind, std::string_view msg = {})
+  explicit Simple(ErrorKind kind, std::string_view msg = {}) noexcept
       : kind{kind}, msg{msg} {}
 };
 
 struct SimpleMessage {
+  // Plain error payload, intentionally aggregate-like.
+  // NOLINTNEXTLINE(*non-private-member-variables-in-classes)
   ErrorKind kind;
+  // NOLINTNEXTLINE(*non-private-member-variables-in-classes)
   std::string msg;
 
-  SimpleMessage(ErrorKind kind, std::string msg);
+  SimpleMessage(ErrorKind kind, std::string msg) noexcept;
 
   template <typename... Args>
   SimpleMessage(
@@ -110,6 +118,20 @@ public:
 
   [[nodiscard]] std::optional<int> os_code() const;
 
+  template <typename... Fs>
+  constexpr decltype(auto) visit(Fs &&...fs) const noexcept(
+      noexcept(match::match(inner, std::forward<Fs>(fs)...))
+  ) {
+    return match::match(inner, std::forward<Fs>(fs)...);
+  }
+
+  template <typename... Fs>
+  constexpr decltype(auto) visit(Fs &&...fs) noexcept(
+      noexcept(match::match(inner, std::forward<Fs>(fs)...))
+  ) {
+    return match::match(inner, std::forward<Fs>(fs)...);
+  }
+
   [[nodiscard]] const Variant &data() const { return inner; }
   [[nodiscard]] Variant &data() { return inner; }
 };
@@ -133,8 +155,7 @@ template <> struct std::formatter<net::error::IoError> {
   }
 
   static auto format(const auto &kind, std::format_context &ctx) {
-    return match::match(
-        kind.data(),
+    return kind.visit(
         [&ctx](const net::error::Os &os) {
           return std::format_to(
               ctx.out(), "{} - {}", os.code, std::strerror(os.code)

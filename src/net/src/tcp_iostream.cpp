@@ -70,14 +70,14 @@ std::streambuf::int_type TcpStreambuf::overflow(int_type ch) {
 int TcpStreambuf::sync() { return flush_output() ? 0 : -1; }
 
 bool TcpStreambuf::flush_output() {
-  const ptrdiff_t bytes_to_write = pptr() - pbase();
-  if (bytes_to_write == 0) {
+  const auto pending = pptr() - pbase();
+  if (pending <= 0) {
     return true;
   }
+  const auto bytes_to_write = static_cast<size_t>(pending);
 
   const std::span<const std::byte> buf(
-      reinterpret_cast<const std::byte *>(pbase()),
-      static_cast<size_t>(bytes_to_write)
+      reinterpret_cast<const std::byte *>(pbase()), bytes_to_write
   );
 
   size_t total_written = 0;

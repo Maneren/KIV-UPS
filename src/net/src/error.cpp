@@ -1,16 +1,14 @@
 #include <cerrno>
 #include <net/error.h>
 #include <utility>
-#include <utils/match.h>
 
 namespace net::error {
 
-SimpleMessage::SimpleMessage(ErrorKind kind, std::string msg)
+SimpleMessage::SimpleMessage(ErrorKind kind, std::string msg) noexcept
     : kind{kind}, msg{std::move(msg)} {}
 
 ErrorKind IoError::kind() const {
-  return match::match(
-      inner,
+  return visit(
       [](const Os &os) { return from_errno(os.code); },
       [](const Simple &simple) { return simple.kind; },
       [](const SimpleMessage &simple) { return simple.kind; }
@@ -18,8 +16,7 @@ ErrorKind IoError::kind() const {
 }
 
 std::optional<int> IoError::os_code() const {
-  return match::match(
-      inner,
+  return visit(
       [](const Os &os) -> std::optional<int> { return os.code; },
       [](const auto &) -> std::optional<int> { return std::nullopt; }
   );

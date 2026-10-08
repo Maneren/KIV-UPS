@@ -88,7 +88,7 @@ public:
   [[nodiscard]] error::result<std::optional<std::chrono::microseconds>>
   write_timeout() const;
 
-  [[nodiscard]] const Socket &socket() const { return sock; }
+  [[nodiscard]] const Socket &socket() const noexcept { return sock; }
 };
 
 } // namespace net
