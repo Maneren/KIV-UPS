@@ -110,6 +110,8 @@ std::string_view to_string(error::ErrorKind kind) {
     return "operation would block";
   case ErrorKind::WriteZero:
     return "write zero";
+  default:
+    std::unreachable();
   }
 }
 
