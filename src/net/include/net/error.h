@@ -106,13 +106,11 @@ public:
   // Implicit converting ctors are intentional: tl::expected<T, IoError> relies
   // on unexpected<Os/Simple/SimpleMessage> converting to IoError.
   // NOLINTNEXTLINE(*explicit-constructor)
-  IoError(const Os &os) : inner{os} {}
+  IoError(Os os) : inner{os} {}
   // NOLINTNEXTLINE(*explicit-constructor)
-  IoError(const Simple &simple) : inner{simple} {}
+  IoError(Simple simple) : inner{simple} {}
   // NOLINTNEXTLINE(*explicit-constructor)
-  IoError(const SimpleMessage &simple) : inner{simple} {}
-  // NOLINTNEXTLINE(*explicit-constructor)
-  IoError(SimpleMessage &&simple) : inner{std::move(simple)} {}
+  IoError(SimpleMessage simple) : inner{std::move(simple)} {}
 
   [[nodiscard]] ErrorKind kind() const;
 
@@ -154,33 +152,27 @@ template <> struct std::formatter<net::error::IoError> {
     return ctx.begin();
   }
 
-  static auto format(const auto &kind, std::format_context &ctx) {
-    return kind.visit(
+  static auto format(const net::error::IoError &err, std::format_context &ctx) {
+    auto format_simple =
+        [&ctx](net::error::ErrorKind kind, std::string_view msg) {
+          if (msg.empty()) {
+            return std::format_to(ctx.out(), "{}", net::error::to_string(kind));
+          }
+          return std::format_to(
+              ctx.out(), "{}: {}", net::error::to_string(kind), msg
+          );
+        };
+    return err.visit(
         [&ctx](const net::error::Os &os) {
           return std::format_to(
               ctx.out(), "{} - {}", os.code, std::strerror(os.code)
           );
         },
-        [&ctx](const net::error::Simple &simple) {
-          if (simple.msg.empty()) {
-            return std::format_to(
-                ctx.out(), "{}", net::error::to_string(simple.kind)
-            );
-          }
-          return std::format_to(
-              ctx.out(),
-              "{}: {}",
-              net::error::to_string(simple.kind),
-              simple.msg
-          );
+        [&](const net::error::Simple &simple) {
+          return format_simple(simple.kind, simple.msg);
         },
-        [&ctx](const net::error::SimpleMessage &simple) {
-          return std::format_to(
-              ctx.out(),
-              "{}: {}",
-              net::error::to_string(simple.kind),
-              simple.msg
-          );
+        [&](const net::error::SimpleMessage &simple) {
+          return format_simple(simple.kind, simple.msg);
         }
     );
   }
