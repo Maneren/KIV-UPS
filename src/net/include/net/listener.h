@@ -5,6 +5,7 @@
 #include <net/stream.h>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <tuple>
 
 namespace net {
@@ -19,7 +20,12 @@ public:
   static error::result<TcpListener>
   bind_with_backlog(const SocketAddr &addr, int backlog);
 
-  Socket &socket() noexcept { return sock; }
+  TcpListener(const TcpListener &) = delete;
+  TcpListener(TcpListener &&) noexcept = default;
+  TcpListener &operator=(const TcpListener &) = delete;
+  TcpListener &operator=(TcpListener &&) noexcept = default;
+  ~TcpListener() = default;
+
   [[nodiscard]] const Socket &socket() const noexcept { return sock; }
 
   [[nodiscard]] error::result<std::tuple<TcpStream, SocketAddr>> accept() const;
@@ -32,7 +38,7 @@ public:
   [[nodiscard]] error::result<uint32_t> ttl() const;
 
   [[nodiscard]] auto incoming() const {
-    return std::ranges::transform_view(std::ranges::iota_view(0), [&](auto) {
+    return std::ranges::transform_view(std::ranges::iota_view(0), [this](auto) {
       return this->accept();
     });
   }

@@ -18,20 +18,20 @@ TcpListener::bind(std::span<const SocketAddr> addrs) {
   for (const auto &addr : addrs) {
     auto result = bind_with_backlog(addr, BACKLOG);
     if (result) {
-      return result;
+      return std::move(*result);
     }
 
-    last_error = result.error();
+    last_error = std::move(result).error();
   }
 
   if (last_error) {
-    return tl::make_unexpected(*last_error);
+    return tl::make_unexpected(std::move(*last_error));
   }
 
   return tl::make_unexpected(
-      error::SimpleMessage(
+      error::Simple{
           error::ErrorKind::InvalidInput, "could not bind to any address"
-      )
+      }
   );
 }
 
@@ -39,21 +39,12 @@ error::result<TcpListener>
 TcpListener::bind_with_backlog(const SocketAddr &addr, int backlog) {
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&addr, backlog](Socket sock) -> error::result<TcpListener> {
-        if (const auto result = sock.setopt(SOL_SOCKET, SO_REUSEADDR, 1);
-            !result) {
-          return tl::make_unexpected(result.error());
-        }
-
-        if (const auto result = sock.bind_to(addr); !result) {
-          return tl::make_unexpected(result.error());
-        }
-
-        if (const auto result = error::from_os(listen(sock.raw_fd(), backlog));
-            !result) {
-          return tl::make_unexpected(result.error());
-        }
-
-        return TcpListener(std::move(sock));
+        return sock.setopt(SOL_SOCKET, SO_REUSEPORT, 1)
+            .and_then([&sock, &addr]() { return sock.bind_to(addr); })
+            .and_then([&sock, backlog]() {
+              return error::from_os(listen(sock.raw_fd(), backlog));
+            })
+            .map([&sock](int) { return TcpListener(std::move(sock)); });
       });
 }
 
@@ -62,18 +53,16 @@ error::result<std::tuple<TcpStream, SocketAddr>> TcpListener::accept() const {
   auto len = sockaddr_union::SIZE;
 
   auto sock = this->sock.accept(storage, len);
-
   if (!sock) {
-    return tl::make_unexpected(sock.error());
+    return tl::make_unexpected(std::move(sock).error());
   }
 
-  const auto addr = SocketAddr::from_sockaddr(storage, len);
-
+  auto addr = SocketAddr::from_sockaddr(storage, len);
   if (!addr) {
-    return tl::make_unexpected(addr.error());
+    return tl::make_unexpected(std::move(addr).error());
   }
 
-  return std::make_tuple(TcpStream(std::move(sock.value())), addr.value());
+  return std::make_tuple(TcpStream(std::move(*sock)), *addr);
 }
 
 error::result<SocketAddr> TcpListener::local_addr() const {
@@ -81,9 +70,7 @@ error::result<SocketAddr> TcpListener::local_addr() const {
 }
 
 error::result<TcpListener> TcpListener::duplicate() const {
-  return sock.duplicate().map([](Socket s) {
-    return TcpListener(std::move(s));
-  });
+  return sock.duplicate().map(functional::Constructor<TcpListener>());
 }
 
 error::result<void> TcpListener::set_nonblocking(bool nonblocking) const {
