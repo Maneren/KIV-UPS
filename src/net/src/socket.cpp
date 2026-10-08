@@ -10,29 +10,41 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <type_traits>
 #include <unistd.h>
 #include <utility>
 #include <utils/functional.h>
 
 namespace net {
 
+namespace {
+
+template <typename F>
+auto retry_on_eintr(F &&fn) -> error::result<std::invoke_result_t<F>> {
+  while (true) {
+    if (auto ret = std::forward<F>(fn)(); ret >= 0) {
+      return ret;
+    }
+    if (errno == EINTR) {
+      continue;
+    }
+    return tl::make_unexpected(error::Os{});
+  }
+}
+
+} // namespace
+
 Socket::Socket(FileDescriptor &&fd) : fd(std::move(fd)) {}
 
 Socket::Socket(Socket &&other) noexcept : fd(std::move(other.fd)) {}
 
 Socket &Socket::operator=(Socket &&other) noexcept {
-  this->fd = std::move(other.fd);
+  fd = std::move(other.fd);
   return *this;
 }
 
 error::result<Socket> Socket::create(int family, int type) {
-  const int fd = socket(
-      family,
-      static_cast<int>(
-          static_cast<unsigned>(type) | static_cast<unsigned>(SOCK_CLOEXEC)
-      ),
-      0
-  );
+  const int fd = socket(family, type | SOCK_CLOEXEC, 0);
 
   return error::from_os(fd).map([](int raw) {
     return Socket(FileDescriptor(raw));
@@ -48,38 +60,25 @@ error::result<Socket> Socket::duplicate() const {
 }
 
 error::result<void> Socket::bind_to(const SocketAddr &addr) const {
-  const auto [sockaddr_union, len] = addr.to_sockaddr();
+  const auto [sockaddr, len] = addr.to_sockaddr();
 
-  return error::from_os(bind(raw_fd(), &sockaddr_union.sa, len))
+  return error::from_os(bind(raw_fd(), &sockaddr.sa, len))
       .map(functional::drop);
 }
 
 error::result<Socket>
 Socket::accept(sockaddr_union &sockaddr, socklen_t &len, int flags) const {
-  while (true) {
-    const int raw = accept4(
-        raw_fd(),
-        &sockaddr.sa,
-        &len,
-        static_cast<int>(
-            static_cast<unsigned>(SOCK_CLOEXEC) | static_cast<unsigned>(flags)
-        )
-    );
-    if (raw != -1) {
-      return Socket(FileDescriptor(raw));
-    }
-    if (errno == EINTR) {
-      continue;
-    }
-    return tl::make_unexpected(error::Os{errno});
-  }
+  return retry_on_eintr([&] {
+           return accept4(raw_fd(), &sockaddr.sa, &len, flags | SOCK_CLOEXEC);
+         })
+      .map([](int raw) { return Socket(FileDescriptor(raw)); });
 }
 
 error::result<void> Socket::connect(const SocketAddr &addr) const {
-  const auto [sockaddr, len] = addr.to_sockaddr();
+  const auto [storage, len] = addr.to_sockaddr();
 
   while (true) {
-    const auto result = ::connect(raw_fd(), &sockaddr.sa, len);
+    const auto result = ::connect(raw_fd(), &storage.sa, len);
 
     if (result != -1 || errno == EISCONN) {
       return {};
@@ -89,7 +88,7 @@ error::result<void> Socket::connect(const SocketAddr &addr) const {
       continue;
     }
 
-    return error::from_os(result).map(functional::drop);
+    return tl::make_unexpected(error::Os{errno});
   }
 }
 
@@ -247,57 +246,21 @@ error::result<void> Socket::set_nonblocking(bool nonblocking) const {
 }
 
 error::result<ssize_t> Socket::read(void *buf, const size_t len) const {
-  while (true) {
-    const ssize_t ret = ::read(raw_fd(), buf, len);
-    if (ret >= 0) {
-      return ret;
-    }
-    if (errno == EINTR) {
-      continue;
-    }
-    return tl::make_unexpected(error::Os{errno});
-  }
+  return retry_on_eintr([&] { return ::read(raw_fd(), buf, len); });
 }
 
 error::result<ssize_t> Socket::write(const void *buf, const size_t len) const {
-  while (true) {
-    const ssize_t ret = ::write(raw_fd(), buf, len);
-    if (ret >= 0) {
-      return ret;
-    }
-    if (errno == EINTR) {
-      continue;
-    }
-    return tl::make_unexpected(error::Os{errno});
-  }
+  return retry_on_eintr([&] { return ::write(raw_fd(), buf, len); });
 }
 
 error::result<ssize_t>
 Socket::recv(void *buf, const size_t len, int flags) const {
-  while (true) {
-    const ssize_t ret = ::recv(raw_fd(), buf, len, flags);
-    if (ret >= 0) {
-      return ret;
-    }
-    if (errno == EINTR) {
-      continue;
-    }
-    return tl::make_unexpected(error::Os{errno});
-  }
+  return retry_on_eintr([&] { return ::recv(raw_fd(), buf, len, flags); });
 }
 
 error::result<ssize_t>
 Socket::send(const void *buf, const size_t len, int flags) const {
-  while (true) {
-    const ssize_t ret = ::send(raw_fd(), buf, len, flags);
-    if (ret >= 0) {
-      return ret;
-    }
-    if (errno == EINTR) {
-      continue;
-    }
-    return tl::make_unexpected(error::Os{errno});
-  }
+  return retry_on_eintr([&] { return ::send(raw_fd(), buf, len, flags); });
 }
 
 error::result<SocketAddr> Socket::local_addr() const {
