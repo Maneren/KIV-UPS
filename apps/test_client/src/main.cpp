@@ -1,19 +1,81 @@
 #include <algorithm>
+#include <cli/cli.hpp>
 #include <iostream>
 #include <net/listener.h>
 #include <net/tcp_iostream.h>
 #include <utils/print.h>
 
+constexpr auto ECHO_PORT = 2001;
+constexpr auto REVERSE_PORT = 2002;
+constexpr auto CALCULATE_PORT = 2003;
+
 namespace {
 
-void test_echo(net::IpAddr address) {
-  const net::SocketAddr sockaddr{address, 2001};
+int test_calculate(
+    const std::string &address, int argc, const char *const *argv
+) {
+  const auto args = cli::Parser().option("o", "operation").parse(argc, argv);
+  if (!args) {
+    std::println("Failed to parse arguments: {}", args.error().what());
+    return 1;
+  }
 
-  auto stream = net::TcpStream::connect(sockaddr).value();
+  const auto operation = args->get_value("operation");
+  if (!operation) {
+    std::println("Missing operation");
+    return 1;
+  }
 
-  std::println("Connected to {}", sockaddr);
+  if (args->positional().size() != 2) {
+    std::println(
+        std::cerr,
+        "Expected 2 positional arguments, got {}",
+        args->positional().size()
+    );
+    return 1;
+  }
 
-  net::TcpIostream iostream{stream};
+  const auto a = std::stol(args->positional()[0]);
+  const auto b = std::stol(args->positional()[1]);
+
+  std::println("Connecting to {}:{}", address, CALCULATE_PORT);
+  auto stream = net::TcpStream::connect_host(address, CALCULATE_PORT);
+  if (!stream) {
+    std::println("Failed to connect to server: {}", stream.error());
+    return 1;
+  }
+
+  std::println("Connected to {}", *stream->peer_addr());
+
+  net::TcpIostream iostream{*stream};
+
+  std::string received;
+  constexpr auto HEADER_LINES = 4;
+  for (const auto _ : std::views::iota(0, HEADER_LINES)) {
+    std::getline(iostream, received);
+    std::println("Received: {}", received);
+  }
+
+  std::println("Sending: {}|{}|{}", *operation, a, b);
+  iostream << *operation << '|' << a << '|' << b << '\n' << std::flush;
+
+  std::getline(iostream, received);
+  std::println("Received: {}", received);
+
+  return 0;
+}
+
+void test_echo(const std::string &address) {
+  std::println("Connecting to {}:{}", address, ECHO_PORT);
+  auto stream = net::TcpStream::connect_host(address, ECHO_PORT);
+  if (!stream) {
+    std::println("Failed to connect to server: {}", stream.error());
+    return;
+  }
+
+  std::println("Connected to {}", *stream->peer_addr());
+
+  net::TcpIostream iostream{*stream};
 
   const auto *const line = "Hello World";
   std::println("Sending: {}", line);
@@ -30,14 +92,17 @@ void test_echo(net::IpAddr address) {
   }
 }
 
-void test_reverse(net::IpAddr address) {
-  const net::SocketAddr sockaddr{address, 2002};
+void test_reverse(const std::string &address) {
+  std::println("Connecting to {}:{}", address, REVERSE_PORT);
+  auto stream = net::TcpStream::connect_host(address, REVERSE_PORT);
+  if (!stream) {
+    std::println("Failed to connect to server: {}", stream.error());
+    return;
+  }
 
-  auto stream = net::TcpStream::connect(sockaddr).value();
+  std::println("Connected to {}", *stream->peer_addr());
 
-  std::println("Connected to {}", sockaddr);
-
-  net::TcpIostream iostream{stream};
+  net::TcpIostream iostream{*stream};
 
   std::string line;
   std::getline(iostream, line);
@@ -53,14 +118,15 @@ void test_reverse(net::IpAddr address) {
 
 } // namespace
 
-int main() {
-  threadpool::Threadpool pool;
-
+int main(const int argc, const char *const *argv) {
   try {
-    const auto server = net::Ipv4Addr::from_string("147.228.67.67").value();
+    constexpr auto address = "kiv-ubl.kiv.zcu.cz";
 
-    test_echo(server);
-    test_reverse(server);
+    test_echo(address);
+    test_reverse(address);
+    if (auto res = test_calculate(address, argc, argv); res != 0) {
+      return res;
+    }
   } catch (const std::exception &e) {
     std::cerr << "Unexpected error: " << e.what() << '\n';
     return 1;
