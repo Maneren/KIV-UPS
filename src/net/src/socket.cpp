@@ -200,10 +200,10 @@ error::result<void> Socket::connect_timeout(
 }
 
 error::result<std::optional<error::IoError>> Socket::take_error() const {
-  const auto result = getopt<int>(SOL_SOCKET, SO_ERROR);
+  auto result = getopt<int>(SOL_SOCKET, SO_ERROR);
 
   if (!result) {
-    return tl::make_unexpected(result.error());
+    return tl::make_unexpected(std::move(result).error());
   }
 
   if (*result == 0) {
@@ -213,21 +213,6 @@ error::result<std::optional<error::IoError>> Socket::take_error() const {
   return error::Os{*result};
 }
 
-namespace {
-
-int enable_bitflag(int base, int flag) {
-  return static_cast<int>(
-      static_cast<unsigned>(base) | static_cast<unsigned>(flag)
-  );
-}
-int disable_bitflag(int base, int flag) {
-  return static_cast<int>(
-      static_cast<unsigned>(base) & ~static_cast<unsigned>(flag)
-  );
-}
-
-} // namespace
-
 error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   // There is no other way to do this
   // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
@@ -235,8 +220,8 @@ error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   if (current == -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  const int updated = nonblocking ? enable_bitflag(current, O_NONBLOCK)
-                                  : disable_bitflag(current, O_NONBLOCK);
+  const int updated =
+      nonblocking ? (current | O_NONBLOCK) : (current & ~O_NONBLOCK);
   if (updated == current) {
     return {};
   }
@@ -263,22 +248,26 @@ Socket::send(const void *buf, const size_t len, int flags) const {
   return retry_on_eintr([&] { return ::send(raw_fd(), buf, len, flags); });
 }
 
-error::result<SocketAddr> Socket::local_addr() const {
-  sockaddr_union sockaddr{};
+namespace {
+
+error::result<SocketAddr>
+addr_from_fd(int fd, int (*getter)(int, sockaddr *, socklen_t *)) {
+  sockaddr_union storage{};
   auto len = sockaddr_union::SIZE;
-  if (getsockname(raw_fd(), &sockaddr.sa, &len) == -1) {
+  if (getter(fd, &storage.sa, &len) == -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  return SocketAddr::from_sockaddr(sockaddr, len);
+  return SocketAddr::from_sockaddr(storage, len);
+}
+
+} // namespace
+
+error::result<SocketAddr> Socket::local_addr() const {
+  return addr_from_fd(raw_fd(), ::getsockname);
 }
 
 error::result<SocketAddr> Socket::peer_addr() const {
-  sockaddr_union sockaddr{};
-  auto len = sockaddr_union::SIZE;
-  if (getpeername(raw_fd(), &sockaddr.sa, &len) == -1) {
-    return tl::make_unexpected(error::Os{errno});
-  }
-  return SocketAddr::from_sockaddr(sockaddr, len);
+  return addr_from_fd(raw_fd(), ::getpeername);
 }
 
 error::result<void> Socket::shutdown(Shutdown how) const {
@@ -293,6 +282,8 @@ error::result<void> Socket::shutdown(Shutdown how) const {
   case Shutdown::Both:
     flag = SHUT_RDWR;
     break;
+  default:
+    std::unreachable();
   }
   return error::from_os(::shutdown(raw_fd(), flag)).map(functional::drop);
 }
@@ -320,8 +311,7 @@ error::result<void> Socket::set_ttl(uint32_t ttl) const {
   if (const auto v4 = setopt(IPPROTO_IP, IP_TTL, opt); v4) {
     return {};
   }
-  const int opt6 = static_cast<int>(ttl);
-  return setopt(IPPROTO_IPV6, IPV6_UNICAST_HOPS, opt6);
+  return setopt(IPPROTO_IPV6, IPV6_UNICAST_HOPS, opt);
 }
 
 error::result<uint32_t> Socket::ttl() const {
@@ -355,9 +345,9 @@ error::result<void> set_socket_timeout(
   if (timeout) {
     if (timeout->count() < 0) {
       return tl::make_unexpected(
-          error::SimpleMessage(
+          error::Simple{
               error::ErrorKind::InvalidInput, "Timeout must be non-negative"
-          )
+          }
       );
     }
     const auto secs =
