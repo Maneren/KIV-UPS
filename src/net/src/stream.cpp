@@ -8,28 +8,35 @@ TcpStream::TcpStream(Socket &&sock) : sock(std::move(sock)) {};
 
 namespace {
 
-error::result<TcpStream>
-connect_each(const std::vector<SocketAddr> &addrs, auto connect_one) {
-  error::IoError last_error(
-      error::Simple{error::ErrorKind::NotFound, "no addresses to connect to"}
-  );
-  bool attempted = false;
+template <typename F, std::ranges::input_range I>
+error::result<TcpStream> connect_each(I &addrs, F connect_one)
+  requires(
+      std::is_invocable_v<F, const SocketAddr &> &&
+      std::is_convertible_v<
+          std::invoke_result_t<F, const SocketAddr &>,
+          error::result<TcpStream>> &&
+      std::is_same_v<typename I::value_type, SocketAddr>
+  )
+{
+  std::optional<error::IoError> last_error;
+
   for (const auto &addr : addrs) {
     auto stream = connect_one(addr);
     if (stream) {
       return stream;
     }
     last_error = stream.error();
-    attempted = true;
   }
-  if (!attempted) {
-    return tl::make_unexpected(
-        error::SimpleMessage(
-            error::ErrorKind::InvalidInput, "No addresses to connect to"
-        )
-    );
+
+  if (last_error) {
+    return tl::make_unexpected(*last_error);
   }
-  return tl::make_unexpected(last_error);
+
+  return tl::make_unexpected(
+      error::SimpleMessage(
+          error::ErrorKind::InvalidInput, "could not connect to any address"
+      )
+  );
 }
 
 } // namespace
@@ -43,6 +50,13 @@ error::result<TcpStream> TcpStream::connect(const SocketAddr &addr) {
       })
       .map(functional::Constructor<TcpStream>());
 }
+
+error::result<TcpStream> TcpStream::connect(std::span<const SocketAddr> addrs) {
+  return connect_each(addrs, [](auto addr) {
+    return TcpStream::connect(addr);
+  });
+}
+
 error::result<TcpStream> TcpStream::connect_timeout(
     const SocketAddr &addr, std::chrono::microseconds timeout
 ) {
@@ -55,12 +69,18 @@ error::result<TcpStream> TcpStream::connect_timeout(
       .map(functional::Constructor<TcpStream>());
 }
 
+error::result<TcpStream> TcpStream::connect_timeout(
+    std::span<const SocketAddr> addrs, std::chrono::microseconds timeout
+) {
+  return connect_each(addrs, [timeout](auto addr) {
+    return TcpStream::connect_timeout(addr, timeout);
+  });
+}
+
 error::result<TcpStream>
 TcpStream::connect_host(const std::string &host, uint16_t port) {
   return SocketAddr::resolve(host, port).and_then([](const auto &addrs) {
-    return connect_each(addrs, [](const SocketAddr &addr) {
-      return TcpStream::connect(addr);
-    });
+    return TcpStream::connect(addrs);
   });
 }
 
@@ -68,9 +88,7 @@ error::result<TcpStream> TcpStream::connect_timeout_host(
     const std::string &host, uint16_t port, std::chrono::microseconds timeout
 ) {
   return SocketAddr::resolve(host, port).and_then([timeout](const auto &addrs) {
-    return connect_each(addrs, [timeout](const SocketAddr &addr) {
-      return TcpStream::connect_timeout(addr, timeout);
-    });
+    return TcpStream::connect_timeout(addrs, timeout);
   });
 }
 

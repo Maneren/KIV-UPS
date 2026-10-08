@@ -352,14 +352,12 @@ error::result<SocketAddr> SocketAddr::from_string(std::string_view str) {
 
 error::result<std::vector<SocketAddr>>
 SocketAddr::resolve(const std::string &host, uint16_t port) {
-  const std::string service = std::to_string(port);
-
   struct addrinfo hints{};
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
   struct addrinfo *list = nullptr;
-  const int code = getaddrinfo(host.c_str(), service.c_str(), &hints, &list);
+  const int code = getaddrinfo(host.c_str(), nullptr, &hints, &list);
   if (code != 0) {
     return tl::make_unexpected(
         error::SimpleMessage(
@@ -373,10 +371,10 @@ SocketAddr::resolve(const std::string &host, uint16_t port) {
 
   std::vector<SocketAddr> out;
   for (const struct addrinfo *ai = list; ai != nullptr; ai = ai->ai_next) {
-
     const sockaddr_union sockaddr{.sa = *ai->ai_addr};
 
     if (auto addr = SocketAddr::from_sockaddr(sockaddr, ai->ai_addrlen); addr) {
+      addr->set_port(port);
       out.emplace_back(*addr);
     }
   }

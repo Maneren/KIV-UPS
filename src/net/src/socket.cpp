@@ -214,6 +214,21 @@ error::result<std::optional<error::IoError>> Socket::take_error() const {
   return error::Os{*result};
 }
 
+namespace {
+
+int enable_bitflag(int base, int flag) {
+  return static_cast<int>(
+      static_cast<unsigned>(base) | static_cast<unsigned>(flag)
+  );
+}
+int disable_bitflag(int base, int flag) {
+  return static_cast<int>(
+      static_cast<unsigned>(base) & ~static_cast<unsigned>(flag)
+  );
+}
+
+} // namespace
+
 error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   // There is no other way to do this
   // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
@@ -221,14 +236,8 @@ error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   if (current == -1) {
     return tl::make_unexpected(error::Os{errno});
   }
-  const int updated = nonblocking ? static_cast<int>(
-                                        static_cast<unsigned>(current) |
-                                        static_cast<unsigned>(O_NONBLOCK)
-                                    )
-                                  : static_cast<int>(
-                                        static_cast<unsigned>(current) &
-                                        ~static_cast<unsigned>(O_NONBLOCK)
-                                    );
+  const int updated = nonblocking ? enable_bitflag(current, O_NONBLOCK)
+                                  : disable_bitflag(current, O_NONBLOCK);
   if (updated == current) {
     return {};
   }

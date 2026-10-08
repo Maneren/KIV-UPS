@@ -12,6 +12,28 @@ TcpListener::TcpListener(Socket &&sock) : sock(std::move(sock)) {}
 error::result<TcpListener> TcpListener::bind(const SocketAddr &addr) {
   return bind_with_backlog(addr, BACKLOG);
 }
+error::result<TcpListener>
+TcpListener::bind(std::span<const SocketAddr> addrs) {
+  std::optional<net::error::IoError> last_error;
+  for (const auto &addr : addrs) {
+    auto result = bind_with_backlog(addr, BACKLOG);
+    if (result) {
+      return result;
+    }
+
+    last_error = result.error();
+  }
+
+  if (last_error) {
+    return tl::make_unexpected(*last_error);
+  }
+
+  return tl::make_unexpected(
+      error::SimpleMessage(
+          error::ErrorKind::InvalidInput, "could not bind to any address"
+      )
+  );
+}
 
 error::result<TcpListener>
 TcpListener::bind_with_backlog(const SocketAddr &addr, int backlog) {

@@ -6,7 +6,6 @@
 #include <optional>
 #include <ranges>
 #include <tuple>
-#include <utility>
 
 namespace net {
 
@@ -16,6 +15,7 @@ class TcpListener {
 public:
   explicit TcpListener(Socket &&sock);
   static error::result<TcpListener> bind(const SocketAddr &addr);
+  static error::result<TcpListener> bind(std::span<const SocketAddr> addrs);
   static error::result<TcpListener>
   bind_with_backlog(const SocketAddr &addr, int backlog);
 
