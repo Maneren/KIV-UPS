@@ -5,7 +5,9 @@
 namespace functional {
 
 template <typename T> struct Constructor {
-  template <typename... Args> T operator()(Args &&...args) const {
+  template <typename... Args>
+    requires std::constructible_from<T, Args...>
+  T operator()(Args &&...args) const {
     return T(std::forward<Args>(args)...);
   }
 };
