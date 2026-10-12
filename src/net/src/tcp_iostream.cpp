@@ -6,12 +6,8 @@ TcpStreambuf::TcpStreambuf(TcpStream *stream)
     : stream_(stream), input_buffer_(DEFAULT_BUFFER_SIZE),
       output_buffer_(DEFAULT_BUFFER_SIZE) {
 
-  // Set up output buffer
-  char *output_begin = output_buffer_.data();
-  char *output_end = output_begin + output_buffer_.size() - 1;
-  setp(output_begin, output_end);
+  setp(output_buffer_.data(), std::to_address(output_buffer_.end()));
 
-  // Set up input buffer (initially empty)
   char *input_begin = input_buffer_.data();
   setg(input_begin, input_begin, input_begin);
 }
@@ -26,7 +22,6 @@ std::streambuf::int_type TcpStreambuf::underflow() {
     return traits_type::to_int_type(*gptr());
   }
 
-  // Read more data from the stream
   const std::span<char> buf(input_buffer_.data(), input_buffer_.size());
 
   const auto result = stream_->read(buf);
@@ -39,11 +34,10 @@ std::streambuf::int_type TcpStreambuf::underflow() {
     return traits_type::eof();
   }
 
-  // Set up the get area
   const std::span<char> read(
       input_buffer_.data(), static_cast<size_t>(bytes_read)
   );
-  setg(read.data(), read.data(), &*read.end());
+  setg(read.data(), read.data(), std::to_address(read.end()));
 
   return traits_type::to_int_type(*gptr());
 }
@@ -83,7 +77,7 @@ bool TcpStreambuf::flush_output() {
   // Reset the put area, keeping one slot reserved so overflow can
   // always store its character before flushing (matches the ctor).
   const std::span<char> buf(output_buffer_.data(), output_buffer_.size() - 1);
-  setp(buf.data(), &*buf.end());
+  setp(buf.data(), std::to_address(buf.end()));
 
   return true;
 }

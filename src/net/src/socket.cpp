@@ -37,61 +37,64 @@ auto retry_on_eintr(F &&fn) -> error::result<std::invoke_result_t<F>> {
 // left alone instead of assuming blocking mode.
 class NonblockingGuard {
 public:
-  explicit NonblockingGuard(int fd) : fd_(fd) {
+  explicit NonblockingGuard(int fd) : fd(fd) {
     // There is no other way to do this
     // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
-    const int flags = ::fcntl(fd_, F_GETFL, 0);
+    const int flags = ::fcntl(fd, F_GETFL, 0);
     if (flags == -1) {
-      error_ = errno;
+      error = errno;
       return;
     }
     if ((flags & O_NONBLOCK) != 0) {
       return;
     }
     // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
-    if (::fcntl(fd_, F_SETFL, flags | O_NONBLOCK) == -1) {
-      error_ = errno;
+    if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+      error = errno;
       return;
     }
-    saved_ = flags;
-    active_ = true;
+    saved = flags;
+    active = true;
   }
 
   NonblockingGuard(const NonblockingGuard &) = delete;
   NonblockingGuard &operator=(const NonblockingGuard &) = delete;
 
+  NonblockingGuard(NonblockingGuard &&) = delete;
+  NonblockingGuard &operator=(NonblockingGuard &&) = delete;
+
   ~NonblockingGuard() {
-    if (active_) {
+    if (active) {
       // Best effort: failures are reported through restore() instead.
       // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
-      ::fcntl(fd_, F_SETFL, saved_);
+      ::fcntl(fd, F_SETFL, saved);
     }
   }
 
   [[nodiscard]] error::result<void> status() const {
-    if (error_ != 0) {
-      return tl::make_unexpected(error::Os{error_});
+    if (error != 0) {
+      return tl::make_unexpected(error::Os{error});
     }
     return {};
   }
 
   error::result<void> restore() {
-    if (!active_) {
+    if (!active) {
       return {};
     }
     // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
-    if (::fcntl(fd_, F_SETFL, saved_) == -1) {
+    if (::fcntl(fd, F_SETFL, saved) == -1) {
       return tl::make_unexpected(error::Os{});
     }
-    active_ = false;
+    active = false;
     return {};
   }
 
 private:
-  int fd_;
-  int saved_ = 0;
-  int error_ = 0;
-  bool active_ = false;
+  int fd;
+  int saved = 0;
+  int error = 0;
+  bool active = false;
 };
 
 struct timespec to_timespec(std::chrono::nanoseconds timeout) {
@@ -99,7 +102,7 @@ struct timespec to_timespec(std::chrono::nanoseconds timeout) {
   const auto nsecs = timeout - secs;
   return {
       .tv_sec = static_cast<time_t>(secs.count()),
-      .tv_nsec = static_cast<long>(nsecs.count())
+      .tv_nsec = static_cast<long>(nsecs.count()),
   };
 }
 
@@ -194,8 +197,6 @@ error::result<void> Socket::connect_timeout(
     return tl::make_unexpected(error::Os{connect_errno});
   }
 
-  // The connect proceeds asynchronously; ppoll waits with nanosecond
-  // precision so sub-millisecond timeouts are honored without rounding.
   struct pollfd pfd{.fd = raw_fd(), .events = POLLOUT, .revents = 0};
 
   const auto deadline = std::chrono::steady_clock::now() + timeout;
