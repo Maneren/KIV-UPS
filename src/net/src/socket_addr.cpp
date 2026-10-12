@@ -1,4 +1,3 @@
-#include <charconv>
 #include <concepts>
 #include <cstring>
 #include <memory>
@@ -8,28 +7,26 @@
 #include <string>
 #include <string_view>
 #include <utils/functional.h>
+#include <utils/parse.h>
 
 namespace net {
 
 namespace {
 
-template <std::unsigned_integral T>
-error::result<T> parse_number(std::string_view string, std::string_view what) {
-  if (string.empty()) {
-    return tl::make_unexpected(
-        error::SimpleMessage(error::ErrorKind::InvalidInput, "Missing {}", what)
-    );
+template <std::integral T>
+error::result<T> parse_number_with_error(
+    std::string_view string, std::string_view what = "number"
+) {
+  const auto result = utils::parse_number<T>(string);
+  if (result) {
+    return *result;
   }
-  T value = 0;
-  const auto [ptr, ec] = std::from_chars(string.begin(), string.end(), value);
-  if (ec != std::errc{} || ptr != string.end()) {
-    return tl::make_unexpected(
-        error::SimpleMessage(
-            error::ErrorKind::InvalidInput, "Invalid {}: {}", what, string
-        )
-    );
-  }
-  return value;
+
+  return tl::make_unexpected(
+      error::SimpleMessage(
+          error::ErrorKind::InvalidInput, "Invalid {}: '{}'", what, string
+      )
+  );
 }
 
 } // namespace
@@ -110,7 +107,7 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
     );
   }
 
-  const auto port = parse_number<uint16_t>(port_part, "port number");
+  const auto port = parse_number_with_error<uint16_t>(port_part, "port number");
   if (!port) {
     return tl::make_unexpected(std::move(port).error());
   }
@@ -205,7 +202,8 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
   if (percent_pos != std::string::npos) {
     const auto scope_part = ip_part.substr(percent_pos + 1);
     ip_part = ip_part.substr(0, percent_pos);
-    const auto parsed_scope = parse_number<uint32_t>(scope_part, "scope id");
+    const auto parsed_scope =
+        parse_number_with_error<uint32_t>(scope_part, "scope id");
     if (!parsed_scope) {
       return tl::make_unexpected(std::move(parsed_scope).error());
     }
@@ -221,7 +219,7 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
     );
   }
 
-  const auto port = parse_number<uint16_t>(port_part, "port number");
+  const auto port = parse_number_with_error<uint16_t>(port_part, "port number");
   if (!port) {
     return tl::make_unexpected(std::move(port).error());
   }

@@ -1,14 +1,12 @@
 #include <iostream>
 #include <net/listener.h>
 #include <net/tcp_iostream.h>
-#include <threadpool/threadpool.h>
-#include <utils/print.h>
-
-#include <charconv>
-#include <optional>
 #include <random>
 #include <string>
 #include <string_view>
+#include <threadpool/threadpool.h>
+#include <utils/parse.h>
+#include <utils/print.h>
 
 namespace {
 
@@ -17,17 +15,6 @@ void strip_cr(std::string &line) {
   if (!line.empty() && line.back() == '\r') {
     line.pop_back();
   }
-}
-
-// Strictly parse the whole line as an integer, with no headers or whitespace.
-std::optional<int> parse_number(const std::string_view line) {
-  int value = 0;
-  const auto [ptr, ec] = std::from_chars(line.begin(), line.end(), value);
-  // If there's and error or anything left, it's not a valid number
-  if (ec != std::errc{} || ptr != line.end()) {
-    return std::nullopt;
-  }
-  return value;
 }
 
 void send_error(net::TcpIostream &io) { io << "ERROR\n" << std::flush; }
@@ -50,7 +37,7 @@ void handle_client(net::TcpStream stream, net::SocketAddr address) {
   }
 
   thread_local std::mt19937 rng{std::random_device{}()};
-  const int number = std::uniform_int_distribution<int>(1, 100)(rng);
+  const auto number = std::uniform_int_distribution<unsigned>(1, 100)(rng);
   io << "NUM:" << number << '\n' << std::flush;
 
   if (!std::getline(io, line)) {
@@ -58,7 +45,7 @@ void handle_client(net::TcpStream stream, net::SocketAddr address) {
     return;
   }
   strip_cr(line);
-  const auto answer = parse_number(line);
+  const auto answer = utils::parse_number<unsigned>(line);
   if (!answer) {
     std::println("Client {}: expected a number, got \"{}\"", address, line);
     send_error(io);
