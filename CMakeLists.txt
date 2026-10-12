@@ -29,7 +29,7 @@ if(USE_IPO)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 endif()
 
-option(USE_CCACHE "Use ccache" OFF)
+option(USE_CCACHE "Use ccache" ON)
 if(USE_CCACHE)
     find_program(CCACHE ccache)
     find_program(SCCACHE sccache)
