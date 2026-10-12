@@ -3,7 +3,7 @@
 
 namespace threadpool {
 
-Threadpool::Threadpool(size_t thread_count) {
+Threadpool::Threadpool(size_t thread_count) noexcept {
   if (thread_count == 0) {
     thread_count = std::thread::hardware_concurrency();
   }
@@ -35,18 +35,7 @@ Threadpool::Threadpool(size_t thread_count) {
   }
 }
 
-Threadpool::~Threadpool() { join(); }
-
-Threadpool::Threadpool(Threadpool &&other) noexcept
-    : mWorkers(std::move(other.mWorkers)), mTasks(std::move(other.mTasks)),
-      mRunning(other.mRunning) {}
-
-Threadpool &Threadpool::operator=(Threadpool &&other) noexcept {
-  mWorkers = std::move(other.mWorkers);
-  mTasks = std::move(other.mTasks);
-  mRunning = other.mRunning;
-  return *this;
-}
+Threadpool::~Threadpool() noexcept { join(); }
 
 void Threadpool::spawn(task_type &&task) {
   {

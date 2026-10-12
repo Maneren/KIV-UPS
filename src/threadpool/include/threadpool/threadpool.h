@@ -44,12 +44,14 @@ public:
    * @param thread_count The number of worker threads to create. Defaults to the
    * number of CPU threads.
    */
-  Threadpool(size_t thread_count = std::thread::hardware_concurrency());
+  Threadpool(
+      size_t thread_count = std::thread::hardware_concurrency()
+  ) noexcept;
 
   /**
    * @brief Destroy the Threadpool object and joins all worker threads.
    */
-  ~Threadpool();
+  ~Threadpool() noexcept;
 
   /**
    * @brief Delete copy constructor.
@@ -62,19 +64,20 @@ public:
   Threadpool &operator=(const Threadpool &) = delete;
 
   /**
-   * @brief Move construct a new Threadpool object.
-   * @param other The other Threadpool to move from.
+   * @brief Delete move constructor.
+   *
+   * @note The futures capture the thread pool by reference -> move would
+   * invalidate them.
    */
-  Threadpool(Threadpool &&other) noexcept;
+  Threadpool(Threadpool &&other) noexcept = delete;
 
   /**
-   * @brief Move assign a Threadpool object.
+   * @brief Delete move assignment operator.
    *
-   * @param other The other Threadpool to move from.
-   *
-   * @return Threadpool& Reference to this Threadpool.
+   * @note The futures capture the thread pool by reference -> move would
+   * invalidate them.
    */
-  Threadpool &operator=(Threadpool &&other) noexcept;
+  Threadpool &operator=(Threadpool &&other) noexcept = delete;
 
   /**
    * @brief Spawn a task and returns a future to retrieve its result.
