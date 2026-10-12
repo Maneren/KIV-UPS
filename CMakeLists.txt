@@ -17,7 +17,7 @@ endif()
 option(THIN_ARCHIVE "Create thin archive" ON)
 set_property(GLOBAL PROPERTY THIN_ARCHIVE ${THIN_ARCHIVE})
 
-option(USE_IPO "Enable IPO" ON)
+option(USE_IPO "Enable IPO" OFF)
 if(USE_IPO)
     include(CheckIPOSupported)
 
