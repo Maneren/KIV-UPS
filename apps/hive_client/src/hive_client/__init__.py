@@ -1,6 +1,7 @@
 """Hive game client."""
 
 import argparse
+import contextlib
 from collections.abc import Sequence
 
 from hive_client.gui import run
@@ -25,5 +26,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     host: str = args.host
     port: int = args.port
 
-    run(host=host, port=port)
+    with contextlib.suppress(KeyboardInterrupt):
+        run(host=host, port=port)
+
     return 0
