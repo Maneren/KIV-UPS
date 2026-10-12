@@ -47,27 +47,11 @@ constexpr bool match_nothrow() {
 /// @param args The lambdas to apply.
 /// @return The result of applying the appropriate lambda to the variant.
 template <typename T, typename... Args>
-constexpr auto match(const T &t, Args &&...args) noexcept(
-    detail::match_nothrow<const T &, Overloaded<std::decay_t<Args>...>>()
+constexpr decltype(auto) match(T &&t, Args &&...args) noexcept(
+    detail::match_nothrow<T &&, Overloaded<std::decay_t<Args>...>>()
 ) {
   Overloaded overload{std::forward<Args>(args)...};
-  return std::visit(std::move(overload), t);
-}
-
-/// A utility function for pattern matching on std::variant.
-/// Combines multiple lambdas into a single callable object and applies them to
-/// the given variant.
-/// @tparam T The type of the variant.
-/// @tparam Args The types of the lambdas.
-/// @param t The variant to match.
-/// @param args The lambdas to apply.
-/// @return The result of applying the appropriate lambda to the variant.
-template <typename T, typename... Args>
-constexpr auto match(T &t, Args &&...args) noexcept(
-    detail::match_nothrow<T &, Overloaded<std::decay_t<Args>...>>()
-) {
-  Overloaded overload{std::forward<Args>(args)...};
-  return std::visit(std::move(overload), t);
+  return std::visit(std::move(overload), std::forward<T>(t));
 }
 
 } // namespace match
