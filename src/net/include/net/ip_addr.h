@@ -38,7 +38,7 @@ struct Ipv4Addr {
   [[nodiscard]] static Ipv4Addr from_bits(uint32_t bits) noexcept;
 
   [[nodiscard]] constexpr bool is_loopback() const noexcept {
-    return octets_.front() == 127;
+    return std::get<0>(octets_) == 127;
   }
   [[nodiscard]] constexpr bool is_unspecified() const noexcept {
     return octets_ == octets_t{0, 0, 0, 0};
@@ -47,13 +47,14 @@ struct Ipv4Addr {
     return octets_ == octets_t{255, 255, 255, 255};
   }
   [[nodiscard]] constexpr bool is_multicast() const noexcept {
-    const auto [a, _b, _c, _d] = octets_;
-    return a >= 224 && a <= 239;
+    return std::get<0>(octets_) >= 224 && std::get<0>(octets_) <= 239;
   }
   [[nodiscard]] constexpr bool is_private() const noexcept {
-    const auto [a, b, _c, _d] = octets_;
-    return (a == 10) || (a == 172 && b >= 16 && b <= 31) ||
-           (a == 192 && b == 168);
+    const auto first = std::get<0>(octets_);
+    const auto second = std::get<1>(octets_);
+
+    return (first == 10) || (first == 172 && second >= 16 && second <= 31) ||
+           (first == 192 && second == 168);
   }
 
   static Ipv4Addr localhost() noexcept;
@@ -114,7 +115,7 @@ struct Ipv6Addr {
     return octets == unspecified;
   }
   [[nodiscard]] constexpr bool is_multicast() const noexcept {
-    return octets.front() == 0xff;
+    return std::get<0>(octets) == 0xff;
   }
   static Ipv6Addr localhost() noexcept;
   static Ipv6Addr unspecified() noexcept;
