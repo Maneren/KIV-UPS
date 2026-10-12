@@ -1,5 +1,13 @@
 #pragma once
 
+/**
+ * @file threadpool.h
+ * @brief Contains the Threadpool class for managing and executing tasks
+ * concurrently.
+ *
+ * Recycled from the UPP semester project.
+ */
+
 #include <chrono>
 #include <functional>
 #include <future>
