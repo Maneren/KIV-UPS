@@ -1,0 +1,21 @@
+[project]
+name = "hive-client"
+version = "1.0.0"
+description = "Hive game client"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+hive_client = "hive_client.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest~=9.1",
+    "ruff~=0.17",
+    "ty~=0.0",
+]
+
+[build-system]
+requires = ["uv_build~=0.13"]
+build-backend = "uv_build"

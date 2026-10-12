@@ -46,8 +46,12 @@ if(USE_CCACHE)
     endif()
 endif()
 
+find_program(UV uv REQUIRED DOC "uv package manager")
+message(STATUS "Found uv: ${UV}")
+
 include(cmake/ExecutableTemplate.cmake)
 include(cmake/LibraryTemplate.cmake)
+include(cmake/PythonAppTemplate.cmake)
 
 add_subdirectory(src)
 add_subdirectory(apps)

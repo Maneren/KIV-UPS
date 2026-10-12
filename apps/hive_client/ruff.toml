@@ -1,0 +1,69 @@
+[lint]
+select = [
+  "A",    # flake8-builtins
+  "ANN",  # flake8-annotations
+  "ARG",  # flake8-unused-arguments
+  "B",    # flake8-bugbear
+  "BLE",  # flake8-blind-except
+  "C4",   # flake8-comprehensions
+  "COM",  # flake8-commas
+  "C90",  # mccabe
+  "D",    # pydocstyle
+  "DTZ",  # flake8-datetimez
+  "E",    # pycodestyle error
+  "F",    # pyflakes
+  "FA",   # flake8-future-annotations
+  "FBT",  # flake8-boolean-trap
+  "FLY",  # flynt
+  "FURB", # refurb
+  "G",    # flake8-logging-format
+  "I",    # isort
+  "ICN",  # flake8-import-conventions
+  "INP",  # flake8-no-pep420
+  "ISC",  # flake8-implicit-str-concat
+  "LOG",  # flake8-logging
+  "N",    # pep8-naming
+  "PERF", # perflint
+  "PGH",  # pygrep-hooks
+  "PIE",  # flake8-pie
+  "PL",   # pylint
+  "PT",   # flake8-pytest-style
+  "PTH",  # flake8-use-pathlib
+  "Q",    # flake8-quotes
+  "RET",  # flake8-return
+  "RSE",  # flake8-raise
+  "RUF",  # Ruff-specific rules
+  "S",    # flake8-bandit
+  "SIM",  # flake8-simplify
+  "T20",  # flake8-print
+  "TID",  # flake8-tidy-imports
+  "TRY",  # tryceratops
+  "UP",   # pyupgrade
+  "YTT",  # flake8-2020
+  "W",    # pycodestyle warning
+]
+ignore = [
+  # enforced by the formatter
+  "COM812", # missing-trailing-comma
+  "COM819", # prohibited-trailing-comma
+
+  # conflicts with D211
+  "D203", # incorrect-blank-line-before-class
+
+  # conflicts with D213
+  "D212", # incorrect-blank-line-after-function
+
+  # allow for code more similar to math
+  "N806",   # non-lowercase-variable-in-function
+  "RUF002", # ambiguous-unicode-character-docstring
+  "RUF003", # ambiguous-unicode-character-comment
+
+  # too pedantic
+  "D100",   # undocumented-public-module
+  "D104",   # undocumented-public-package
+  "TRY003", # raise-vanilla-args
+
+  # I know what I'm doing
+  "S101", # assert
+  "S311", # suspicious-non-cryptographic-random-usage
+]

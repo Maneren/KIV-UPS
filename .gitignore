@@ -54,3 +54,9 @@ bin/*
 test/test_runner
 
 Testing/
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+*.pyo
