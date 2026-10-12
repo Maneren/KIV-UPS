@@ -69,7 +69,7 @@ error::result<TcpStream> TcpStream::connect(std::span<const SocketAddr> addrs) {
 }
 
 error::result<TcpStream> TcpStream::connect_timeout(
-    const SocketAddr &addr, std::chrono::microseconds timeout
+    const SocketAddr &addr, std::chrono::nanoseconds timeout
 ) {
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&addr, timeout](auto &&sock) {
@@ -81,7 +81,7 @@ error::result<TcpStream> TcpStream::connect_timeout(
 }
 
 error::result<TcpStream> TcpStream::connect_timeout(
-    std::span<const SocketAddr> addrs, std::chrono::microseconds timeout
+    std::span<const SocketAddr> addrs, std::chrono::nanoseconds timeout
 ) {
   return connect_each(addrs, [timeout](const auto &addr) {
     return TcpStream::connect_timeout(addr, timeout);
@@ -96,7 +96,7 @@ TcpStream::connect_host(const std::string &host, uint16_t port) {
 }
 
 error::result<TcpStream> TcpStream::connect_timeout_host(
-    const std::string &host, uint16_t port, std::chrono::microseconds timeout
+    const std::string &host, uint16_t port, std::chrono::nanoseconds timeout
 ) {
   return SocketAddr::resolve(host, port).and_then([timeout](const auto &addrs) {
     return TcpStream::connect_timeout(addrs, timeout);

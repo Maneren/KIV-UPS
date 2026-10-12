@@ -26,15 +26,15 @@ public:
   static error::result<TcpStream> connect(const SocketAddr &addr);
   static error::result<TcpStream> connect(std::span<const SocketAddr> addrs);
   static error::result<TcpStream>
-  connect_timeout(const SocketAddr &addr, std::chrono::microseconds timeout);
+  connect_timeout(const SocketAddr &addr, std::chrono::nanoseconds timeout);
   static error::result<TcpStream> connect_timeout(
-      std::span<const SocketAddr> addrs, std::chrono::microseconds timeout
+      std::span<const SocketAddr> addrs, std::chrono::nanoseconds timeout
   );
 
   static error::result<TcpStream>
   connect_host(const std::string &host, uint16_t port);
   static error::result<TcpStream> connect_timeout_host(
-      const std::string &host, uint16_t port, std::chrono::microseconds timeout
+      const std::string &host, uint16_t port, std::chrono::nanoseconds timeout
   );
 
   template <typename T, size_t Extent>

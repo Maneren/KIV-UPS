@@ -70,7 +70,7 @@ public:
 
   [[nodiscard]] error::result<void> connect(const SocketAddr &addr) const;
   [[nodiscard]] error::result<void> connect_timeout(
-      const SocketAddr &addr, std::chrono::microseconds timeout
+      const SocketAddr &addr, std::chrono::nanoseconds timeout
   ) const;
 
   [[nodiscard]] error::result<std::optional<error::IoError>> take_error() const;

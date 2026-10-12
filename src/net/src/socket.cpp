@@ -1,6 +1,6 @@
 #include <cerrno>
+#include <ctime>
 #include <fcntl.h>
-#include <limits>
 #include <net/error.h>
 #include <net/socket.h>
 #include <net/socket_addr.h>
@@ -30,6 +30,81 @@ auto retry_on_eintr(F &&fn) -> error::result<std::invoke_result_t<F>> {
     }
     return tl::make_unexpected(error::Os{});
   }
+}
+
+// Enables O_NONBLOCK for the duration of a connect-with-timeout and
+// restores the original flags afterwards. A pre-existing O_NONBLOCK is
+// left alone instead of assuming blocking mode.
+class NonblockingGuard {
+public:
+  explicit NonblockingGuard(int fd) : fd_(fd) {
+    // There is no other way to do this
+    // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
+    const int flags = ::fcntl(fd_, F_GETFL, 0);
+    if (flags == -1) {
+      error_ = errno;
+      return;
+    }
+    if ((flags & O_NONBLOCK) != 0) {
+      return;
+    }
+    // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
+    if (::fcntl(fd_, F_SETFL, flags | O_NONBLOCK) == -1) {
+      error_ = errno;
+      return;
+    }
+    saved_ = flags;
+    active_ = true;
+  }
+
+  NonblockingGuard(const NonblockingGuard &) = delete;
+  NonblockingGuard &operator=(const NonblockingGuard &) = delete;
+
+  ~NonblockingGuard() {
+    if (active_) {
+      // Best effort: failures are reported through restore() instead.
+      // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
+      ::fcntl(fd_, F_SETFL, saved_);
+    }
+  }
+
+  [[nodiscard]] error::result<void> status() const {
+    if (error_ != 0) {
+      return tl::make_unexpected(error::Os{error_});
+    }
+    return {};
+  }
+
+  error::result<void> restore() {
+    if (!active_) {
+      return {};
+    }
+    // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
+    if (::fcntl(fd_, F_SETFL, saved_) == -1) {
+      return tl::make_unexpected(error::Os{});
+    }
+    active_ = false;
+    return {};
+  }
+
+private:
+  int fd_;
+  int saved_ = 0;
+  int error_ = 0;
+  bool active_ = false;
+};
+
+struct timespec to_timespec(std::chrono::nanoseconds timeout) {
+  const auto secs = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+  const auto nsecs = timeout - secs;
+  return {
+      .tv_sec = static_cast<time_t>(secs.count()),
+      .tv_nsec = static_cast<long>(nsecs.count())
+  };
+}
+
+error::IoError timed_out_error() {
+  return error::Simple{error::ErrorKind::TimedOut, "Connection timed out"};
 }
 
 } // namespace
@@ -93,9 +168,9 @@ error::result<void> Socket::connect(const SocketAddr &addr) const {
 }
 
 error::result<void> Socket::connect_timeout(
-    const SocketAddr &addr, std::chrono::microseconds timeout
+    const SocketAddr &addr, std::chrono::nanoseconds timeout
 ) const {
-  if (timeout.count() <= 0) {
+  if (timeout <= std::chrono::nanoseconds::zero()) {
     return tl::make_unexpected(
         error::Simple{
             error::ErrorKind::InvalidInput, "Timeout must be positive"
@@ -103,77 +178,62 @@ error::result<void> Socket::connect_timeout(
     );
   }
 
-  const auto [storage, len] = addr.to_sockaddr();
-
-  if (auto made = set_nonblocking(true); !made) {
-    return tl::make_unexpected(std::move(made).error());
+  NonblockingGuard nonblocking(raw_fd());
+  if (auto status = nonblocking.status(); !status) {
+    return tl::make_unexpected(std::move(status).error());
   }
 
-  auto fail = [this](auto &&err) -> error::result<void> {
-    if (auto restored = set_nonblocking(false); !restored) {
-      return tl::make_unexpected(std::move(restored).error());
-    }
-    return tl::make_unexpected(std::forward<decltype(err)>(err));
-  };
+  const auto [storage, len] = addr.to_sockaddr();
 
-  const int connect_result = ::connect(raw_fd(), &storage.sa, len);
-
-  if (connect_result == 0) {
-    return set_nonblocking(false);
+  if (::connect(raw_fd(), &storage.sa, len) == 0 || errno == EISCONN) {
+    return nonblocking.restore();
   }
 
   const int connect_errno = errno;
   if (connect_errno != EINPROGRESS && connect_errno != EINTR) {
-    return fail(error::Os{connect_errno});
+    return tl::make_unexpected(error::Os{connect_errno});
   }
 
+  // The connect proceeds asynchronously; ppoll waits with nanosecond
+  // precision so sub-millisecond timeouts are honored without rounding.
   struct pollfd pfd{.fd = raw_fd(), .events = POLLOUT, .revents = 0};
 
   const auto deadline = std::chrono::steady_clock::now() + timeout;
 
   while (true) {
     const auto remaining = deadline - std::chrono::steady_clock::now();
-    if (remaining <= std::chrono::microseconds::zero()) {
-      return fail(
-          error::Simple{error::ErrorKind::TimedOut, "Connection timed out"}
-      );
+    if (remaining <= std::chrono::steady_clock::duration::zero()) {
+      return tl::make_unexpected(timed_out_error());
     }
 
-    const auto millis = std::clamp<int64_t>(
-        std::chrono::ceil<std::chrono::milliseconds>(remaining).count(),
-        1,
-        std::numeric_limits<int>::max()
+    const struct timespec wait = to_timespec(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(remaining)
     );
-    const int poll_timeout = static_cast<int>(millis);
-
-    const int poll_result = poll(&pfd, 1, poll_timeout);
+    const int poll_result = ppoll(&pfd, 1, &wait, nullptr);
 
     if (poll_result == -1) {
       if (errno == EINTR) {
         continue;
       }
-      return fail(error::Os{errno});
+      return tl::make_unexpected(error::Os{errno});
     }
 
     if (poll_result == 0) {
-      return fail(
-          error::Simple{error::ErrorKind::TimedOut, "Connection timed out"}
-      );
+      return tl::make_unexpected(timed_out_error());
     }
 
     // A writable socket may still carry a pending async error, so
     // always consult SO_ERROR (not only on POLLERR/POLLHUP).
     auto error_result = take_error();
     if (!error_result) {
-      return fail(std::move(error_result).error());
+      return tl::make_unexpected(std::move(error_result).error());
     }
 
-    auto pending = std::move(*error_result);
-    if (pending) {
-      return fail(std::move(*pending));
+    if (auto pending = std::move(*error_result); pending) {
+      return tl::make_unexpected(std::move(*pending));
     }
 
-    return set_nonblocking(false);
+    return nonblocking.restore();
   }
 }
 
