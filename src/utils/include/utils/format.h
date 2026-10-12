@@ -84,9 +84,9 @@ struct std::formatter<std::optional<T>> : static_formatter<std::optional<T>> {
   }
 };
 
-template <typename T>
-  requires(formattable<T>)
-struct std::formatter<std::pair<T, T>> : static_formatter<std::pair<T, T>> {
+template <typename T, typename U>
+  requires(formattable<T> && formattable<U>)
+struct std::formatter<std::pair<T, U>> : static_formatter<std::pair<T, U>> {
   static auto format(auto &obj, std::format_context &ctx) {
     return std::format_to(ctx.out(), "({}, {})", obj.first, obj.second);
   }
