@@ -1,7 +1,6 @@
 #include "cli/cli.hpp"
 #include <algorithm>
 #include <expected>
-#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,7 +10,7 @@ namespace cli {
 
 bool Args::has_flag(std::string_view name) const {
   return _flags.contains(name);
-};
+}
 
 std::optional<std::string_view> Args::get_value(std::string_view name) const {
   if (auto it = _values.find(name); it != _values.end()) {
@@ -70,17 +69,6 @@ bool Parser::is_option(
   return find_in(_options, short_name, long_name);
 }
 
-namespace {
-
-template <typename T>
-  requires requires(T name) { name == name; }
-bool optional_contains(std::optional<T> opt, T name) {
-  return opt.transform(std::bind_front(std::equal_to<>(), name))
-      .value_or(false);
-}
-
-} // namespace
-
 bool Parser::find_in(
     const std::vector<NamePair> &vec,
     std::string_view short_name,
@@ -88,15 +76,20 @@ bool Parser::find_in(
 ) {
   return std::ranges::any_of(vec, [&](const auto pair) {
     const auto &[s, l] = pair;
-    return optional_contains(s, short_name) || optional_contains(l, long_name);
+    return s == short_name || l == long_name;
   });
 }
 std::string_view Parser::get_store_name(
     std::string_view name, const std::vector<NamePair> &vec
 ) {
   for (const auto &[s, l] : vec) {
-    if (optional_contains(s, name)) {
-      return l.value_or(name);
+    if (s == name || l == name) {
+      if (l) {
+        return *l;
+      }
+      if (s) {
+        return *s;
+      }
     }
   }
   return name;

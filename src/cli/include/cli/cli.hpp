@@ -36,7 +36,7 @@ public:
   ParsingContext(std::span<raw_argument> arguments) : arguments(arguments) {}
 
   [[nodiscard]] argument current() const { return arguments[i]; }
-  [[nodiscard]] std::optional<argument> next() const {
+  [[nodiscard]] std::optional<argument> peek_next() const {
     if (i + 1 < arguments.size()) {
       return arguments[i + 1];
     }
@@ -132,7 +132,7 @@ private:
   );
 
   [[nodiscard]] static std::string_view
-  get_store_name(std::string_view short_name, const std::vector<NamePair> &vec);
+  get_store_name(std::string_view name, const std::vector<NamePair> &vec);
 
   std::expected<void, ParseError>
   parse_long_option(detail::ParsingContext &context, Args &args) const;
