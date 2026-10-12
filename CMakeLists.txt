@@ -5,7 +5,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 set(CMAKE_INSTALL_MESSAGE LAZY)
 
-set(PROJECT "hive-server")
+set(PROJECT "kiv-ups")
 project(${PROJECT} LANGUAGES CXX)
 
 option(SANITIZERS "Enable sanitizers" OFF)
