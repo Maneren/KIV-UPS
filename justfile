@@ -31,7 +31,7 @@ run config executable +args="": (build config executable)
     '{{ builddir }}/bin/{{ config }}/{{ executable }}' {{ args }}
 
 test config="Debug": (build config "all_tests")
-    ctest --test-dir {{ builddir }} -C {{ config }}
+    ctest --test-dir {{ builddir }} -C {{ config }} -j {{ CTEST_PARALLEL_LEVEL }}
 
 lint: lint-cpp lint-py
 
