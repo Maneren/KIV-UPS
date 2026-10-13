@@ -35,8 +35,8 @@ function(create_python_app TARGET)
         ${TARGET}
         ALL
         COMMAND
-            "${CMAKE_COMMAND}" -E env "UV_PROJECT_ENVIRONMENT=${_venv}"
-            "${UV}" sync ${PYAPP_SYNC_ARGS}
+            "${CMAKE_COMMAND}" -E env "UV_PROJECT_ENVIRONMENT=${_venv}" "${UV}"
+            sync ${PYAPP_SYNC_ARGS}
         WORKING_DIRECTORY "${PYAPP_PROJECT_DIR}"
         COMMENT "uv sync (${TARGET})"
         VERBATIM
@@ -114,7 +114,8 @@ function(add_python_tests TARGET)
         set(PYTEST_PYTEST_ARGS "--group" "dev")
     endif()
 
-    set(_env "\
+    set(_env
+        "\
 UV_PROJECT_ENVIRONMENT=${CMAKE_BINARY_DIR}/venvs/${TARGET}/.venv;\
 PYTHONPYCACHEPREFIX=${CMAKE_BINARY_DIR}/pycache"
     )
@@ -122,8 +123,8 @@ PYTHONPYCACHEPREFIX=${CMAKE_BINARY_DIR}/pycache"
     add_test(
         NAME "${TARGET}.import"
         COMMAND
-            "${UV}" run --project "${PYTEST_PROJECT_DIR}" --no-sync
-            python -c "import ${PYTEST_MODULE}"
+            "${UV}" run --project "${PYTEST_PROJECT_DIR}" --no-sync python -c
+            "import ${PYTEST_MODULE}"
         WORKING_DIRECTORY "${PYTEST_PROJECT_DIR}"
     )
     add_test(

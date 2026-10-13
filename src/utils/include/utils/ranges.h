@@ -3,9 +3,8 @@
 #include <ranges>
 #include <tuple>
 
-namespace utils {
+namespace utils::views {
 
-namespace views {
 namespace detail {
 struct enumerate_uz_impl {
   template <std::ranges::input_range Rng>
@@ -27,6 +26,5 @@ struct enumerate_uz_impl {
 } // namespace detail
 
 inline constexpr detail::enumerate_uz_impl enumerate_uz;
-} // namespace views
 
-} // namespace utils
+} // namespace utils::views
