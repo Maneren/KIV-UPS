@@ -171,9 +171,12 @@ template <> struct deserializer<std::string> {
       return std::nullopt;
     }
 
-    auto length = std::ranges::distance(
-        std::ranges::begin(ctx), std::ranges::find(ctx, '"')
-    );
+    auto close_quote = std::ranges::find(ctx, '"');
+    if (close_quote == ctx.end()) {
+      return std::nullopt;
+    }
+
+    auto length = std::ranges::distance(std::ranges::begin(ctx), close_quote);
 
     auto res = std::string(ctx.begin(), ctx.begin() + length);
     ctx.remove_prefix(static_cast<size_t>(length));
