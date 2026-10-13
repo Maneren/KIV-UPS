@@ -39,27 +39,27 @@ public:
 
   template <typename T, size_t Extent>
     requires std::is_trivially_copyable_v<T>
-  [[nodiscard]] error::result<ssize_t> read(std::span<T, Extent> buf) const {
+  [[nodiscard]] error::result<size_t> read(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.read(byte_buf.data(), byte_buf.size());
   };
   template <typename T, size_t Extent>
     requires std::is_trivially_copyable_v<std::remove_const_t<T>>
-  [[nodiscard]] error::result<ssize_t> write(std::span<T, Extent> buf) const {
+  [[nodiscard]] error::result<size_t> write(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_bytes(buf);
     return sock.write(byte_buf.data(), byte_buf.size());
   };
 
   template <typename T, size_t Extent>
     requires std::is_trivially_copyable_v<T>
-  [[nodiscard]] error::result<ssize_t>
+  [[nodiscard]] error::result<size_t>
   recv(std::span<T, Extent> buf, int flags = 0) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.recv(byte_buf.data(), byte_buf.size(), flags);
   };
   template <typename T, size_t Extent>
     requires std::is_trivially_copyable_v<std::remove_const_t<T>>
-  [[nodiscard]] error::result<ssize_t>
+  [[nodiscard]] error::result<size_t>
   send(std::span<T, Extent> buf, int flags = 0) const {
     const auto byte_buf = std::as_bytes(buf);
     return sock.send(byte_buf.data(), byte_buf.size(), flags);
@@ -68,7 +68,7 @@ public:
   // Peek at incoming data without consuming it (MSG_PEEK).
   template <typename T, size_t Extent>
     requires std::is_trivially_copyable_v<T>
-  [[nodiscard]] error::result<ssize_t> peek(std::span<T, Extent> buf) const {
+  [[nodiscard]] error::result<size_t> peek(std::span<T, Extent> buf) const {
     const auto byte_buf = std::as_writable_bytes(buf);
     return sock.recv(byte_buf.data(), byte_buf.size(), MSG_PEEK);
   }

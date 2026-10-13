@@ -29,14 +29,12 @@ std::streambuf::int_type TcpStreambuf::underflow() {
     return traits_type::eof();
   }
 
-  const ssize_t bytes_read = result.value();
+  const auto bytes_read = result.value();
   if (bytes_read <= 0) {
     return traits_type::eof();
   }
 
-  const std::span<char> read(
-      input_buffer_.data(), static_cast<size_t>(bytes_read)
-  );
+  const std::span<char> read(input_buffer_.data(), bytes_read);
   setg(read.data(), read.data(), std::to_address(read.end()));
 
   return traits_type::to_int_type(*gptr());

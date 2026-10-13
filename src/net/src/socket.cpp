@@ -20,10 +20,11 @@ namespace net {
 namespace {
 
 template <typename F>
+  requires std::is_integral_v<std::invoke_result_t<F>>
 auto retry_on_eintr(F &&fn) -> error::result<std::invoke_result_t<F>> {
   while (true) {
     if (auto ret = std::forward<F>(fn)(); ret >= 0) {
-      return ret;
+      return static_cast<std::make_unsigned_t<std::invoke_result_t<F>>>(ret);
     }
     if (errno == EINTR) {
       continue;
@@ -269,20 +270,20 @@ error::result<void> Socket::set_nonblocking(bool nonblocking) const {
       .transform(functional::drop);
 }
 
-error::result<ssize_t> Socket::read(void *buf, const size_t len) const {
+error::result<size_t> Socket::read(void *buf, const size_t len) const {
   return retry_on_eintr([&] { return ::read(raw_fd(), buf, len); });
 }
 
-error::result<ssize_t> Socket::write(const void *buf, const size_t len) const {
+error::result<size_t> Socket::write(const void *buf, const size_t len) const {
   return retry_on_eintr([&] { return ::write(raw_fd(), buf, len); });
 }
 
-error::result<ssize_t>
+error::result<size_t>
 Socket::recv(void *buf, const size_t len, int flags) const {
   return retry_on_eintr([&] { return ::recv(raw_fd(), buf, len, flags); });
 }
 
-error::result<ssize_t>
+error::result<size_t>
 Socket::send(const void *buf, const size_t len, int flags) const {
   return retry_on_eintr([&] { return ::send(raw_fd(), buf, len, flags); });
 }

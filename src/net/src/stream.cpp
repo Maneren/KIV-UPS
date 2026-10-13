@@ -47,7 +47,7 @@ pump_all(Span buf, Op op, error::ErrorKind empty_kind, std::string_view msg) {
     if (*ret == 0) {
       return std::unexpected(error::Simple{empty_kind, msg});
     }
-    done += static_cast<size_t>(*ret);
+    done += *ret;
   }
   return {};
 }

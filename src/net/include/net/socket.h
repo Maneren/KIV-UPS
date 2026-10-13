@@ -78,12 +78,12 @@ public:
   [[nodiscard]] error::result<void> set_nonblocking(bool nonblocking) const;
 
   // Single syscalls with EINTR retry. Errors come back as result.
-  [[nodiscard]] error::result<ssize_t> read(void *buf, size_t len) const;
-  [[nodiscard]] error::result<ssize_t> write(const void *buf, size_t len) const;
+  [[nodiscard]] error::result<size_t> read(void *buf, size_t len) const;
+  [[nodiscard]] error::result<size_t> write(const void *buf, size_t len) const;
 
-  [[nodiscard]] error::result<ssize_t>
+  [[nodiscard]] error::result<size_t>
   recv(void *buf, size_t len, int flags) const;
-  [[nodiscard]] error::result<ssize_t>
+  [[nodiscard]] error::result<size_t>
   send(const void *buf, size_t len, int flags) const;
 
   [[nodiscard]] error::result<SocketAddr> local_addr() const;
