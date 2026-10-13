@@ -150,7 +150,6 @@ template <typename O> struct serde::serializer<hive::MoveMessage, O> {
   }
 };
 
-#include <utils/print.h>
 template <> struct serde::deserializer<hive::MoveMessage> {
   static std::optional<hive::MoveMessage> deserialize(auto &ctx) {
     if (!ctx.assert_prefix("m;")) {

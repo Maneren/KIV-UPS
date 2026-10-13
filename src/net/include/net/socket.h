@@ -47,7 +47,7 @@ public:
         raw_fd(), level, optname, &optval, static_cast<socklen_t>(sizeof(T))
     );
 
-    return error::from_os(code).map(functional::drop);
+    return error::from_os(code).transform(functional::drop);
   };
 
   template <typename T>
@@ -57,7 +57,7 @@ public:
     auto len = static_cast<socklen_t>(sizeof(T));
 
     return error::from_os(getsockopt(raw_fd(), level, optname, &optval, &len))
-        .map([val = std::move(optval)](auto) mutable {
+        .transform([val = std::move(optval)](auto) mutable {
           return std::move(val);
         });
   };

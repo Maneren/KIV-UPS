@@ -3,11 +3,11 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
+#include <expected>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <utility>
 #include <utils/match.h>
 #include <variant>
@@ -103,7 +103,7 @@ private:
   Variant inner;
 
 public:
-  // Implicit converting ctors are intentional: tl::expected<T, IoError> relies
+  // Implicit converting ctors are intentional: std::expected<T, IoError> relies
   // on unexpected<Os/Simple/SimpleMessage> converting to IoError.
   // NOLINTNEXTLINE(*explicit-constructor)
   IoError(Os os) : inner{os} {}
@@ -134,11 +134,11 @@ public:
   [[nodiscard]] Variant &data() { return inner; }
 };
 
-template <typename T> using result = tl::expected<T, IoError>;
+template <typename T> using result = std::expected<T, IoError>;
 
 template <typename T> result<T> from_os(T code) {
   if (code == -1) {
-    return tl::make_unexpected(Os{});
+    return std::unexpected(Os{});
   }
 
   return code;

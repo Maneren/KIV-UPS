@@ -25,10 +25,10 @@ error::result<TcpStream> connect_each(const R &addrs, F connect_one) {
   }
 
   if (last_error) {
-    return tl::make_unexpected(std::move(*last_error));
+    return std::unexpected(std::move(*last_error));
   }
 
-  return tl::make_unexpected(
+  return std::unexpected(
       error::Simple{
           error::ErrorKind::InvalidInput, "could not connect to any address"
       }
@@ -42,10 +42,10 @@ pump_all(Span buf, Op op, error::ErrorKind empty_kind, std::string_view msg) {
   while (done < buf.size()) {
     auto ret = op(buf.subspan(done));
     if (!ret) {
-      return tl::make_unexpected(std::move(ret).error());
+      return std::unexpected(std::move(ret).error());
     }
     if (*ret == 0) {
-      return tl::make_unexpected(error::Simple{empty_kind, msg});
+      return std::unexpected(error::Simple{empty_kind, msg});
     }
     done += static_cast<size_t>(*ret);
   }
@@ -57,9 +57,9 @@ pump_all(Span buf, Op op, error::ErrorKind empty_kind, std::string_view msg) {
 error::result<TcpStream> TcpStream::connect(const SocketAddr &addr) {
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&](auto &&sock) {
-        return sock.connect(addr).map([&] { return std::move(sock); });
+        return sock.connect(addr).transform([&] { return std::move(sock); });
       })
-      .map(functional::Constructor<TcpStream>());
+      .transform(functional::Constructor<TcpStream>());
 }
 
 error::result<TcpStream> TcpStream::connect(std::span<const SocketAddr> addrs) {
@@ -73,11 +73,11 @@ error::result<TcpStream> TcpStream::connect_timeout(
 ) {
   return Socket::create(addr, SOCK_STREAM)
       .and_then([&addr, timeout](auto &&sock) {
-        return sock.connect_timeout(addr, timeout).map([&] {
+        return sock.connect_timeout(addr, timeout).transform([&] {
           return std::move(sock);
         });
       })
-      .map(functional::Constructor<TcpStream>());
+      .transform(functional::Constructor<TcpStream>());
 }
 
 error::result<TcpStream> TcpStream::connect_timeout(
@@ -122,7 +122,9 @@ error::result<void> TcpStream::write_all(std::span<const std::byte> buf) const {
 }
 
 error::result<TcpStream> TcpStream::try_clone() const {
-  return sock.duplicate().map([](Socket s) { return TcpStream(std::move(s)); });
+  return sock.duplicate().transform([](Socket s) {
+    return TcpStream(std::move(s));
+  });
 }
 
 error::result<SocketAddr> TcpStream::local_addr() const {

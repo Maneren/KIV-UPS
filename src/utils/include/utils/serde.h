@@ -5,9 +5,9 @@
 #include <format>
 #include <iterator>
 #include <optional>
+#include <print>
 #include <string>
 #include <utility>
-#include <utils/print.h>
 #include <vector>
 
 namespace serde {

@@ -1,10 +1,10 @@
 
 #include <chrono>
 #include <gtest/gtest.h>
+#include <print>
 #include <ranges>
 #include <thread>
 #include <threadpool/threadpool.h>
-#include <utils/print.h>
 
 class ThreadPoolTest : public ::testing::Test {};
 

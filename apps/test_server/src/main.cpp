@@ -1,12 +1,12 @@
 #include <iostream>
 #include <net/listener.h>
 #include <net/tcp_iostream.h>
+#include <print>
 #include <random>
 #include <string>
 #include <string_view>
 #include <threadpool/threadpool.h>
 #include <utils/parse.h>
-#include <utils/print.h>
 
 namespace {
 

@@ -3,9 +3,9 @@
 #include <net/listener.h>
 #include <net/stream.h>
 #include <optional>
+#include <print>
 #include <string_view>
 #include <thread>
-#include <utils/print.h>
 
 namespace net {
 

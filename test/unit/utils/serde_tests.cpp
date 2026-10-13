@@ -2,8 +2,8 @@
 #include <gtest/gtest.h>
 #include <numeric>
 #include <optional>
+#include <print>
 #include <string>
-#include <utils/print.h>
 #include <utils/serde.h>
 
 // Test fixture for serde tests

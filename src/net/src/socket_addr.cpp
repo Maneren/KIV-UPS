@@ -22,7 +22,7 @@ error::result<T> parse_number_with_error(
     return *result;
   }
 
-  return tl::make_unexpected(
+  return std::unexpected(
       error::SimpleMessage(
           error::ErrorKind::InvalidInput, "Invalid {}: '{}'", what, string
       )
@@ -47,7 +47,7 @@ sockaddr_in SocketAddrV4::to_sockaddr() const noexcept {
 error::result<SocketAddrV4>
 SocketAddrV4::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
   if (len < SIZE) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Invalid address length: {} < {}",
@@ -58,7 +58,7 @@ SocketAddrV4::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
   }
 
   if (sockaddr.sa.sa_family != FAMILY) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Invalid address family for IPv4: {:x}",
@@ -77,7 +77,7 @@ SocketAddrV4::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
 
 error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
   if (str.empty()) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
         )
@@ -86,7 +86,7 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
 
   const size_t colon_pos = str.rfind(':');
   if (colon_pos == std::string::npos) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Missing port in socket address: {}",
@@ -100,7 +100,7 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
 
   const auto ip = Ipv4Addr::from_string(ip_part);
   if (!ip) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
         )
@@ -109,7 +109,7 @@ error::result<SocketAddrV4> SocketAddrV4::from_string(std::string_view str) {
 
   const auto port = parse_number_with_error<uint16_t>(port_part, "port number");
   if (!port) {
-    return tl::make_unexpected(std::move(port).error());
+    return std::unexpected(std::move(port).error());
   }
 
   return SocketAddrV4{*ip, *port};
@@ -135,7 +135,7 @@ sockaddr_in6 SocketAddrV6::to_sockaddr() const noexcept {
 error::result<SocketAddrV6>
 SocketAddrV6::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
   if (len < SIZE) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Invalid IPv6 address length: {} < {}",
@@ -146,7 +146,7 @@ SocketAddrV6::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
   }
 
   if (sockaddr.sa.sa_family != FAMILY) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Invalid address family for IPv6: {}",
@@ -168,7 +168,7 @@ SocketAddrV6::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
 
 error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
   if (!str.starts_with('[')) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
         )
@@ -177,7 +177,7 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
 
   const size_t bracket_pos = str.find(']', 1);
   if (bracket_pos == std::string::npos) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
         )
@@ -187,7 +187,7 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
   auto ip_part = str.substr(1, bracket_pos - 1);
   const auto rest = str.substr(bracket_pos + 1);
   if (!rest.starts_with(':')) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Missing port in socket address: {}",
@@ -205,14 +205,14 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
     const auto parsed_scope =
         parse_number_with_error<uint32_t>(scope_part, "scope id");
     if (!parsed_scope) {
-      return tl::make_unexpected(std::move(parsed_scope).error());
+      return std::unexpected(std::move(parsed_scope).error());
     }
     scope_id = *parsed_scope;
   }
 
   const auto ip = Ipv6Addr::from_string(ip_part);
   if (!ip) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
         )
@@ -221,7 +221,7 @@ error::result<SocketAddrV6> SocketAddrV6::from_string(std::string_view str) {
 
   const auto port = parse_number_with_error<uint16_t>(port_part, "port number");
   if (!port) {
-    return tl::make_unexpected(std::move(port).error());
+    return std::unexpected(std::move(port).error());
   }
 
   return SocketAddrV6{*ip, *port, 0, scope_id};
@@ -256,12 +256,12 @@ SocketAddr::from_sockaddr(const sockaddr_union &sockaddr, socklen_t len) {
   switch (sockaddr.sa.sa_family) {
   case SocketAddrV4::FAMILY:
     return SocketAddrV4::from_sockaddr(sockaddr, len)
-        .map(functional::Constructor<SocketAddr>());
+        .transform(functional::Constructor<SocketAddr>());
   case SocketAddrV6::FAMILY:
     return SocketAddrV6::from_sockaddr(sockaddr, len)
-        .map(functional::Constructor<SocketAddr>());
+        .transform(functional::Constructor<SocketAddr>());
   default:
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Unrecognized socket family: {}",
@@ -290,7 +290,7 @@ error::result<SocketAddr> SocketAddr::from_string(std::string_view str) {
   if (const auto v6 = SocketAddrV6::from_string(str); v6) {
     return SocketAddr(*v6);
   }
-  return tl::make_unexpected(
+  return std::unexpected(
       error::SimpleMessage(
           error::ErrorKind::InvalidInput, "Invalid socket address: {}", str
       )
@@ -306,7 +306,7 @@ SocketAddr::resolve(const std::string &host, uint16_t port) {
   struct addrinfo *list = nullptr;
   const int code = getaddrinfo(host.c_str(), nullptr, &hints, &list);
   if (code != 0) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput,
             "Failed to resolve {}: {}",
@@ -331,7 +331,7 @@ SocketAddr::resolve(const std::string &host, uint16_t port) {
   }
 
   if (out.empty()) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::NotFound, "No addresses found for {}", host
         )

@@ -26,7 +26,7 @@ Ipv4Addr Ipv4Addr::broadcast() noexcept { return {255, 255, 255, 255}; }
 
 error::result<Ipv4Addr> Ipv4Addr::from_string(std::string_view str) {
   static constexpr auto invalid_ipv4 = [](std::string_view str) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid IPv4 address: {}", str
         )
@@ -64,7 +64,7 @@ Ipv6Addr Ipv6Addr::unspecified() noexcept { return {}; }
 
 error::result<Ipv6Addr> Ipv6Addr::from_string(std::string_view str) {
   if (str.empty() || str.starts_with('[') || str.size() >= INET6_ADDRSTRLEN) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
         )
@@ -76,7 +76,7 @@ error::result<Ipv6Addr> Ipv6Addr::from_string(std::string_view str) {
 
   struct in6_addr addr{};
   if (inet_pton(AF_INET6, null_terminated.data(), &addr) != 1) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::SimpleMessage(
             error::ErrorKind::InvalidInput, "Invalid IPv6 address: {}", str
         )
@@ -114,7 +114,7 @@ error::result<IpAddr> IpAddr::from_string(std::string_view str) {
       return IpAddr(*v4);
     }
   }
-  return tl::make_unexpected(
+  return std::unexpected(
       error::SimpleMessage(
           error::ErrorKind::InvalidInput, "Invalid IP address: {}", str
       )

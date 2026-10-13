@@ -28,7 +28,7 @@ auto retry_on_eintr(F &&fn) -> error::result<std::invoke_result_t<F>> {
     if (errno == EINTR) {
       continue;
     }
-    return tl::make_unexpected(error::Os{});
+    return std::unexpected(error::Os{});
   }
 }
 
@@ -73,7 +73,7 @@ public:
 
   [[nodiscard]] error::result<void> status() const {
     if (error != 0) {
-      return tl::make_unexpected(error::Os{error});
+      return std::unexpected(error::Os{error});
     }
     return {};
   }
@@ -84,7 +84,7 @@ public:
     }
     // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
     if (::fcntl(fd, F_SETFL, saved) == -1) {
-      return tl::make_unexpected(error::Os{});
+      return std::unexpected(error::Os{});
     }
     active = false;
     return {};
@@ -124,7 +124,7 @@ Socket &Socket::operator=(Socket &&other) noexcept {
 error::result<Socket> Socket::create(int family, int type) {
   const int fd = socket(family, type | SOCK_CLOEXEC, 0);
 
-  return error::from_os(fd).map([](int raw) {
+  return error::from_os(fd).transform([](int raw) {
     return Socket(FileDescriptor(raw));
   });
 }
@@ -134,14 +134,14 @@ error::result<Socket> Socket::create(const SocketAddr &addr, int type) {
 }
 
 error::result<Socket> Socket::duplicate() const {
-  return fd.duplicate().map(functional::Constructor<Socket>());
+  return fd.duplicate().transform(functional::Constructor<Socket>());
 }
 
 error::result<void> Socket::bind_to(const SocketAddr &addr) const {
   const auto [sockaddr, len] = addr.to_sockaddr();
 
   return error::from_os(bind(raw_fd(), &sockaddr.sa, len))
-      .map(functional::drop);
+      .transform(functional::drop);
 }
 
 error::result<Socket>
@@ -149,7 +149,7 @@ Socket::accept(sockaddr_union &sockaddr, socklen_t &len, int flags) const {
   return retry_on_eintr([&] {
            return accept4(raw_fd(), &sockaddr.sa, &len, flags | SOCK_CLOEXEC);
          })
-      .map([](int raw) { return Socket(FileDescriptor(raw)); });
+      .transform([](int raw) { return Socket(FileDescriptor(raw)); });
 }
 
 error::result<void> Socket::connect(const SocketAddr &addr) const {
@@ -166,7 +166,7 @@ error::result<void> Socket::connect(const SocketAddr &addr) const {
       continue;
     }
 
-    return tl::make_unexpected(error::Os{errno});
+    return std::unexpected(error::Os{errno});
   }
 }
 
@@ -174,7 +174,7 @@ error::result<void> Socket::connect_timeout(
     const SocketAddr &addr, std::chrono::nanoseconds timeout
 ) const {
   if (timeout <= std::chrono::nanoseconds::zero()) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::Simple{
             error::ErrorKind::InvalidInput, "Timeout must be positive"
         }
@@ -183,7 +183,7 @@ error::result<void> Socket::connect_timeout(
 
   NonblockingGuard nonblocking(raw_fd());
   if (auto status = nonblocking.status(); !status) {
-    return tl::make_unexpected(std::move(status).error());
+    return std::unexpected(std::move(status).error());
   }
 
   const auto [storage, len] = addr.to_sockaddr();
@@ -194,7 +194,7 @@ error::result<void> Socket::connect_timeout(
 
   const int connect_errno = errno;
   if (connect_errno != EINPROGRESS && connect_errno != EINTR) {
-    return tl::make_unexpected(error::Os{connect_errno});
+    return std::unexpected(error::Os{connect_errno});
   }
 
   struct pollfd pfd{.fd = raw_fd(), .events = POLLOUT, .revents = 0};
@@ -204,7 +204,7 @@ error::result<void> Socket::connect_timeout(
   while (true) {
     const auto remaining = deadline - std::chrono::steady_clock::now();
     if (remaining <= std::chrono::steady_clock::duration::zero()) {
-      return tl::make_unexpected(timed_out_error());
+      return std::unexpected(timed_out_error());
     }
 
     const struct timespec wait = to_timespec(
@@ -216,22 +216,22 @@ error::result<void> Socket::connect_timeout(
       if (errno == EINTR) {
         continue;
       }
-      return tl::make_unexpected(error::Os{errno});
+      return std::unexpected(error::Os{errno});
     }
 
     if (poll_result == 0) {
-      return tl::make_unexpected(timed_out_error());
+      return std::unexpected(timed_out_error());
     }
 
     // A writable socket may still carry a pending async error, so
     // always consult SO_ERROR (not only on POLLERR/POLLHUP).
     auto error_result = take_error();
     if (!error_result) {
-      return tl::make_unexpected(std::move(error_result).error());
+      return std::unexpected(std::move(error_result).error());
     }
 
     if (auto pending = std::move(*error_result); pending) {
-      return tl::make_unexpected(std::move(*pending));
+      return std::unexpected(std::move(*pending));
     }
 
     return nonblocking.restore();
@@ -242,7 +242,7 @@ error::result<std::optional<error::IoError>> Socket::take_error() const {
   auto result = getopt<int>(SOL_SOCKET, SO_ERROR);
 
   if (!result) {
-    return tl::make_unexpected(std::move(result).error());
+    return std::unexpected(std::move(result).error());
   }
 
   if (*result == 0) {
@@ -257,7 +257,7 @@ error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
   const int current = ::fcntl(raw_fd(), F_GETFL, 0);
   if (current == -1) {
-    return tl::make_unexpected(error::Os{errno});
+    return std::unexpected(error::Os{errno});
   }
   const int updated =
       nonblocking ? (current | O_NONBLOCK) : (current & ~O_NONBLOCK);
@@ -266,7 +266,7 @@ error::result<void> Socket::set_nonblocking(bool nonblocking) const {
   }
   // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
   return error::from_os(::fcntl(raw_fd(), F_SETFL, updated))
-      .map(functional::drop);
+      .transform(functional::drop);
 }
 
 error::result<ssize_t> Socket::read(void *buf, const size_t len) const {
@@ -294,7 +294,7 @@ addr_from_fd(int fd, int (*getter)(int, sockaddr *, socklen_t *)) {
   sockaddr_union storage{};
   auto len = sockaddr_union::SIZE;
   if (getter(fd, &storage.sa, &len) == -1) {
-    return tl::make_unexpected(error::Os{errno});
+    return std::unexpected(error::Os{errno});
   }
   return SocketAddr::from_sockaddr(storage, len);
 }
@@ -324,7 +324,7 @@ error::result<void> Socket::shutdown(Shutdown how) const {
   default:
     std::unreachable();
   }
-  return error::from_os(::shutdown(raw_fd(), flag)).map(functional::drop);
+  return error::from_os(::shutdown(raw_fd(), flag)).transform(functional::drop);
 }
 
 error::result<void> Socket::set_reuseaddr(bool reuse) const {
@@ -338,7 +338,7 @@ error::result<void> Socket::set_nodelay(bool nodelay) const {
 }
 
 error::result<bool> Socket::nodelay() const {
-  return getopt<int>(IPPROTO_TCP, TCP_NODELAY).map([](int opt) {
+  return getopt<int>(IPPROTO_TCP, TCP_NODELAY).transform([](int opt) {
     return opt != 0;
   });
 }
@@ -356,11 +356,10 @@ error::result<void> Socket::set_ttl(uint32_t ttl) const {
 error::result<uint32_t> Socket::ttl() const {
   if (const auto addr = local_addr(); addr) {
     if (addr->family() == AF_INET6) {
-      return getopt<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS).map([](int opt) {
-        return static_cast<uint32_t>(opt);
-      });
+      return getopt<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS)
+          .transform([](int opt) { return static_cast<uint32_t>(opt); });
     }
-    return getopt<int>(IPPROTO_IP, IP_TTL).map([](int opt) {
+    return getopt<int>(IPPROTO_IP, IP_TTL).transform([](int opt) {
       return static_cast<uint32_t>(opt);
     });
   }
@@ -368,7 +367,7 @@ error::result<uint32_t> Socket::ttl() const {
   if (auto v4 = getopt<int>(IPPROTO_IP, IP_TTL); v4) {
     return static_cast<uint32_t>(*v4);
   }
-  return getopt<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS).map([](int opt) {
+  return getopt<int>(IPPROTO_IPV6, IPV6_UNICAST_HOPS).transform([](int opt) {
     return static_cast<uint32_t>(opt);
   });
 }
@@ -383,7 +382,7 @@ error::result<void> set_socket_timeout(
   struct timeval tv{};
   if (timeout) {
     if (timeout->count() < 0) {
-      return tl::make_unexpected(
+      return std::unexpected(
           error::Simple{
               error::ErrorKind::InvalidInput, "Timeout must be non-negative"
           }
@@ -402,13 +401,15 @@ error::result<void> set_socket_timeout(
 error::result<std::optional<std::chrono::microseconds>>
 get_socket_timeout(const Socket &sock, int optname) {
   return sock.getopt<struct timeval>(SOL_SOCKET, optname)
-      .map([](struct timeval tv) -> std::optional<std::chrono::microseconds> {
-        if (tv.tv_sec == 0 && tv.tv_usec == 0) {
-          return std::nullopt;
-        }
-        return std::chrono::seconds(tv.tv_sec) +
-               std::chrono::microseconds(tv.tv_usec);
-      });
+      .transform(
+          [](struct timeval tv) -> std::optional<std::chrono::microseconds> {
+            if (tv.tv_sec == 0 && tv.tv_usec == 0) {
+              return std::nullopt;
+            }
+            return std::chrono::seconds(tv.tv_sec) +
+                   std::chrono::microseconds(tv.tv_usec);
+          }
+      );
 }
 
 } // namespace

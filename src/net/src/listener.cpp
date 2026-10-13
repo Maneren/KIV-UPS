@@ -1,6 +1,6 @@
+#include <expected>
 #include <net/listener.h>
 #include <sys/socket.h>
-#include <tl/expected.hpp>
 #include <utility>
 
 namespace net {
@@ -25,10 +25,10 @@ TcpListener::bind(std::span<const SocketAddr> addrs) {
   }
 
   if (last_error) {
-    return tl::make_unexpected(std::move(*last_error));
+    return std::unexpected(std::move(*last_error));
   }
 
-  return tl::make_unexpected(
+  return std::unexpected(
       error::Simple{
           error::ErrorKind::InvalidInput, "could not bind to any address"
       }
@@ -44,7 +44,7 @@ TcpListener::bind_with_backlog(const SocketAddr &addr, int backlog) {
             .and_then([&sock, backlog]() {
               return error::from_os(listen(sock.raw_fd(), backlog));
             })
-            .map([&sock](int) { return TcpListener(std::move(sock)); });
+            .transform([&sock](int) { return TcpListener(std::move(sock)); });
       });
 }
 
@@ -54,12 +54,12 @@ error::result<std::tuple<TcpStream, SocketAddr>> TcpListener::accept() const {
 
   auto sock = this->sock.accept(storage, len);
   if (!sock) {
-    return tl::make_unexpected(std::move(sock).error());
+    return std::unexpected(std::move(sock).error());
   }
 
   auto addr = SocketAddr::from_sockaddr(storage, len);
   if (!addr) {
-    return tl::make_unexpected(std::move(addr).error());
+    return std::unexpected(std::move(addr).error());
   }
 
   return std::make_tuple(TcpStream(std::move(*sock)), *addr);
@@ -70,7 +70,7 @@ error::result<SocketAddr> TcpListener::local_addr() const {
 }
 
 error::result<TcpListener> TcpListener::duplicate() const {
-  return sock.duplicate().map(functional::Constructor<TcpListener>());
+  return sock.duplicate().transform(functional::Constructor<TcpListener>());
 }
 
 error::result<void> TcpListener::set_nonblocking(bool nonblocking) const {

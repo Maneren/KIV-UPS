@@ -32,16 +32,15 @@ void FileDescriptor::close() noexcept {
 
 error::result<FileDescriptor> FileDescriptor::duplicate() const {
   if (fd < 0) {
-    return tl::make_unexpected(
+    return std::unexpected(
         error::Simple{error::ErrorKind::InvalidInput, "Invalid file descriptor"}
     );
   }
 
   // There is no other way to do this
   // NOLINTNEXTLINE(*cppcoreguidelines-pro-type-vararg)
-  return error::from_os(::fcntl(fd, F_DUPFD_CLOEXEC, 0)).map([](int new_fd) {
-    return FileDescriptor(new_fd);
-  });
+  return error::from_os(::fcntl(fd, F_DUPFD_CLOEXEC, 0))
+      .transform([](int new_fd) { return FileDescriptor(new_fd); });
 }
 
 } // namespace net

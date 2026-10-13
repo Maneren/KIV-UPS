@@ -1,7 +1,3 @@
-# Handle external dependencies first
-set(EXPECTED_BUILD_TESTS OFF)
-set(EXPECTED_BUILD_PACKAGE OFF)
-
 # Add external dependencies
 add_subdirectory(external)
 

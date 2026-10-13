@@ -1,9 +1,9 @@
 #pragma once
 
+#include <generator>
 #include <hive/types.h>
 #include <utility>
 #include <utils/format.h>
-#include <utils/generator.h>
 #include <vector>
 
 namespace hive {
