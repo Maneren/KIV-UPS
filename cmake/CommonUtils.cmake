@@ -31,6 +31,27 @@ function(set_compiler_and_linker_flags TARGET)
             $<$<CONFIG:Debug>:${CXX_DEBUG_FLAGS}>
             $<${USE_DEBUG_INFO}:${CXX_DEBUG_INFO}>
     )
+
+    if(USE_PCH)
+        # Shared PCH: heavy + frequently included std headers
+        target_precompile_headers(
+            ${TARGET}
+            PRIVATE
+                <expected>
+                <format>
+                <functional>
+                <optional>
+                <print>
+                <span>
+                <string>
+                <string_view>
+                <unordered_map>
+                <unordered_set>
+                <utility>
+                <variant>
+                <vector>
+        )
+    endif()
     get_property(THIN_ARCHIVE GLOBAL PROPERTY THIN_ARCHIVE)
     if(THIN_ARCHIVE)
         set_property(

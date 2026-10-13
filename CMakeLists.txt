@@ -46,6 +46,8 @@ if(USE_CCACHE)
     endif()
 endif()
 
+option(USE_PCH "Use precompiled headers to speed up compilation" ON)
+
 find_program(UV uv REQUIRED DOC "uv package manager")
 message(STATUS "Found uv: ${UV}")
 

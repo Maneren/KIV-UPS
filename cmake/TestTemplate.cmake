@@ -31,5 +31,10 @@ function(create_test_executable TARGET)
         INCLUDE_DIRS ${TEST_INCLUDE_DIRS}
     )
 
+    if(USE_PCH)
+        # gtest is the single most expensive header in test TUs (~1.4s parse)
+        target_precompile_headers(${TARGET} PRIVATE <gtest/gtest.h>)
+    endif()
+
     gtest_discover_tests(${TARGET})
 endfunction()
