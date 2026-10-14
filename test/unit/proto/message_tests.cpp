@@ -19,7 +19,7 @@ void expect_invalid(std::string_view frame) {
 
 TEST(ProtoTest, LoginWireFormat) {
   const proto::Message msg{proto::Login{.nick = "alice", .lobby = "my-lobby"}};
-  EXPECT_EQ(proto::encode(msg), "HIVE LOGN 05alice 08my-lobby\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE LOGIN 05alice 08my-lobby\n");
   expect_round_trip(msg);
 }
 
@@ -27,7 +27,7 @@ TEST(ProtoTest, PlaceWireFormat) {
   const proto::Message msg{
       proto::Place{.pos = {.p = 0, .q = 0}, .piece = hive::PieceKind::Queen}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE PLAC 0 0 Q\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE PLACE 0 0 Q\n");
   expect_round_trip(msg);
 }
 
@@ -45,7 +45,7 @@ TEST(ProtoTest, GameStartWireFormat) {
   const proto::Message msg{
       proto::GameStart{.color = hive::Player::White, .opponent = "bob"}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE STRT W 03bob\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE START W 03bob\n");
   expect_round_trip(msg);
 }
 
@@ -61,7 +61,7 @@ TEST(ProtoTest, RejectWireFormat) {
   const proto::Message msg{
       proto::Reject{.code = proto::RejectCode::NotYourTurn}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE REJT NOTN\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE REJECT NOTN\n");
   expect_round_trip(msg);
 }
 
@@ -69,7 +69,7 @@ TEST(ProtoTest, LobbyQueuedWireFormat) {
   const proto::Message msg{
       proto::LobbyStatus{.state = proto::LobbyState::Queued, .position = 1}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE LOBY QUEU 01\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE LOBBY QUEU 01\n");
   expect_round_trip(msg);
 }
 
@@ -86,7 +86,7 @@ TEST(ProtoTest, BareCommandsRoundTrip) {
   expect_round_trip(proto::Message{proto::Leave{}});
   expect_round_trip(proto::Message{proto::ListLobbies{}});
   expect_round_trip(proto::Message{proto::Ack{}});
-  EXPECT_EQ(proto::encode(proto::Message{proto::Ack{}}), "HIVE ACKN\n");
+  EXPECT_EQ(proto::encode(proto::Message{proto::Ack{}}), "HIVE ACK\n");
 }
 
 TEST(ProtoTest, AllRejectCodesRoundTrip) {
@@ -146,46 +146,46 @@ TEST(ProtoTest, DrawWinnerAccepted) {
 TEST(ProtoTest, InvalidFramesRejected) {
   expect_invalid("");
   expect_invalid("HIVE");
-  expect_invalid("HIVE ACKN");
-  expect_invalid("HIVX0004 ACKN\n");
-  expect_invalid("hive0004 ACKN\n");
-  expect_invalid("HIVE00X4 ACKN\n");
-  expect_invalid("HIVE PLAC 0 0 Q");
-  expect_invalid("HIVE PLAC 0 0 Q \n");
-  expect_invalid("HIVE PLAC  0 0 Q\n");
+  expect_invalid("HIVE ACK");
+  expect_invalid("HIVX0004 ACK\n");
+  expect_invalid("hive0004 ACK\n");
+  expect_invalid("HIVE00X4 ACK\n");
+  expect_invalid("HIVE PLACE 0 0 Q");
+  expect_invalid("HIVE PLACE 0 0 Q \n");
+  expect_invalid("HIVE PLACE  0 0 Q\n");
   expect_invalid("HIVE XXXX\n");
-  expect_invalid("HIVE ACKN \n");
-  expect_invalid("HIVE REMTX\n");
-  expect_invalid("HIVE PLAC 0 0 X\n");
-  expect_invalid("HIVE PLAC 0 0 q\n");
+  expect_invalid("HIVE ACK \n");
+  expect_invalid("HIVE REMATCHX\n");
+  expect_invalid("HIVE PLACE 0 0 X\n");
+  expect_invalid("HIVE PLACE 0 0 q\n");
   expect_invalid("HIVE MOVE 0 1 1 0 G \n");
-  expect_invalid("HIVE STRT X 03bob\n");
+  expect_invalid("HIVE START X 03bob\n");
   expect_invalid("HIVE OVER W DRAW\n");
   expect_invalid("HIVE OVER W ABRT\n");
-  expect_invalid("HIVE LOBY QUEU\n");
-  expect_invalid("HIVE LOBY PROM 01\n");
-  expect_invalid("HIVE LOBY QUEU 00\n");
-  expect_invalid("HIVE REJT XXXX\n");
-  expect_invalid("HIVE REJT BADV\n");
+  expect_invalid("HIVE LOBBY QUEU\n");
+  expect_invalid("HIVE LOBBY PROM 01\n");
+  expect_invalid("HIVE LOBBY QUEU 00\n");
+  expect_invalid("HIVE REJECT XXXX\n");
+  expect_invalid("HIVE REJECT BADV\n");
   expect_invalid("HIVE LIST 01\n");
   expect_invalid("HIVE LIST 00 X\n");
 }
 
 TEST(ProtoTest, InvalidCoordinatesRejected) {
-  expect_invalid("HIVE PLAC 9999999999 0 Q\n");
-  expect_invalid("HIVE PLAC -9999999999 0 Q\n");
-  expect_invalid("HIVE PLAC +1 0 Q\n");
-  expect_invalid("HIVE PLAC  0 Q\n");
-  expect_invalid("HIVE PLAC 1x 0 Q\n");
-  expect_invalid("HIVE PLAC - 0 Q\n");
+  expect_invalid("HIVE PLACE 9999999999 0 Q\n");
+  expect_invalid("HIVE PLACE -9999999999 0 Q\n");
+  expect_invalid("HIVE PLACE +1 0 Q\n");
+  expect_invalid("HIVE PLACE  0 Q\n");
+  expect_invalid("HIVE PLACE 1x 0 Q\n");
+  expect_invalid("HIVE PLACE - 0 Q\n");
 }
 
 TEST(ProtoTest, InvalidNamesRejected) {
   // '!' is outside [A-Za-z0-9_-]; lengths are consistent on purpose.
-  expect_invalid("HIVE LOGN 05al!ce 08my-lobby\n");
-  expect_invalid("HIVE LOGN 00 08my-lobby\n");
-  expect_invalid("HIVE LOGN 05alice 00\n");
-  expect_invalid("HIVE STRT W 04bo b\n");
+  expect_invalid("HIVE LOGIN 05al!ce 08my-lobby\n");
+  expect_invalid("HIVE LOGIN 00 08my-lobby\n");
+  expect_invalid("HIVE LOGIN 05alice 00\n");
+  expect_invalid("HIVE START W 04bo b\n");
 }
 
 TEST(ProtoTest, EncodeValidatesNames) {
@@ -260,14 +260,14 @@ TEST(ProtoTest, TakeFramePartialAndCoalesced) {
   EXPECT_EQ(first.status, proto::TakeStatus::Incomplete);
   EXPECT_TRUE(buffer == "HIVE PL");
 
-  buffer += "AC 0 0 Q\nHIVE ACKN\n";
+  buffer += "ACE 0 0 Q\nHIVE ACK\n";
   first = proto::take_frame(buffer);
   ASSERT_EQ(first.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(first.frame, "HIVE PLAC 0 0 Q\n");
+  EXPECT_EQ(first.frame, "HIVE PLACE 0 0 Q\n");
 
   auto second = proto::take_frame(buffer);
   ASSERT_EQ(second.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(second.frame, "HIVE ACKN\n");
+  EXPECT_EQ(second.frame, "HIVE ACK\n");
   EXPECT_TRUE(buffer.empty());
 
   auto third = proto::take_frame(buffer);
@@ -275,24 +275,24 @@ TEST(ProtoTest, TakeFramePartialAndCoalesced) {
 }
 
 TEST(ProtoTest, TakeFrameDropsBadLines) {
-  std::string buffer = "GARBAGE\nHIVE ACKN\n";
+  std::string buffer = "GARBAGE\nHIVE ACK\n";
   EXPECT_EQ(proto::take_frame(buffer).status, proto::TakeStatus::Error);
   auto next = proto::take_frame(buffer);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACKN\n");
+  EXPECT_EQ(next.frame, "HIVE ACK\n");
   EXPECT_TRUE(buffer.empty());
 
-  std::string no_space = "HIVEACKN\nHIVE ACKN\n";
+  std::string no_space = "HIVEACK\nHIVE ACK\n";
   EXPECT_EQ(proto::take_frame(no_space).status, proto::TakeStatus::Error);
   next = proto::take_frame(no_space);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACKN\n");
+  EXPECT_EQ(next.frame, "HIVE ACK\n");
 
-  std::string blank = "\nHIVE ACKN\n";
+  std::string blank = "\nHIVE ACK\n";
   EXPECT_EQ(proto::take_frame(blank).status, proto::TakeStatus::Error);
   next = proto::take_frame(blank);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACKN\n");
+  EXPECT_EQ(next.frame, "HIVE ACK\n");
 }
 
 TEST(ProtoTest, TakeFrameEnforcesLineCap) {
@@ -300,9 +300,9 @@ TEST(ProtoTest, TakeFrameEnforcesLineCap) {
   EXPECT_EQ(proto::take_frame(buffer).status, proto::TakeStatus::Error);
   EXPECT_TRUE(buffer.empty());
 
-  std::string capped = "HIVE " + std::string(16 * 1024, 'X') + "\nHIVE ACKN\n";
+  std::string capped = "HIVE " + std::string(16 * 1024, 'X') + "\nHIVE ACK\n";
   EXPECT_EQ(proto::take_frame(capped).status, proto::TakeStatus::Error);
   auto next = proto::take_frame(capped);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACKN\n");
+  EXPECT_EQ(next.frame, "HIVE ACK\n");
 }

@@ -90,7 +90,7 @@ std::optional<std::string> body_of(const Login &msg) {
     return std::nullopt;
   }
   return std::format(
-      "LOGN {:02}{} {:02}{}",
+      "LOGIN {:02}{} {:02}{}",
       msg.nick.size(),
       msg.nick,
       msg.lobby.size(),
@@ -100,7 +100,7 @@ std::optional<std::string> body_of(const Login &msg) {
 
 std::optional<std::string> body_of(const Place &msg) {
   return std::format(
-      "PLAC {} {} {}", msg.pos.p, msg.pos.q, piece_to_char(msg.piece)
+      "PLACE {} {} {}", msg.pos.p, msg.pos.q, piece_to_char(msg.piece)
   );
 }
 
@@ -115,16 +115,16 @@ std::optional<std::string> body_of(const Move &msg) {
   );
 }
 
-std::optional<std::string> body_of(const RematchVote &) { return "REMT"; }
+std::optional<std::string> body_of(const RematchVote &) { return "REMATCH"; }
 
-std::optional<std::string> body_of(const Leave &) { return "LEAV"; }
+std::optional<std::string> body_of(const Leave &) { return "LEAVE"; }
 
 std::optional<std::string> body_of(const ListLobbies &) { return "LIST"; }
 
-std::optional<std::string> body_of(const Ack &) { return "ACKN"; }
+std::optional<std::string> body_of(const Ack &) { return "ACK"; }
 
 std::optional<std::string> body_of(const Reject &msg) {
-  return std::format("REJT {}", reject_to_str(msg.code));
+  return std::format("REJECT {}", reject_to_str(msg.code));
 }
 
 std::optional<std::string> body_of(const GameStart &msg) {
@@ -132,7 +132,7 @@ std::optional<std::string> body_of(const GameStart &msg) {
     return std::nullopt;
   }
   return std::format(
-      "STRT {} {:02}{}",
+      "START {} {:02}{}",
       player_to_char(msg.color),
       msg.opponent.size(),
       msg.opponent
@@ -151,12 +151,12 @@ std::optional<std::string> body_of(const LobbyStatus &msg) {
         *msg.position > kMaxListEntries) {
       return std::nullopt;
     }
-    return std::format("LOBY QUEU {:02}", *msg.position);
+    return std::format("LOBBY QUEU {:02}", *msg.position);
   }
   if (msg.position.has_value()) {
     return std::nullopt;
   }
-  return std::format("LOBY {}", state_to_str(msg.state));
+  return std::format("LOBBY {}", state_to_str(msg.state));
 }
 
 std::optional<std::string> body_of(const LobbyList &msg) {
@@ -493,30 +493,30 @@ std::optional<Message> decode_loby(Cursor &cur) {
 
 std::optional<Message> decode_body(std::string_view body) {
   Cursor cur(body);
-  if (cur.literal("LOGN")) {
+  if (cur.literal("LOGIN")) {
     return decode_login(cur);
   }
-  if (cur.literal("PLAC")) {
+  if (cur.literal("PLACE")) {
     return decode_place(cur);
   }
   if (cur.literal("MOVE")) {
     return decode_move(cur);
   }
-  if (cur.literal("REMT")) {
+  if (cur.literal("REMATCH")) {
     return cur.empty() ? std::optional<Message>{Message{RematchVote{}}}
                        : std::nullopt;
   }
-  if (cur.literal("LEAV")) {
+  if (cur.literal("LEAVE")) {
     return cur.empty() ? std::optional<Message>{Message{Leave{}}}
                        : std::nullopt;
   }
   if (cur.literal("LIST")) {
     return decode_list(cur);
   }
-  if (cur.literal("ACKN")) {
+  if (cur.literal("ACK")) {
     return cur.empty() ? std::optional<Message>{Message{Ack{}}} : std::nullopt;
   }
-  if (cur.literal("REJT")) {
+  if (cur.literal("REJECT")) {
     if (!cur.space()) {
       return std::nullopt;
     }
@@ -526,7 +526,7 @@ std::optional<Message> decode_body(std::string_view body) {
     }
     return Message{Reject{.code = *code}};
   }
-  if (cur.literal("STRT")) {
+  if (cur.literal("START")) {
     if (!cur.space()) {
       return std::nullopt;
     }
@@ -554,7 +554,7 @@ std::optional<Message> decode_body(std::string_view body) {
     }
     return Message{GameOver{.winner = *winner, .reason = *reason}};
   }
-  if (cur.literal("LOBY")) {
+  if (cur.literal("LOBBY")) {
     return decode_loby(cur);
   }
   return std::nullopt;
@@ -571,7 +571,7 @@ std::optional<std::string> encode(const Message &msg) {
 }
 
 std::optional<Message> decode(std::string_view frame) {
-  if (frame.size() < kMagic.size() + 4 + 1) {
+  if (frame.size() < kMagic.size() + 3 + 1) {
     return std::nullopt;
   }
   if (!frame.starts_with(kMagic)) {
@@ -582,7 +582,7 @@ std::optional<Message> decode(std::string_view frame) {
   }
   const std::string_view body =
       frame.substr(kMagic.size(), frame.size() - kMagic.size() - 1);
-  if (body.size() < 4 || body.size() > kMaxBodyLen) {
+  if (body.size() < 3 || body.size() > kMaxBodyLen) {
     return std::nullopt;
   }
   return decode_body(body);
