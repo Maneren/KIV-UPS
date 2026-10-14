@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <format>
+#include <utility>
 
 namespace proto {
 namespace {
@@ -50,37 +51,37 @@ char player_to_char(hive::Player player) {
 std::string_view reject_to_str(RejectCode code) {
   switch (code) {
   case RejectCode::BadSyntax:
-    return "BADS";
+    return "BAD_SYNTAX";
   case RejectCode::BadNick:
-    return "BADN";
+    return "BAD_NAME";
   case RejectCode::NotYourTurn:
-    return "NOTN";
+    return "NOT_YOUR_TURN";
   case RejectCode::IllegalMove:
-    return "ILLG";
+    return "ILLEGAL_MOVE";
   case RejectCode::BadState:
-    return "STAT";
+    return "BAD_STATE";
   }
 }
 
 std::string_view reason_to_str(EndReason reason) {
   switch (reason) {
   case EndReason::Surround:
-    return "SURN";
+    return "SURROUND";
   case EndReason::Forfeit:
-    return "FORF";
+    return "FORFEIT";
   }
 }
 
 std::string_view state_to_str(LobbyState state) {
   switch (state) {
   case LobbyState::Waiting:
-    return "WAIT";
+    return "WAITING";
   case LobbyState::Queued:
-    return "QUEU";
+    return "QUEUED";
   case LobbyState::Promoted:
-    return "PROM";
+    return "PROMOTED";
   case LobbyState::RematchWait:
-    return "RMWT";
+    return "REMATCH_WAIT";
   }
 }
 
@@ -151,7 +152,9 @@ std::optional<std::string> body_of(const LobbyStatus &msg) {
         *msg.position > kMaxListEntries) {
       return std::nullopt;
     }
-    return std::format("LOBBY QUEU {:02}", *msg.position);
+    return std::format(
+        "LOBBY {} {:02}", state_to_str(msg.state), *msg.position
+    );
   }
   if (msg.position.has_value()) {
     return std::nullopt;
@@ -310,65 +313,52 @@ public:
     return std::optional<hive::Player>{*player};
   }
 
+  // Literal match; the caller rejects trailing garbage (space/end check).
   std::optional<RejectCode> reject_code() {
-    if (rest_.size() < 4) {
-      return std::nullopt;
+    constexpr std::pair<std::string_view, RejectCode> codes[] = {
+        {"BAD_SYNTAX", RejectCode::BadSyntax},
+        {"BAD_NAME", RejectCode::BadNick},
+        {"NOT_YOUR_TURN", RejectCode::NotYourTurn},
+        {"ILLEGAL_MOVE", RejectCode::IllegalMove},
+        {"BAD_STATE", RejectCode::BadState},
+    };
+    for (const auto &[text, code] : codes) {
+      if (rest_.starts_with(text)) {
+        rest_.remove_prefix(text.size());
+        return code;
+      }
     }
-    const std::string_view code = rest_.substr(0, 4);
-    RejectCode result;
-    if (code == "BADS") {
-      result = RejectCode::BadSyntax;
-    } else if (code == "BADN") {
-      result = RejectCode::BadNick;
-    } else if (code == "NOTN") {
-      result = RejectCode::NotYourTurn;
-    } else if (code == "ILLG") {
-      result = RejectCode::IllegalMove;
-    } else if (code == "STAT") {
-      result = RejectCode::BadState;
-    } else {
-      return std::nullopt;
-    }
-    rest_.remove_prefix(4);
-    return result;
+    return std::nullopt;
   }
 
   std::optional<EndReason> end_reason() {
-    if (rest_.size() < 4) {
-      return std::nullopt;
+    constexpr std::pair<std::string_view, EndReason> reasons[] = {
+        {"SURROUND", EndReason::Surround},
+        {"FORFEIT", EndReason::Forfeit},
+    };
+    for (const auto &[text, reason] : reasons) {
+      if (rest_.starts_with(text)) {
+        rest_.remove_prefix(text.size());
+        return reason;
+      }
     }
-    const std::string_view code = rest_.substr(0, 4);
-    EndReason result;
-    if (code == "SURN") {
-      result = EndReason::Surround;
-    } else if (code == "FORF") {
-      result = EndReason::Forfeit;
-    } else {
-      return std::nullopt;
-    }
-    rest_.remove_prefix(4);
-    return result;
+    return std::nullopt;
   }
 
   std::optional<LobbyState> lobby_state() {
-    if (rest_.size() < 4) {
-      return std::nullopt;
+    constexpr std::pair<std::string_view, LobbyState> states[] = {
+        {"WAITING", LobbyState::Waiting},
+        {"QUEUED", LobbyState::Queued},
+        {"PROMOTED", LobbyState::Promoted},
+        {"REMATCH_WAIT", LobbyState::RematchWait},
+    };
+    for (const auto &[text, state] : states) {
+      if (rest_.starts_with(text)) {
+        rest_.remove_prefix(text.size());
+        return state;
+      }
     }
-    const std::string_view code = rest_.substr(0, 4);
-    LobbyState result;
-    if (code == "WAIT") {
-      result = LobbyState::Waiting;
-    } else if (code == "QUEU") {
-      result = LobbyState::Queued;
-    } else if (code == "PROM") {
-      result = LobbyState::Promoted;
-    } else if (code == "RMWT") {
-      result = LobbyState::RematchWait;
-    } else {
-      return std::nullopt;
-    }
-    rest_.remove_prefix(4);
-    return result;
+    return std::nullopt;
   }
 };
 

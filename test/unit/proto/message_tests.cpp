@@ -53,7 +53,7 @@ TEST(ProtoTest, GameOverWireFormat) {
   const proto::Message msg{proto::GameOver{
       .winner = hive::Player::White, .reason = proto::EndReason::Surround
   }};
-  EXPECT_EQ(proto::encode(msg), "HIVE OVER W SURN\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE OVER W SURROUND\n");
   expect_round_trip(msg);
 }
 
@@ -61,7 +61,7 @@ TEST(ProtoTest, RejectWireFormat) {
   const proto::Message msg{
       proto::Reject{.code = proto::RejectCode::NotYourTurn}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE REJECT NOTN\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE REJECT NOT_YOUR_TURN\n");
   expect_round_trip(msg);
 }
 
@@ -69,7 +69,7 @@ TEST(ProtoTest, LobbyQueuedWireFormat) {
   const proto::Message msg{
       proto::LobbyStatus{.state = proto::LobbyState::Queued, .position = 1}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE LOBBY QUEU 01\n");
+  EXPECT_EQ(proto::encode(msg), "HIVE LOBBY QUEUED 01\n");
   expect_round_trip(msg);
 }
 
@@ -135,7 +135,7 @@ TEST(ProtoTest, NegativeCoordinatesRoundTrip) {
 
 TEST(ProtoTest, DrawWinnerAccepted) {
   // '-' is reserved in beta but must still parse (forward compatibility).
-  const auto decoded = proto::decode("HIVE OVER - SURN\n");
+  const auto decoded = proto::decode("HIVE OVER - SURROUND\n");
   ASSERT_TRUE(decoded.has_value());
   const proto::Message expected{proto::GameOver{
       .winner = std::nullopt, .reason = proto::EndReason::Surround
@@ -162,9 +162,9 @@ TEST(ProtoTest, InvalidFramesRejected) {
   expect_invalid("HIVE START X 03bob\n");
   expect_invalid("HIVE OVER W DRAW\n");
   expect_invalid("HIVE OVER W ABRT\n");
-  expect_invalid("HIVE LOBBY QUEU\n");
-  expect_invalid("HIVE LOBBY PROM 01\n");
-  expect_invalid("HIVE LOBBY QUEU 00\n");
+  expect_invalid("HIVE LOBBY QUEUED\n");
+  expect_invalid("HIVE LOBBY PROMOTED 01\n");
+  expect_invalid("HIVE LOBBY QUEUED 00\n");
   expect_invalid("HIVE REJECT XXXX\n");
   expect_invalid("HIVE REJECT BADV\n");
   expect_invalid("HIVE LIST 01\n");
