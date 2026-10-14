@@ -11,11 +11,11 @@
 namespace proto {
 
 // Wire limits, see src/hive/PROTOCOL.md.
-constexpr std::string_view kMagic = "HIVE";
-constexpr std::size_t kHeaderLen = 8;
+constexpr std::string_view kMagic = "HIVE ";
 constexpr std::size_t kMaxNickLen = 16;
 constexpr std::size_t kMaxLobbyLen = 32;
 constexpr std::size_t kMaxBodyLen = 9999;
+constexpr std::size_t kMaxLine = 16 * 1024;
 constexpr unsigned kMaxListEntries = 99;
 
 enum class RejectCode : std::uint8_t {
@@ -145,7 +145,7 @@ struct TakeResult {
   std::string frame; // valid only when status == Ok
 };
 
-// Take the first length-framed message; Error resyncs to magic.
+// Take the first line; Error drops it.
 TakeResult take_frame(std::string &buffer);
 
 } // namespace proto

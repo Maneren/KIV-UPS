@@ -560,22 +560,6 @@ std::optional<Message> decode_body(std::string_view body) {
   return std::nullopt;
 }
 
-// Drop through resync, keeping a split "HIVE" tail.
-void discard_for_resync(std::string &buffer) {
-  const std::size_t at = buffer.find(kMagic, 1);
-  if (at != std::string::npos) {
-    buffer.erase(0, at);
-    return;
-  }
-  std::size_t keep = 0;
-  for (std::size_t n = 1; n < kMagic.size() && n <= buffer.size(); ++n) {
-    if (buffer.compare(buffer.size() - n, n, kMagic.data(), n) == 0) {
-      keep = n;
-    }
-  }
-  buffer.erase(0, buffer.size() - keep);
-}
-
 } // namespace
 
 std::optional<std::string> encode(const Message &msg) {
@@ -583,57 +567,42 @@ std::optional<std::string> encode(const Message &msg) {
   if (!body.has_value() || body->size() > kMaxBodyLen) {
     return std::nullopt;
   }
-  return std::format("{}{:04}{}\n", kMagic, body->size(), *body);
+  return std::format("{}{}\n", kMagic, *body);
 }
 
 std::optional<Message> decode(std::string_view frame) {
-  if (frame.size() < kHeaderLen + 4 + 1) {
+  if (frame.size() < kMagic.size() + 4 + 1) {
     return std::nullopt;
   }
   if (!frame.starts_with(kMagic)) {
     return std::nullopt;
   }
-  Cursor head(frame.substr(kHeaderLen - 4));
-  const auto len = head.digits(4);
-  if (!len.has_value()) {
+  if (frame.back() != '\n') {
     return std::nullopt;
   }
-  if (frame.size() != kHeaderLen + *len + 1 || frame.back() != '\n') {
+  const std::string_view body =
+      frame.substr(kMagic.size(), frame.size() - kMagic.size() - 1);
+  if (body.size() < 4 || body.size() > kMaxBodyLen) {
     return std::nullopt;
   }
-  return decode_body(frame.substr(kHeaderLen, *len));
+  return decode_body(body);
 }
 
 TakeResult take_frame(std::string &buffer) {
-  if (buffer.size() < 4) {
-    return {TakeStatus::Incomplete, {}};
-  }
-  if (!buffer.starts_with(kMagic)) {
-    discard_for_resync(buffer);
-    return {TakeStatus::Error, {}};
-  }
-  if (buffer.size() < kHeaderLen) {
-    return {TakeStatus::Incomplete, {}};
-  }
-  unsigned len = 0;
-  for (std::size_t i = 4; i < kHeaderLen; ++i) {
-    const char c = buffer[i];
-    if (c < '0' || c > '9') {
-      discard_for_resync(buffer);
+  const std::size_t nl = buffer.find('\n');
+  if (nl == std::string::npos) {
+    if (buffer.size() > kMaxLine) {
+      buffer.clear();
       return {TakeStatus::Error, {}};
     }
-    len = len * 10 + static_cast<unsigned>(c - '0');
-  }
-  const std::size_t total = kHeaderLen + len + 1;
-  if (buffer.size() < total) {
     return {TakeStatus::Incomplete, {}};
   }
-  if (buffer[kHeaderLen + len] != '\n') {
-    discard_for_resync(buffer);
-    return {TakeStatus::Error, {}};
-  }
+  const std::size_t total = nl + 1;
   std::string frame = buffer.substr(0, total);
   buffer.erase(0, total);
+  if (total > kMaxLine || !frame.starts_with(kMagic)) {
+    return {TakeStatus::Error, {}};
+  }
   return {TakeStatus::Ok, std::move(frame)};
 }
 
