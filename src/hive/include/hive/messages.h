@@ -20,7 +20,7 @@ public:
   bool operator==(const Message &other) const = default;
 };
 
-class MoveMessage : Message {
+class MoveMessage : public Message {
   Move _move;
   Player _player;
 
@@ -33,7 +33,7 @@ public:
   [[nodiscard]] Player player() const;
 };
 
-class OkMessage : Message {
+class OkMessage : public Message {
 public:
   OkMessage() = default;
 
@@ -54,12 +54,18 @@ template <typename O> struct serde::serializer<hive::TilePointer, O> {
 template <> struct serde::deserializer<hive::TilePointer> {
   static std::optional<hive::TilePointer> deserialize(auto &ctx) {
     auto p = serde::deserialize<int>(ctx);
+    if (!p.has_value()) {
+      return std::nullopt;
+    }
 
     if (!ctx.assert_prefix(",")) {
       return std::nullopt;
     }
 
     auto q = serde::deserialize<int>(ctx);
+    if (!q.has_value()) {
+      return std::nullopt;
+    }
 
     return hive::TilePointer{.p = *p, .q = *q};
   }
@@ -157,24 +163,36 @@ template <> struct serde::deserializer<hive::MoveMessage> {
     }
 
     auto from = serde::deserialize<hive::TilePointer>(ctx);
+    if (!from.has_value()) {
+      return std::nullopt;
+    }
 
     if (!ctx.assert_prefix(";")) {
       return std::nullopt;
     }
 
     auto to = serde::deserialize<hive::TilePointer>(ctx);
+    if (!to.has_value()) {
+      return std::nullopt;
+    }
 
     if (!ctx.assert_prefix(";")) {
       return std::nullopt;
     }
 
     auto piece_kind = serde::deserialize<hive::PieceKind>(ctx);
+    if (!piece_kind.has_value()) {
+      return std::nullopt;
+    }
 
     if (!ctx.assert_prefix(";")) {
       return std::nullopt;
     }
 
     auto player = serde::deserialize<hive::Player>(ctx);
+    if (!player.has_value()) {
+      return std::nullopt;
+    }
 
     auto move = hive::Move{.from = *from, .to = *to, .piece_kind = *piece_kind};
 
