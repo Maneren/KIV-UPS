@@ -25,9 +25,9 @@ public:
     ~LiftPiece();
 
     LiftPiece(const LiftPiece &) = delete;
-    LiftPiece(LiftPiece &&) noexcept = default;
+    LiftPiece(LiftPiece &&) = delete;
     LiftPiece &operator=(const LiftPiece &) = delete;
-    LiftPiece &operator=(LiftPiece &&) noexcept = default;
+    LiftPiece &operator=(LiftPiece &&) = delete;
   };
 
   [[nodiscard]] const std::vector<Piece> &get(TilePointer ptr) const;
