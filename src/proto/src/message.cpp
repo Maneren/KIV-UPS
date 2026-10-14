@@ -421,7 +421,9 @@ std::optional<Message> decode_move(Cursor &cur) {
     return std::nullopt;
   }
   return Message{Move{
-      .from = {.p = *fp, .q = *fq}, .to = {.p = *tp, .q = *tq}, .piece = *piece
+      .from = {.p = *fp, .q = *fq},
+      .to = {.p = *tp, .q = *tq},
+      .piece = *piece,
   }};
 }
 

@@ -8,3 +8,4 @@ AlignAfterOpenBracket: BlockIndent
 AllowAllArgumentsOnNextLine: true
 BinPackParameters: false
 BinPackArguments: false
+EnumTrailingComma: Insert

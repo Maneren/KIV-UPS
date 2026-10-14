@@ -35,7 +35,7 @@ TEST(ProtoTest, MoveWireFormat) {
   const proto::Message msg{proto::Move{
       .from = {.p = 0, .q = 1},
       .to = {.p = 1, .q = 0},
-      .piece = hive::PieceKind::Grasshopper
+      .piece = hive::PieceKind::Grasshopper,
   }};
   EXPECT_EQ(proto::encode(msg), "HIVE MOVE 0 1 1 0 G\n");
   expect_round_trip(msg);
@@ -51,7 +51,8 @@ TEST(ProtoTest, GameStartWireFormat) {
 
 TEST(ProtoTest, GameOverWireFormat) {
   const proto::Message msg{proto::GameOver{
-      .winner = hive::Player::White, .reason = proto::EndReason::Surround
+      .winner = hive::Player::White,
+      .reason = proto::EndReason::Surround,
   }};
   EXPECT_EQ(proto::encode(msg), "HIVE OVER W SURROUND\n");
   expect_round_trip(msg);
@@ -75,7 +76,7 @@ TEST(ProtoTest, LobbyQueuedWireFormat) {
 
 TEST(ProtoTest, LobbyListWireFormat) {
   const proto::Message msg{proto::LobbyList{
-      .entries = {proto::LobbyEntry{.name = "my-lobby", .occupants = 3}}
+      .entries = {proto::LobbyEntry{.name = "my-lobby", .occupants = 3}},
   }};
   EXPECT_EQ(proto::encode(msg), "HIVE LIST 01 08my-lobby 03\n");
   expect_round_trip(msg);
@@ -104,7 +105,8 @@ TEST(ProtoTest, AllRejectCodesRoundTrip) {
 TEST(ProtoTest, AllLobbyStatesRoundTrip) {
   expect_round_trip(
       proto::Message{proto::LobbyStatus{
-          .state = proto::LobbyState::Waiting, .position = std::nullopt
+          .state = proto::LobbyState::Waiting,
+          .position = std::nullopt,
       }}
   );
   expect_round_trip(
@@ -114,12 +116,14 @@ TEST(ProtoTest, AllLobbyStatesRoundTrip) {
   );
   expect_round_trip(
       proto::Message{proto::LobbyStatus{
-          .state = proto::LobbyState::Promoted, .position = std::nullopt
+          .state = proto::LobbyState::Promoted,
+          .position = std::nullopt,
       }}
   );
   expect_round_trip(
       proto::Message{proto::LobbyStatus{
-          .state = proto::LobbyState::RematchWait, .position = std::nullopt
+          .state = proto::LobbyState::RematchWait,
+          .position = std::nullopt,
       }}
   );
 }
@@ -128,7 +132,7 @@ TEST(ProtoTest, NegativeCoordinatesRoundTrip) {
   expect_round_trip(
       proto::Message{proto::Place{
           .pos = {.p = -2147483648, .q = 2147483647},
-          .piece = hive::PieceKind::Ant
+          .piece = hive::PieceKind::Ant,
       }}
   );
 }
@@ -138,7 +142,8 @@ TEST(ProtoTest, DrawWinnerAccepted) {
   const auto decoded = proto::decode("HIVE OVER - SURROUND\n");
   ASSERT_TRUE(decoded.has_value());
   const proto::Message expected{proto::GameOver{
-      .winner = std::nullopt, .reason = proto::EndReason::Surround
+      .winner = std::nullopt,
+      .reason = proto::EndReason::Surround,
   }};
   EXPECT_EQ(*decoded, expected);
 }

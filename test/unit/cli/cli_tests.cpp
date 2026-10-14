@@ -312,7 +312,11 @@ TEST_F(CliParserTest, RealWorldUsageScenario) {
       .long_flag("debug-ast")
       .long_flag("debug-vm");
   ArgvHelper args{
-      "prog", "-d", "--debug-lexer", "--debug-parser", "input.lang"
+      "prog",
+      "-d",
+      "--debug-lexer",
+      "--debug-parser",
+      "input.lang",
   };
 
   auto result = parser.parse(args.argc(), args.argv());
@@ -332,7 +336,12 @@ TEST_F(CliParserTest, RealWorldUsageScenario) {
 TEST_F(CliParserTest, MixedFlagsAndOptions) {
   parser.flag("v", "verbose").option("o", "output").option("c", "config");
   ArgvHelper args{
-      "prog", "-v", "-o", "out.txt", "--config=settings.ini", "input.txt"
+      "prog",
+      "-v",
+      "-o",
+      "out.txt",
+      "--config=settings.ini",
+      "input.txt",
   };
 
   auto result = parser.parse(args.argc(), args.argv());

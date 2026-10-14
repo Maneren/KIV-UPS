@@ -213,9 +213,11 @@ template <> struct serde::deserializer<hive::MoveMessage> {
 
       return hive::MoveMessage{
           hive::Move{hive::MovePiece{
-              .from = *from, .to = *to, .piece_kind = *piece_kind
+              .from = *from,
+              .to = *to,
+              .piece_kind = *piece_kind,
           }},
-          *player
+          *player,
       };
     }
 
@@ -252,7 +254,7 @@ template <> struct serde::deserializer<hive::MoveMessage> {
 
     return hive::MoveMessage{
         hive::Move{hive::PlacePiece{.pos = *pos, .piece_kind = *piece_kind}},
-        *player
+        *player,
     };
   }
 };

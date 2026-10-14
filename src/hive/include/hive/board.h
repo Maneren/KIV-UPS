@@ -120,7 +120,7 @@ private:
 
   std::map<Player, PlayerPiecesMap> player_pieces{
       {Player::White, DEFAULT_PLAYER_PIECES},
-      {Player::Black, DEFAULT_PLAYER_PIECES}
+      {Player::Black, DEFAULT_PLAYER_PIECES},
   };
 
   friend std::formatter<Board>;

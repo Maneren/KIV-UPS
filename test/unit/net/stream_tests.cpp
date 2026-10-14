@@ -104,7 +104,10 @@ TEST(StreamEphemeralTest, LocalAddrAndExactTransfer) {
   ASSERT_TRUE(client.nodelay().value());
 
   const std::array<std::byte, 4> out{
-      std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4}
+      std::byte{1},
+      std::byte{2},
+      std::byte{3},
+      std::byte{4},
   };
   ASSERT_TRUE(client.write_all(out).has_value());
   std::array<std::byte, 4> back{};

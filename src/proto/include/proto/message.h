@@ -138,7 +138,11 @@ std::optional<std::string> encode(const Message &msg);
 // Decode one wire message; nullopt on violation, never throws.
 std::optional<Message> decode(std::string_view frame);
 
-enum class TakeStatus { Ok, Incomplete, Error };
+enum class TakeStatus {
+  Ok,
+  Incomplete,
+  Error,
+};
 
 struct TakeResult {
   TakeStatus status;

@@ -94,7 +94,7 @@ Board::moves_for_piece(TilePointer pos, Piece piece) const {
           &Board::spider_moves,
           &Board::beetle_moves,
           &Board::grasshopper_moves,
-          &Board::ant_moves
+          &Board::ant_moves,
   };
 
   const auto &handler =
@@ -395,7 +395,7 @@ std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) const {
           co_yield Move{MovePiece{
               .from = grasshopper,
               .to = current,
-              .piece_kind = PieceKind::Grasshopper
+              .piece_kind = PieceKind::Grasshopper,
           }};
         }
         break;
