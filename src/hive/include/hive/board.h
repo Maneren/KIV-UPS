@@ -2,6 +2,9 @@
 
 #include <generator>
 #include <hive/types.h>
+#include <optional>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <utils/format.h>
 #include <vector>
@@ -13,62 +16,53 @@ Direction rotate_right(Direction dir);
 
 class Board {
 public:
-  class LiftPiece {
-  private:
-    TilePointer ptr;
-    Board *board;
-    Piece piece;
-
-  public:
-    LiftPiece(TilePointer ptr, Board *board);
-
-    ~LiftPiece();
-
-    LiftPiece(const LiftPiece &) = delete;
-    LiftPiece(LiftPiece &&) = delete;
-    LiftPiece &operator=(const LiftPiece &) = delete;
-    LiftPiece &operator=(LiftPiece &&) = delete;
-  };
-
   [[nodiscard]] const std::vector<Piece> &get(TilePointer ptr) const;
 
-  [[nodiscard]] Piece get_top(TilePointer ptr) const;
+  [[nodiscard]] Piece
+  get_top(TilePointer ptr, std::optional<TilePointer> ignored = {}) const;
 
   [[nodiscard]] bool is_empty() const;
-  [[nodiscard]] bool is_empty(TilePointer ptr) const;
+  [[nodiscard]] bool
+  is_empty(TilePointer ptr, std::optional<TilePointer> ignored = {}) const;
 
   [[nodiscard]] bool has_placed(Player player) const;
   [[nodiscard]] bool has_placed_queen(Player player) const;
 
-  [[nodiscard]] std::generator<std::pair<TilePointer, Piece>> pieces() const;
+  [[nodiscard]] std::generator<std::pair<TilePointer, Piece>>
+  pieces(std::optional<TilePointer> ignored = {}) const;
 
   [[nodiscard]] std::generator<std::pair<TilePointer, Piece>>
-  players_tiles(Player player) const;
+  players_tiles(Player player, std::optional<TilePointer> ignored = {}) const;
 
   void add_piece(TilePointer ptr, Piece piece);
 
   Piece remove_piece(TilePointer ptr);
 
   [[nodiscard]]
-  std::generator<Move> moves_for_piece(TilePointer pos, Piece piece);
+  std::generator<Move> moves_for_piece(TilePointer pos, Piece piece) const;
 
   [[nodiscard]] std::generator<Move>
-  moves_for_player(Player player, PlayerPiecesMap pieces);
-
-  [[nodiscard]] std::generator<TilePointer> neighbors(TilePointer ptr) const;
+  moves_for_player(Player player, PlayerPiecesMap pieces) const;
 
   [[nodiscard]] std::generator<TilePointer>
-  empty_neighbors(TilePointer ptr) const;
+  neighbors(TilePointer ptr, std::optional<TilePointer> ignored = {}) const;
 
-  [[nodiscard]] bool
-  tile_belongs_to_player(TilePointer ptr, Player player) const;
+  [[nodiscard]] std::generator<TilePointer> empty_neighbors(
+      TilePointer ptr, std::optional<TilePointer> ignored = {}
+  ) const;
 
-  [[nodiscard]] bool
-  neighbors_only_players(TilePointer ptr, Player player) const;
+  [[nodiscard]] bool tile_belongs_to_player(
+      TilePointer ptr, Player player, std::optional<TilePointer> ignored = {}
+  ) const;
 
-  [[nodiscard]] std::unordered_set<TilePointer> tiles_around_hive() const;
+  [[nodiscard]] bool neighbors_only_players(
+      TilePointer ptr, Player player, std::optional<TilePointer> ignored = {}
+  ) const;
 
-  bool can_player_move(Player player, TilePointer ptr);
+  [[nodiscard]] std::unordered_set<TilePointer>
+  tiles_around_hive(std::optional<TilePointer> ignored = {}) const;
+
+  bool can_player_move(Player player, TilePointer ptr) const;
 
   bool can_player_place(Player player, PieceKind kind) const;
 
@@ -77,31 +71,43 @@ public:
   [[nodiscard]] std::generator<TilePointer>
   valid_placements(Player player) const;
 
-  [[nodiscard]] bool moving_breaks_hive(TilePointer ptr);
+  [[nodiscard]] bool moving_breaks_hive(TilePointer ptr) const;
 
   [[nodiscard]] std::generator<std::pair<TilePointer, Piece>>
-  moveable_pieces_for(Player player);
-
-  [[nodiscard]] bool has_neighbor(TilePointer cell) const;
+  moveable_pieces_for(Player player) const;
 
   [[nodiscard]] bool
-  has_neighbor_in_direction(TilePointer cell, Direction direction) const;
+  has_neighbor(TilePointer cell, std::optional<TilePointer> ignored = {}) const;
 
-  [[nodiscard]] bool
-  can_move_to(TilePointer from, TilePointer to, bool can_leave) const;
+  [[nodiscard]] bool has_neighbor_in_direction(
+      TilePointer cell,
+      Direction direction,
+      std::optional<TilePointer> ignored = {}
+  ) const;
 
-  [[nodiscard]] std::generator<TilePointer>
-  valid_steps(TilePointer ptr, bool can_leave = false) const;
+  [[nodiscard]] bool can_move_to(
+      TilePointer from,
+      TilePointer to,
+      bool can_leave,
+      std::optional<TilePointer> ignored = {}
+  ) const;
 
-  [[nodiscard]] std::generator<Move> queens_moves(TilePointer queen);
+  [[nodiscard]] std::generator<TilePointer> valid_steps(
+      TilePointer ptr,
+      std::optional<TilePointer> ignored = {},
+      bool can_leave = false
+  ) const;
 
-  [[nodiscard]] std::generator<Move> beetle_moves(TilePointer beetle);
+  [[nodiscard]] std::generator<Move> queens_moves(TilePointer queen) const;
 
-  [[nodiscard]] std::generator<Move> grasshopper_moves(TilePointer grasshopper);
+  [[nodiscard]] std::generator<Move> beetle_moves(TilePointer beetle) const;
 
-  [[nodiscard]] std::generator<Move> spider_moves(TilePointer spider);
+  [[nodiscard]] std::generator<Move>
+  grasshopper_moves(TilePointer grasshopper) const;
 
-  [[nodiscard]] std::generator<Move> ant_moves(TilePointer ant);
+  [[nodiscard]] std::generator<Move> spider_moves(TilePointer spider) const;
+
+  [[nodiscard]] std::generator<Move> ant_moves(TilePointer ant) const;
 
   void apply_move(Move move, Player player);
 

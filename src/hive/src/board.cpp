@@ -18,43 +18,51 @@ std::generator<TilePointer> neighboring_cells(TilePointer ptr) {
 }
 } // namespace
 
-std::generator<TilePointer> Board::empty_neighbors(TilePointer ptr) const {
+std::generator<TilePointer> Board::empty_neighbors(
+    TilePointer ptr, std::optional<TilePointer> ignored
+) const {
   for (const auto neighbor : neighboring_cells(ptr)) {
-    if (is_empty(neighbor)) {
+    if (is_empty(neighbor, ignored)) {
       co_yield neighbor;
     }
   }
 }
 
-std::generator<TilePointer> Board::neighbors(TilePointer ptr) const {
+std::generator<TilePointer>
+Board::neighbors(TilePointer ptr, std::optional<TilePointer> ignored) const {
   for (const auto neighbor : neighboring_cells(ptr)) {
-    if (!is_empty(neighbor)) {
+    if (!is_empty(neighbor, ignored)) {
       co_yield neighbor;
     }
   }
 }
 
-bool Board::tile_belongs_to_player(TilePointer ptr, Player player) const {
-  return get_top(ptr).owner == player;
+bool Board::tile_belongs_to_player(
+    TilePointer ptr, Player player, std::optional<TilePointer> ignored
+) const {
+  return get_top(ptr, ignored).owner == player;
 }
 
-bool Board::neighbors_only_players(TilePointer ptr, Player player) const {
+bool Board::neighbors_only_players(
+    TilePointer ptr, Player player, std::optional<TilePointer> ignored
+) const {
   return std::ranges::all_of(
-      neighbors(ptr), [player, this](TilePointer neighbor) {
-        return tile_belongs_to_player(neighbor, player);
+      neighbors(ptr, ignored), [player, ignored, this](TilePointer neighbor) {
+        return tile_belongs_to_player(neighbor, player, ignored);
       }
   );
 }
 
-std::unordered_set<TilePointer> Board::tiles_around_hive() const {
+std::unordered_set<TilePointer>
+Board::tiles_around_hive(std::optional<TilePointer> ignored) const {
   std::unordered_set<TilePointer> tiles;
 
-  for (const auto &[pos, tile] : data) {
-    if (tile.empty()) {
+  for (const auto &entry : data) {
+    if (is_empty(entry.first, ignored)) {
       continue;
     }
 
-    for (auto neighbor_ptr : empty_neighbors(pos)) {
+    for (auto neighbor_ptr : empty_neighbors(entry.first, ignored)) {
       tiles.insert(neighbor_ptr);
     }
   }
@@ -75,9 +83,10 @@ std::generator<TilePointer> Board::valid_placements(Player player) const {
   }
 }
 
-std::generator<Move> Board::moves_for_piece(TilePointer pos, Piece piece) {
+std::generator<Move>
+Board::moves_for_piece(TilePointer pos, Piece piece) const {
   constexpr std::array<
-      std::generator<Move> (hive::Board::*)(TilePointer),
+      std::generator<Move> (hive::Board::*)(TilePointer) const,
       NUMBER_OF_PIECES>
       PIECE_HANDLERS{
           &Board::queens_moves,
@@ -96,7 +105,7 @@ std::generator<Move> Board::moves_for_piece(TilePointer pos, Piece piece) {
 }
 
 std::generator<Move>
-Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
+Board::moves_for_player(Player player, PlayerPiecesMap pieces) const {
   for (const auto placement_ptr : valid_placements(player)) {
     for (const auto [piece_kind, count] : pieces) {
       if (count == 0) {
@@ -118,24 +127,30 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) {
   }
 }
 
-std::generator<std::pair<TilePointer, Piece>> Board::pieces() const {
-  for (const auto &[pos, tile] : data) {
-    if (tile.empty()) {
+std::generator<std::pair<TilePointer, Piece>>
+Board::pieces(std::optional<TilePointer> ignored) const {
+  for (const auto &entry : data) {
+    if (is_empty(entry.first, ignored)) {
       continue;
     }
 
-    co_yield {pos, tile.back()};
+    co_yield {entry.first, get_top(entry.first, ignored)};
   }
 }
 
 std::generator<std::pair<TilePointer, Piece>>
-Board::players_tiles(Player player) const {
-  for (const auto &[pos, tile] : data) {
-    if (tile.empty() || tile.back().owner != player) {
+Board::players_tiles(Player player, std::optional<TilePointer> ignored) const {
+  for (const auto &entry : data) {
+    if (is_empty(entry.first, ignored)) {
       continue;
     }
 
-    co_yield {pos, tile.back()};
+    const auto top = get_top(entry.first, ignored);
+    if (top.owner != player) {
+      continue;
+    }
+
+    co_yield {entry.first, top};
   }
 }
 
@@ -147,31 +162,44 @@ Direction rotate_right(Direction dir) {
   return {-dir.second, dir.first + dir.second};
 }
 
-Board::LiftPiece::LiftPiece(TilePointer ptr, Board *board)
-    : ptr(ptr), board(board), piece(board->remove_piece(ptr)) {}
-
-Board::LiftPiece::~LiftPiece() { board->add_piece(ptr, piece); }
-
 const std::vector<Piece> &Board::get(TilePointer ptr) const {
   return data.at(ptr);
 }
 
-Piece Board::get_top(TilePointer ptr) const {
-  const auto &pieces = get(ptr);
-  if (pieces.empty()) {
+Piece Board::get_top(
+    TilePointer ptr, std::optional<TilePointer> ignored
+) const {
+  const auto &stack = get(ptr);
+  if (ignored == ptr) {
+    // Top piece is treated as absent; reveal the covered one.
+    if (stack.size() <= 1) {
+      throw std::runtime_error("No pieces at position");
+    }
+    return stack.at(stack.size() - 2);
+  }
+  if (stack.empty()) {
     throw std::runtime_error("No pieces at position");
   }
-  return pieces.back();
+  return stack.back();
 }
 
 bool Board::is_empty() const { return data.empty(); }
 
-bool Board::is_empty(TilePointer ptr) const {
+bool Board::is_empty(
+    TilePointer ptr, std::optional<TilePointer> ignored
+) const {
   const auto it = data.find(ptr);
-  return it == data.end() || it->second.empty();
+  if (it == data.end() || it->second.empty()) {
+    return true;
+  }
+  // An ignored top piece is treated as absent; covered pieces stay.
+  if (ignored == ptr) {
+    return it->second.size() <= 1;
+  }
+  return false;
 }
 
-bool Board::can_player_move(Player player, TilePointer ptr) {
+bool Board::can_player_move(Player player, TilePointer ptr) const {
   return !is_empty(ptr) && has_placed_queen(player) &&
          get_top(ptr).owner == player && !moving_breaks_hive(ptr);
 }
@@ -216,12 +244,16 @@ Piece Board::remove_piece(TilePointer ptr) {
   const auto piece = pieces.back();
   pieces.pop_back();
 
+  if (pieces.empty()) {
+    data.erase(it);
+  }
+
   return piece;
 }
 
-bool Board::moving_breaks_hive(TilePointer ptr) {
+bool Board::moving_breaks_hive(TilePointer ptr) const {
   if (data.size() <= 2) {
-    return true;
+    return false;
   }
 
   const auto &tile = get(ptr);
@@ -230,13 +262,11 @@ bool Board::moving_breaks_hive(TilePointer ptr) {
     return false;
   }
 
-  const LiftPiece _(ptr, this);
-
   std::unordered_set<TilePointer> visited{};
   std::stack<TilePointer> stack{};
 
-  // start from one of the neighbors
-  for (const auto neighbor_ptr : neighbors(ptr)) {
+  // start from one of the neighbors (ignoring the lifted piece)
+  for (const auto neighbor_ptr : neighbors(ptr, ptr)) {
     stack.push(neighbor_ptr);
     break;
   }
@@ -250,21 +280,23 @@ bool Board::moving_breaks_hive(TilePointer ptr) {
     }
     visited.insert(current);
 
-    for (const auto neighbor_ptr : neighbors(current)) {
+    for (const auto neighbor_ptr : neighbors(current, ptr)) {
       stack.push(neighbor_ptr);
     }
   }
 
   return std::ranges::any_of(
-      pieces() | std::ranges::views::keys,
+      pieces(ptr) | std::ranges::views::keys,
       [&visited](const auto ptr) { return !visited.contains(ptr); }
   );
 }
 
 std::generator<std::pair<TilePointer, Piece>>
-Board::moveable_pieces_for(Player player) {
+Board::moveable_pieces_for(Player player) const {
+  // Lift-free: the ignore is an explicit parameter now, so iterating
+  // players_tiles() while can_player_move() checks connectivity is safe.
   for (const auto [pos, piece] : players_tiles(player)) {
-    if (can_player_move(player, pos)) {
+    if (!can_player_move(player, pos)) {
       continue;
     }
 
@@ -273,7 +305,10 @@ Board::moveable_pieces_for(Player player) {
 }
 
 bool Board::can_move_to(
-    TilePointer from, TilePointer to, bool can_leave
+    TilePointer from,
+    TilePointer to,
+    bool can_leave,
+    std::optional<TilePointer> ignored
 ) const {
   const auto [p, q] = from;
   const auto [np, nq] = to;
@@ -286,27 +321,29 @@ bool Board::can_move_to(
   const TilePointer left{.p = p + lp, .q = q + lq};
   const TilePointer right{.p = p + rp, .q = q + rq};
 
-  const auto left_empty = is_empty(left);
-  const auto right_empty = is_empty(right);
+  const auto left_empty = is_empty(left, ignored);
+  const auto right_empty = is_empty(right, ignored);
 
   const bool has_gap = left_empty != right_empty;
   const bool both_empty_and_can_leave = left_empty && right_empty && can_leave;
-  const bool has_neighbor_in_to_dir = has_neighbor_in_direction(to, dir);
+  const bool has_neighbor_in_to_dir =
+      has_neighbor_in_direction(to, dir, ignored);
 
   return has_gap || (both_empty_and_can_leave && has_neighbor_in_to_dir);
 }
 
-std::generator<TilePointer>
-Board::valid_steps(TilePointer ptr, bool can_leave) const {
-  for (const auto neighbor : empty_neighbors(ptr)) {
-    if (can_move_to(ptr, neighbor, can_leave)) {
+std::generator<TilePointer> Board::valid_steps(
+    TilePointer ptr, std::optional<TilePointer> ignored, bool can_leave
+) const {
+  for (const auto neighbor : empty_neighbors(ptr, ignored)) {
+    if (can_move_to(ptr, neighbor, can_leave, ignored)) {
       co_yield neighbor;
     }
   }
 }
 
 bool Board::has_neighbor_in_direction(
-    TilePointer cell, Direction direction
+    TilePointer cell, Direction direction, std::optional<TilePointer> ignored
 ) const {
   const auto [p, q] = cell;
   const auto [dp, dq] = direction;
@@ -318,19 +355,22 @@ bool Board::has_neighbor_in_direction(
   const TilePointer right{.p = p + rp, .q = q + rq};
   const TilePointer center{.p = p + dp, .q = q + dq};
 
-  return !is_empty(left) || !is_empty(right) || !is_empty(center);
+  return !is_empty(left, ignored) || !is_empty(right, ignored) ||
+         !is_empty(center, ignored);
 }
 
-bool Board::has_neighbor(TilePointer cell) const {
+bool Board::has_neighbor(
+    TilePointer cell, std::optional<TilePointer> ignored
+) const {
   return data.size() == 2 ||
-         std::ranges::any_of(neighboring_cells(cell), [this](TilePointer ptr) {
-           return !is_empty(ptr);
-         });
+         std::ranges::any_of(
+             neighboring_cells(cell), [ignored, this](TilePointer ptr) {
+               return !is_empty(ptr, ignored);
+             }
+         );
 }
 
-std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) {
-  const LiftPiece _(grasshopper, this);
-
+std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) const {
   // for each direction
   for (const auto [dp, dq] : DIRECTIONS) {
     // start at grasshopper's position
@@ -344,7 +384,7 @@ std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) {
       // if tile is empty and
       // if something was skipped, yield move
       // else try different direction
-      if (is_empty(current)) {
+      if (is_empty(current, grasshopper)) {
         if (skipped) {
           co_yield Move{
               .from = grasshopper,
@@ -360,29 +400,23 @@ std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) {
   }
 }
 
-std::generator<Move> Board::queens_moves(TilePointer queen) {
-  const LiftPiece _(queen, this);
-
-  for (const auto step_ptr : valid_steps(queen, true)) {
+std::generator<Move> Board::queens_moves(TilePointer queen) const {
+  for (const auto step_ptr : valid_steps(queen, queen, true)) {
     co_yield Move{
         .from = queen, .to = step_ptr, .piece_kind = PieceKind::Queen
     };
   }
 }
 
-std::generator<Move> Board::beetle_moves(TilePointer beetle) {
-  const LiftPiece _(beetle, this);
-
+std::generator<Move> Board::beetle_moves(TilePointer beetle) const {
   for (const auto ptr : neighboring_cells(beetle)) {
-    if (has_neighbor(ptr)) {
+    if (has_neighbor(ptr, beetle)) {
       co_yield Move{.from = beetle, .to = ptr, .piece_kind = PieceKind::Beetle};
     }
   }
 }
 
-std::generator<Move> Board::spider_moves(TilePointer spider) {
-  const LiftPiece _(spider, this);
-
+std::generator<Move> Board::spider_moves(TilePointer spider) const {
   std::unordered_set<TilePointer> visited;
   std::vector<TilePointer> stack;
   stack.push_back(spider);
@@ -394,7 +428,7 @@ std::generator<Move> Board::spider_moves(TilePointer spider) {
     for (const auto ptr : stack) {
       visited.insert(ptr);
 
-      for (const auto step_ptr : valid_steps(ptr)) {
+      for (const auto step_ptr : valid_steps(ptr, spider)) {
         if (!visited.contains(step_ptr)) {
           new_stack.push_back(step_ptr);
         }
@@ -413,14 +447,12 @@ std::generator<Move> Board::spider_moves(TilePointer spider) {
   }
 }
 
-std::generator<Move> Board::ant_moves(TilePointer ant) {
-  const LiftPiece _(ant, this);
-
+std::generator<Move> Board::ant_moves(TilePointer ant) const {
   std::unordered_set<TilePointer> visited{ant};
   std::queue<TilePointer> queue;
 
   // Add initial neighbors to queue
-  for (const auto neighbor : valid_steps(ant)) {
+  for (const auto neighbor : valid_steps(ant, ant)) {
     queue.push(neighbor);
   }
 
@@ -436,7 +468,7 @@ std::generator<Move> Board::ant_moves(TilePointer ant) {
     co_yield Move{.from = ant, .to = current, .piece_kind = PieceKind::Ant};
 
     // Add next level neighbors
-    for (const auto neighbor : valid_steps(current)) {
+    for (const auto neighbor : valid_steps(current, ant)) {
       queue.push(neighbor);
     }
   }
