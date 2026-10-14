@@ -1,14 +1,7 @@
 create_test_executable(
     proto_tests
     SOURCES proto/message_tests.cpp
-    DEPENDS proto
-    CXX_STD 23
-)
-
-create_test_executable(
-    hive_tests
-    SOURCES hive/message_tests.cpp
-    DEPENDS hive
+    DEPENDS proto utils
     CXX_STD 23
 )
 
@@ -43,7 +36,6 @@ create_test_executable(
 add_dependencies(
     all_tests
     proto_tests
-    hive_tests
     net_tests
     threadpool_tests
     utils_tests

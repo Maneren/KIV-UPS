@@ -7,7 +7,9 @@
 #include <optional>
 #include <print>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <utils/parse.h>
 #include <vector>
 
 namespace serde {
@@ -43,8 +45,39 @@ public:
 
 using DeserializationContext = BaseDeserializationContext<char>;
 
-template <typename O, typename C> class BaseSerializationContext {
-  static_assert(std::output_iterator<O, C>);
+/**
+ * @brief RAII guard for atomic (all-or-nothing) parsing.
+ *
+ * Snapshot the context on construction and restore it on destruction
+ * unless commit() was called.
+ */
+template <typename C> class DeserializationTransaction {
+public:
+  explicit DeserializationTransaction(BaseDeserializationContext<C> &ctx)
+      : ctx(ctx), saved(ctx) {}
+  DeserializationTransaction(const DeserializationTransaction &) = delete;
+  DeserializationTransaction &
+  operator=(const DeserializationTransaction &) = delete;
+  DeserializationTransaction(DeserializationTransaction &&) = delete;
+  DeserializationTransaction &operator=(DeserializationTransaction &&) = delete;
+
+  void commit() noexcept { committed = true; }
+
+  ~DeserializationTransaction() {
+    if (!committed) {
+      ctx = saved;
+    }
+  }
+
+private:
+  BaseDeserializationContext<C> &ctx;
+  BaseDeserializationContext<C> saved;
+  bool committed = false;
+};
+
+template <typename O, typename C>
+  requires std::output_iterator<O, C>
+class BaseSerializationContext {
   O _out;
 
 public:
@@ -74,13 +107,14 @@ BaseSerializationContext(I)
 template <typename O>
 using SerializationContext = BaseSerializationContext<O, char>;
 
-template <typename T, std::output_iterator<char> O> struct serializer {
-  static SerializationContext<O>
-  serialize_to(const T &obj, SerializationContext<O> &&out);
+template <typename T, typename O, typename C = char> struct serializer {
+  static BaseSerializationContext<O, C>
+  serialize_to(const T &obj, BaseSerializationContext<O, C> &&out) = delete;
 };
 
 template <typename T, typename C = char> struct deserializer {
-  static std::optional<T> deserialize(BaseDeserializationContext<C> &ctx);
+  static std::optional<T>
+  deserialize(BaseDeserializationContext<C> &ctx) = delete;
 };
 
 template <typename O = std::string> O serialize(const auto &obj) {
@@ -115,6 +149,29 @@ std::optional<T> deserialize(std::basic_string<C> data) {
 template <typename T, typename C = char>
 std::optional<T> deserialize(BaseDeserializationContext<C> &ctx) {
   return deserializer<T, C>::deserialize(ctx);
+}
+
+template <typename T, std::size_t N>
+std::optional<T>
+read_keyword(auto &ctx, const std::pair<std::string_view, T> (&table)[N]) {
+  for (const auto &[text, value] : table) {
+    if (ctx.assert_prefix(text)) {
+      return value;
+    }
+  }
+  return std::nullopt;
+}
+
+template <typename T, std::size_t N>
+void write_keyword(
+    const T &value, auto &ctx, const std::pair<std::string_view, T> (&table)[N]
+) {
+  for (const auto &[text, entry] : table) {
+    if (entry == value) {
+      std::format_to(ctx.out(), "{}", text);
+      return;
+    }
+  }
 }
 
 template <typename O> struct serializer<int, O> {
@@ -203,7 +260,9 @@ template <> struct deserializer<bool> {
   }
 };
 
-template <typename T> struct deserializer<T> {
+template <typename T>
+  requires std::is_arithmetic_v<T>
+struct deserializer<T> {
   static std::optional<T> deserialize(auto &ctx) {
     T value;
 

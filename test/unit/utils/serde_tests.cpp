@@ -1,9 +1,11 @@
+#include <cstdint>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <numeric>
 #include <optional>
 #include <print>
 #include <string>
+#include <utility>
 #include <utils/serde.h>
 
 // Test fixture for serde tests
@@ -194,6 +196,80 @@ TEST_F(SerdeTest, RoundTripConsistency) {
     original =
         deserialized.value(); // Use deserialized as input for next iteration
   }
+}
+
+// ===== Keyword Table Tests =====
+
+namespace {
+
+enum class TestKeyword : std::uint8_t {
+  Alpha,
+  Beta,
+  Gamma,
+};
+
+constexpr std::pair<std::string_view, TestKeyword> TEST_KEYWORD_TABLE[] = {
+    {"ALPHA", TestKeyword::Alpha},
+    {"BETA", TestKeyword::Beta},
+    {"GAMMA", TestKeyword::Gamma},
+};
+
+std::string write_test_keyword(TestKeyword value) {
+  std::string out;
+  auto it = std::back_inserter(out);
+  SerializationContext ctx(it);
+  write_keyword(value, ctx, TEST_KEYWORD_TABLE);
+  return out;
+}
+
+} // namespace
+
+TEST_F(SerdeTest, ReadKeywordMatch) {
+  DeserializationContext ctx("BETA rest");
+  const auto result = read_keyword<TestKeyword>(ctx, TEST_KEYWORD_TABLE);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(*result, TestKeyword::Beta);
+  EXPECT_EQ(std::string(ctx), " rest");
+}
+
+TEST_F(SerdeTest, ReadKeywordNoMatchLeavesContextUntouched) {
+  DeserializationContext ctx("DELTA rest");
+  EXPECT_FALSE(read_keyword<TestKeyword>(ctx, TEST_KEYWORD_TABLE).has_value());
+  EXPECT_EQ(std::string(ctx), "DELTA rest");
+}
+
+TEST_F(SerdeTest, WriteKeywordRoundTrip) {
+  EXPECT_EQ(write_test_keyword(TestKeyword::Alpha), "ALPHA");
+  EXPECT_EQ(write_test_keyword(TestKeyword::Gamma), "GAMMA");
+
+  DeserializationContext ctx(write_test_keyword(TestKeyword::Beta));
+  const auto result = read_keyword<TestKeyword>(ctx, TEST_KEYWORD_TABLE);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(*result, TestKeyword::Beta);
+  EXPECT_TRUE(ctx.empty());
+}
+
+// ===== DeserializationTransaction Tests =====
+
+TEST_F(SerdeTest, TransactionRestoresOnFailure) {
+  DeserializationContext ctx("LOGIN 05alice");
+  {
+    DeserializationTransaction tx(ctx);
+    EXPECT_TRUE(ctx.assert_prefix("LOGIN "));
+    EXPECT_TRUE(ctx.assert_prefix("05"));
+    // Simulate a failed multi-step parse: no commit.
+  }
+  EXPECT_EQ(std::string(ctx), "LOGIN 05alice");
+}
+
+TEST_F(SerdeTest, TransactionKeepsProgressOnCommit) {
+  DeserializationContext ctx("LOGIN 05alice");
+  {
+    DeserializationTransaction tx(ctx);
+    EXPECT_TRUE(ctx.assert_prefix("LOGIN "));
+    tx.commit();
+  }
+  EXPECT_EQ(std::string(ctx), "05alice");
 }
 
 // ===== Performance Tests (optional) =====

@@ -1,25 +1,27 @@
 #include <gtest/gtest.h>
 #include <proto/message.h>
+#include <utils/serde.h>
 
 namespace {
 
 void expect_round_trip(const proto::Message &msg) {
-  const auto frame = proto::encode(msg);
-  ASSERT_TRUE(frame.has_value());
-  const auto decoded = proto::decode(*frame);
-  ASSERT_TRUE(decoded.has_value());
+  const auto frame = serde::serialize<std::string>(msg);
+  const auto decoded = serde::deserialize<proto::Message>(frame);
+  ASSERT_TRUE(decoded.has_value()) << frame;
   EXPECT_EQ(*decoded, msg);
 }
 
 void expect_invalid(std::string_view frame) {
-  EXPECT_FALSE(proto::decode(frame).has_value()) << frame;
+  EXPECT_FALSE(serde::deserialize<proto::Message>(frame).has_value()) << frame;
 }
 
 } // namespace
 
 TEST(ProtoTest, LoginWireFormat) {
   const proto::Message msg{proto::Login{.nick = "alice", .lobby = "my-lobby"}};
-  EXPECT_EQ(proto::encode(msg), "HIVE LOGIN 05alice 08my-lobby\n");
+  EXPECT_EQ(
+      serde::serialize<std::string>(msg), "HIVE LOGIN 05alice 08my-lobby\n"
+  );
   expect_round_trip(msg);
 }
 
@@ -27,7 +29,7 @@ TEST(ProtoTest, PlaceWireFormat) {
   const proto::Message msg{
       proto::Place{.pos = {.p = 0, .q = 0}, .piece = hive::PieceKind::Queen}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE PLACE 0 0 Q\n");
+  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE PLACE 0 0 Q\n");
   expect_round_trip(msg);
 }
 
@@ -37,7 +39,7 @@ TEST(ProtoTest, MoveWireFormat) {
       .to = {.p = 1, .q = 0},
       .piece = hive::PieceKind::Grasshopper,
   }};
-  EXPECT_EQ(proto::encode(msg), "HIVE MOVE 0 1 1 0 G\n");
+  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE MOVE 0 1 1 0 G\n");
   expect_round_trip(msg);
 }
 
@@ -45,7 +47,7 @@ TEST(ProtoTest, GameStartWireFormat) {
   const proto::Message msg{
       proto::GameStart{.color = hive::Player::White, .opponent = "bob"}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE START W 03bob\n");
+  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE START W 03bob\n");
   expect_round_trip(msg);
 }
 
@@ -54,7 +56,7 @@ TEST(ProtoTest, GameOverWireFormat) {
       .winner = hive::Player::White,
       .reason = proto::EndReason::Surround,
   }};
-  EXPECT_EQ(proto::encode(msg), "HIVE OVER W SURROUND\n");
+  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE OVER W SURROUND\n");
   expect_round_trip(msg);
 }
 
@@ -62,7 +64,7 @@ TEST(ProtoTest, RejectWireFormat) {
   const proto::Message msg{
       proto::Reject{.code = proto::RejectCode::NotYourTurn}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE REJECT NOT_YOUR_TURN\n");
+  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE REJECT NOT_YOUR_TURN\n");
   expect_round_trip(msg);
 }
 
@@ -70,7 +72,7 @@ TEST(ProtoTest, LobbyQueuedWireFormat) {
   const proto::Message msg{
       proto::LobbyStatus{.state = proto::LobbyState::Queued, .position = 1}
   };
-  EXPECT_EQ(proto::encode(msg), "HIVE LOBBY QUEUED 01\n");
+  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE LOBBY QUEUED 01\n");
   expect_round_trip(msg);
 }
 
@@ -78,7 +80,7 @@ TEST(ProtoTest, LobbyListWireFormat) {
   const proto::Message msg{proto::LobbyList{
       .entries = {proto::LobbyEntry{.name = "my-lobby", .occupants = 3}},
   }};
-  EXPECT_EQ(proto::encode(msg), "HIVE LIST 01 08my-lobby 03\n");
+  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE LIST 01 08my-lobby 03\n");
   expect_round_trip(msg);
 }
 
@@ -87,7 +89,9 @@ TEST(ProtoTest, BareCommandsRoundTrip) {
   expect_round_trip(proto::Message{proto::Leave{}});
   expect_round_trip(proto::Message{proto::ListLobbies{}});
   expect_round_trip(proto::Message{proto::Ack{}});
-  EXPECT_EQ(proto::encode(proto::Message{proto::Ack{}}), "HIVE ACK\n");
+  EXPECT_EQ(
+      serde::serialize<std::string>(proto::Message{proto::Ack{}}), "HIVE ACK\n"
+  );
 }
 
 TEST(ProtoTest, AllRejectCodesRoundTrip) {
@@ -131,21 +135,10 @@ TEST(ProtoTest, AllLobbyStatesRoundTrip) {
 TEST(ProtoTest, NegativeCoordinatesRoundTrip) {
   expect_round_trip(
       proto::Message{proto::Place{
-          .pos = {.p = -2147483648, .q = 2147483647},
+          .pos = {.p = -INT32_MIN, .q = INT32_MAX},
           .piece = hive::PieceKind::Ant,
       }}
   );
-}
-
-TEST(ProtoTest, DrawWinnerAccepted) {
-  // '-' is reserved in beta but must still parse (forward compatibility).
-  const auto decoded = proto::decode("HIVE OVER - SURROUND\n");
-  ASSERT_TRUE(decoded.has_value());
-  const proto::Message expected{proto::GameOver{
-      .winner = std::nullopt,
-      .reason = proto::EndReason::Surround,
-  }};
-  EXPECT_EQ(*decoded, expected);
 }
 
 TEST(ProtoTest, InvalidFramesRejected) {
@@ -174,6 +167,11 @@ TEST(ProtoTest, InvalidFramesRejected) {
   expect_invalid("HIVE REJECT BADV\n");
   expect_invalid("HIVE LIST 01\n");
   expect_invalid("HIVE LIST 00 X\n");
+  // Magic is part of deserialization, not framing.
+  expect_invalid("GARBAGE\n");
+  expect_invalid("HIVEACK\n");
+  expect_invalid("\n");
+  expect_invalid("HIVE ACK\r\n");
 }
 
 TEST(ProtoTest, InvalidCoordinatesRejected) {
@@ -191,71 +189,21 @@ TEST(ProtoTest, InvalidNamesRejected) {
   expect_invalid("HIVE LOGIN 00 08my-lobby\n");
   expect_invalid("HIVE LOGIN 05alice 00\n");
   expect_invalid("HIVE START W 04bo b\n");
+  // Length prefix must match limits from PROTOCOL.md.
+  expect_invalid("HIVE LOGIN 17abcdefghijklmnopq 01l\n");
+  expect_invalid("HIVE LOGIN 05alice 33abcdefghijklmnopqrstuvwxyz1234567\n");
 }
 
-TEST(ProtoTest, EncodeValidatesNames) {
+TEST(ProtoTest, InvalidWireRoundTrip) {
+  // Serializing out-of-range values still produces wire the peer rejects.
+  const proto::Message bad_nick{
+      proto::Login{.nick = "this-nick-is-way-too-long", .lobby = "l"}
+  };
   EXPECT_FALSE(
-      proto::encode(
-          proto::Message{
-              proto::Login{.nick = "this-nick-is-way-too-long", .lobby = "l"}
-          }
+      serde::deserialize<proto::Message>(
+          serde::serialize<std::string>(bad_nick)
       )
           .has_value()
-  );
-  EXPECT_FALSE(
-      proto::encode(
-          proto::Message{proto::Login{.nick = "bad nick", .lobby = "l"}}
-      )
-          .has_value()
-  );
-  EXPECT_FALSE(
-      proto::encode(
-          proto::Message{
-              proto::GameStart{.color = hive::Player::Black, .opponent = ""}
-          }
-      )
-          .has_value()
-  );
-}
-
-TEST(ProtoTest, EncodeValidatesLobbyStatus) {
-  EXPECT_FALSE(
-      proto::encode(
-          proto::Message{proto::LobbyStatus{
-              .state = proto::LobbyState::Queued, .position = std::nullopt
-          }}
-      ).has_value()
-  );
-  EXPECT_FALSE(
-      proto::encode(
-          proto::Message{proto::LobbyStatus{
-              .state = proto::LobbyState::Queued, .position = 0
-          }}
-      )
-          .has_value()
-  );
-  EXPECT_FALSE(
-      proto::encode(
-          proto::Message{proto::LobbyStatus{
-              .state = proto::LobbyState::Waiting, .position = 1
-          }}
-      )
-          .has_value()
-  );
-}
-
-TEST(ProtoTest, EncodeValidatesLobbyList) {
-  proto::LobbyList big;
-  for (unsigned i = 0; i < 100; ++i) {
-    big.entries.push_back(proto::LobbyEntry{.name = "l", .occupants = 1});
-  }
-  EXPECT_FALSE(proto::encode(proto::Message{big}).has_value());
-  EXPECT_FALSE(
-      proto::encode(
-          proto::Message{proto::LobbyList{
-              .entries = {proto::LobbyEntry{.name = "l", .occupants = 100}}
-          }}
-      ).has_value()
   );
 }
 
@@ -279,22 +227,31 @@ TEST(ProtoTest, TakeFramePartialAndCoalesced) {
   EXPECT_EQ(third.status, proto::TakeStatus::Incomplete);
 }
 
-TEST(ProtoTest, TakeFrameDropsBadLines) {
+TEST(ProtoTest, TakeFrameIsPureFraming) {
+  // Framing splits on '\n' only; magic validation lives in deserialization.
   std::string buffer = "GARBAGE\nHIVE ACK\n";
-  EXPECT_EQ(proto::take_frame(buffer).status, proto::TakeStatus::Error);
+  auto first = proto::take_frame(buffer);
+  ASSERT_EQ(first.status, proto::TakeStatus::Ok);
+  EXPECT_EQ(first.frame, "GARBAGE\n");
+  EXPECT_FALSE(serde::deserialize<proto::Message>(first.frame).has_value());
   auto next = proto::take_frame(buffer);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
   EXPECT_EQ(next.frame, "HIVE ACK\n");
   EXPECT_TRUE(buffer.empty());
 
   std::string no_space = "HIVEACK\nHIVE ACK\n";
-  EXPECT_EQ(proto::take_frame(no_space).status, proto::TakeStatus::Error);
+  first = proto::take_frame(no_space);
+  ASSERT_EQ(first.status, proto::TakeStatus::Ok);
+  EXPECT_FALSE(serde::deserialize<proto::Message>(first.frame).has_value());
   next = proto::take_frame(no_space);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
   EXPECT_EQ(next.frame, "HIVE ACK\n");
 
   std::string blank = "\nHIVE ACK\n";
-  EXPECT_EQ(proto::take_frame(blank).status, proto::TakeStatus::Error);
+  first = proto::take_frame(blank);
+  ASSERT_EQ(first.status, proto::TakeStatus::Ok);
+  EXPECT_EQ(first.frame, "\n");
+  EXPECT_FALSE(serde::deserialize<proto::Message>(first.frame).has_value());
   next = proto::take_frame(blank);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
   EXPECT_EQ(next.frame, "HIVE ACK\n");
@@ -305,7 +262,7 @@ TEST(ProtoTest, TakeFrameEnforcesLineCap) {
   EXPECT_EQ(proto::take_frame(buffer).status, proto::TakeStatus::Error);
   EXPECT_TRUE(buffer.empty());
 
-  std::string capped = "HIVE " + std::string(16 * 1024, 'X') + "\nHIVE ACK\n";
+  auto capped = "HIVE " + std::string(16 * 1024, 'X') + "\nHIVE ACK\n";
   EXPECT_EQ(proto::take_frame(capped).status, proto::TakeStatus::Error);
   auto next = proto::take_frame(capped);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);

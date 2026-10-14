@@ -1,14 +1,14 @@
 #pragma once
 
 #include <charconv>
-#include <concepts>
 #include <optional>
 #include <string_view>
 
 namespace utils {
 
-template <std::integral T>
-std::optional<T> parse_number(std::string_view string) {
+template <typename T, typename C = char>
+  requires std::is_arithmetic_v<T>
+std::optional<T> parse_number(std::basic_string_view<C> string) {
   if (string.empty()) {
     return std::nullopt;
   }
@@ -18,6 +18,12 @@ std::optional<T> parse_number(std::string_view string) {
     return std::nullopt;
   }
   return value;
+}
+
+template <typename T, typename C = char>
+  requires std::is_arithmetic_v<T>
+std::optional<T> parse_number(std::basic_string<C> string) {
+  return parse_number<T>(std::basic_string_view<C>{string});
 }
 
 } // namespace utils
