@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
+#include <utils/match.h>
 
 namespace hive {
 
@@ -112,9 +113,7 @@ Board::moves_for_player(Player player, PlayerPiecesMap pieces) const {
         continue;
       }
 
-      co_yield {
-          .from = placement_ptr, .to = placement_ptr, .piece_kind = piece_kind
-      };
+      co_yield Move{PlacePiece{.pos = placement_ptr, .piece_kind = piece_kind}};
     }
   }
 
@@ -205,24 +204,31 @@ bool Board::can_player_move(Player player, TilePointer ptr) const {
 }
 
 void Board::apply_move(Move move, Player player) {
-  if (move.from == move.to) {
-    auto &available = player_pieces.at(player).at(move.piece_kind);
+  match::match(
+      move,
+      [this](MovePiece movement) {
+        const auto piece = remove_piece(movement.from);
+        if (piece.kind != movement.piece_kind) {
+          throw std::runtime_error("Tried to move piece of different kind");
+        }
+        add_piece(movement.to, piece);
+      },
+      [this, player](PlacePiece placement) {
+        const auto [pos, kind] = placement;
 
-    if (available == 0) {
-      throw std::runtime_error("Attempted to add piece when no pieces left");
-    }
+        auto &available = player_pieces.at(player).at(kind);
 
-    const auto piece = Piece{.kind = move.piece_kind, .owner = player};
-    add_piece(move.from, piece);
-    --available;
-    return;
-  }
+        if (available == 0) {
+          throw std::runtime_error(
+              "Attempted to add piece when no pieces left"
+          );
+        }
 
-  const auto piece = remove_piece(move.from);
-  if (piece.kind != move.piece_kind) {
-    throw std::runtime_error("Tried to move piece of different kind");
-  }
-  add_piece(move.to, piece);
+        const auto piece = Piece{.kind = kind, .owner = player};
+        add_piece(pos, piece);
+        --available;
+      }
+  );
 }
 
 const std::map<Player, PlayerPiecesMap> &Board::get_player_pieces() const {
@@ -386,11 +392,11 @@ std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) const {
       // else try different direction
       if (is_empty(current, grasshopper)) {
         if (skipped) {
-          co_yield Move{
+          co_yield Move{MovePiece{
               .from = grasshopper,
               .to = current,
               .piece_kind = PieceKind::Grasshopper
-          };
+          }};
         }
         break;
       }
@@ -403,7 +409,7 @@ std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) const {
 std::generator<Move> Board::queens_moves(TilePointer queen) const {
   for (const auto step_ptr : valid_steps(queen, queen, true)) {
     co_yield Move{
-        .from = queen, .to = step_ptr, .piece_kind = PieceKind::Queen
+        MovePiece{.from = queen, .to = step_ptr, .piece_kind = PieceKind::Queen}
     };
   }
 }
@@ -411,7 +417,9 @@ std::generator<Move> Board::queens_moves(TilePointer queen) const {
 std::generator<Move> Board::beetle_moves(TilePointer beetle) const {
   for (const auto ptr : neighboring_cells(beetle)) {
     if (has_neighbor(ptr, beetle)) {
-      co_yield Move{.from = beetle, .to = ptr, .piece_kind = PieceKind::Beetle};
+      co_yield Move{
+          MovePiece{.from = beetle, .to = ptr, .piece_kind = PieceKind::Beetle}
+      };
     }
   }
 }
@@ -443,7 +451,9 @@ std::generator<Move> Board::spider_moves(TilePointer spider) const {
   }
 
   for (const auto ptr : stack) {
-    co_yield Move{.from = spider, .to = ptr, .piece_kind = PieceKind::Spider};
+    co_yield Move{
+        MovePiece{.from = spider, .to = ptr, .piece_kind = PieceKind::Spider}
+    };
   }
 }
 
@@ -465,7 +475,9 @@ std::generator<Move> Board::ant_moves(TilePointer ant) const {
     }
     visited.insert(current);
 
-    co_yield Move{.from = ant, .to = current, .piece_kind = PieceKind::Ant};
+    co_yield Move{
+        MovePiece{.from = ant, .to = current, .piece_kind = PieceKind::Ant}
+    };
 
     // Add next level neighbors
     for (const auto neighbor : valid_steps(current, ant)) {

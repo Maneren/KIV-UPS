@@ -5,6 +5,7 @@
 #include <format>
 #include <functional>
 #include <map>
+#include <variant>
 
 namespace hive {
 
@@ -28,13 +29,22 @@ struct TilePointer {
   bool operator==(const TilePointer &other) const = default;
 };
 
-struct Move {
+struct MovePiece {
   TilePointer from;
   TilePointer to;
   PieceKind piece_kind;
 
-  bool operator==(const Move &other) const = default;
+  bool operator==(const MovePiece &other) const = default;
 };
+
+struct PlacePiece {
+  TilePointer pos;
+  PieceKind piece_kind;
+
+  bool operator==(const PlacePiece &other) const = default;
+};
+
+using Move = std::variant<MovePiece, PlacePiece>;
 
 Move make_move(TilePointer from, TilePointer to, PieceKind piece_kind);
 
@@ -126,18 +136,39 @@ template <> struct std::formatter<hive::TilePointer> {
   }
 };
 
+template <> struct std::formatter<hive::MovePiece> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  static auto format(const hive::MovePiece &obj, std::format_context &ctx) {
+    return std::format_to(
+        ctx.out(), "{}: {} -> {}", obj.piece_kind, obj.from, obj.to
+    );
+  }
+};
+
+template <> struct std::formatter<hive::PlacePiece> {
+  static constexpr auto parse(std::format_parse_context &ctx) {
+    return ctx.begin();
+  }
+
+  static auto format(const hive::PlacePiece &obj, std::format_context &ctx) {
+    return std::format_to(ctx.out(), "{}: {}", obj.piece_kind, obj.pos);
+  }
+};
+
 template <> struct std::formatter<hive::Move> {
   static constexpr auto parse(std::format_parse_context &ctx) {
     return ctx.begin();
   }
 
-  static auto format(auto &obj, std::format_context &ctx) {
-    if (obj.from != obj.to) {
-      return std::format_to(
-          ctx.out(), "{}: {} -> {}", obj.piece_kind, obj.from, obj.to
-      );
-    }
-
-    return std::format_to(ctx.out(), "{}: {}", obj.piece_kind, obj.to);
+  static auto format(const hive::Move &obj, std::format_context &ctx) {
+    return std::visit(
+        [&ctx](const auto &move) {
+          return std::format_to(ctx.out(), "{}", move);
+        },
+        obj
+    );
   }
 };

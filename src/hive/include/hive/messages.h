@@ -3,6 +3,7 @@
 #include "types.h"
 #include <format>
 #include <utils/format.h>
+#include <utils/match.h>
 #include <utils/serde.h>
 
 namespace hive {
@@ -141,38 +142,89 @@ template <> struct serde::deserializer<hive::PieceKind> {
 
 template <typename O> struct serde::serializer<hive::MoveMessage, O> {
   template <typename T> using ser = serde::serializer<T, O>;
-  static auto serialize_to(auto &msg, auto ctx) {
-    auto [from, to, piece_kind] = msg.move();
-    std::format_to(ctx.out(), "m;");
-    serde::serialize_to(from, std::move(ctx));
-    std::format_to(ctx.out(), ";");
-    serde::serialize_to(to, std::move(ctx));
-    std::format_to(ctx.out(), ";");
-    serde::serialize_to(piece_kind, std::move(ctx));
-    std::format_to(ctx.out(), ";");
-    serde::serialize_to(msg.player(), std::move(ctx));
-    std::format_to(ctx.out(), ".");
+  static auto serialize_to(const hive::MoveMessage &msg, auto ctx) {
+
+    match::match(
+        msg.move(),
+        [&](const hive::MovePiece &movement) {
+          std::format_to(ctx.out(), "m;");
+          serde::serialize_to(movement.from, std::move(ctx));
+          std::format_to(ctx.out(), ";");
+          serde::serialize_to(movement.to, std::move(ctx));
+          std::format_to(ctx.out(), ";");
+          serde::serialize_to(movement.piece_kind, std::move(ctx));
+          std::format_to(ctx.out(), ";");
+          serde::serialize_to(msg.player(), std::move(ctx));
+          std::format_to(ctx.out(), ".");
+        },
+        [&](const hive::PlacePiece &placement) {
+          std::format_to(ctx.out(), "p;");
+          serde::serialize_to(placement.pos, std::move(ctx));
+          std::format_to(ctx.out(), ";");
+          serde::serialize_to(placement.piece_kind, std::move(ctx));
+          std::format_to(ctx.out(), ";");
+          serde::serialize_to(msg.player(), std::move(ctx));
+          std::format_to(ctx.out(), ".");
+        }
+    );
+
     return ctx;
   }
 };
 
 template <> struct serde::deserializer<hive::MoveMessage> {
   static std::optional<hive::MoveMessage> deserialize(auto &ctx) {
-    if (!ctx.assert_prefix("m;")) {
+    if (ctx.assert_prefix("m;")) {
+      auto from = serde::deserialize<hive::TilePointer>(ctx);
+      if (!from.has_value()) {
+        return std::nullopt;
+      }
+
+      if (!ctx.assert_prefix(";")) {
+        return std::nullopt;
+      }
+
+      auto to = serde::deserialize<hive::TilePointer>(ctx);
+      if (!to.has_value()) {
+        return std::nullopt;
+      }
+
+      if (!ctx.assert_prefix(";")) {
+        return std::nullopt;
+      }
+
+      auto piece_kind = serde::deserialize<hive::PieceKind>(ctx);
+      if (!piece_kind.has_value()) {
+        return std::nullopt;
+      }
+
+      if (!ctx.assert_prefix(";")) {
+        return std::nullopt;
+      }
+
+      auto player = serde::deserialize<hive::Player>(ctx);
+      if (!player.has_value()) {
+        return std::nullopt;
+      }
+
+      if (!ctx.assert_prefix(".")) {
+        return std::nullopt;
+      }
+
+      return hive::MoveMessage{
+          hive::Move{hive::MovePiece{
+              .from = *from, .to = *to, .piece_kind = *piece_kind
+          }},
+          *player
+      };
+    }
+
+    if (!ctx.assert_prefix("p;")) {
       return std::nullopt;
     }
 
-    auto from = serde::deserialize<hive::TilePointer>(ctx);
-    if (!from.has_value()) {
-      return std::nullopt;
-    }
-
-    if (!ctx.assert_prefix(";")) {
-      return std::nullopt;
-    }
-
-    auto to = serde::deserialize<hive::TilePointer>(ctx);
-    if (!to.has_value()) {
+    auto pos = serde::deserialize<hive::TilePointer>(ctx);
+    if (!pos.has_value()) {
       return std::nullopt;
     }
 
@@ -194,13 +246,14 @@ template <> struct serde::deserializer<hive::MoveMessage> {
       return std::nullopt;
     }
 
-    auto move = hive::Move{.from = *from, .to = *to, .piece_kind = *piece_kind};
-
     if (!ctx.assert_prefix(".")) {
       return std::nullopt;
     }
 
-    return hive::MoveMessage{move, *player};
+    return hive::MoveMessage{
+        hive::Move{hive::PlacePiece{.pos = *pos, .piece_kind = *piece_kind}},
+        *player
+    };
   }
 };
 
