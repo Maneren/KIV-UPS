@@ -7,17 +7,20 @@ TakeResult take_frame(std::string &buffer) {
   if (nl == std::string::npos) {
     if (buffer.size() > MAX_LINE) {
       buffer.clear();
-      return {.status = TakeStatus::Error, .frame = {}};
+      return DroppedFrame{};
     }
-    return {.status = TakeStatus::Incomplete, .frame = {}};
+    return IncompleteFrame{};
   }
+
   const auto total = nl + 1;
+  if (total > MAX_LINE) {
+    buffer.erase(0, total);
+    return DroppedFrame{};
+  }
+
   auto frame = buffer.substr(0, total);
   buffer.erase(0, total);
-  if (total > MAX_LINE) {
-    return {.status = TakeStatus::Error, .frame = {}};
-  }
-  return {.status = TakeStatus::Ok, .frame = std::move(frame)};
+  return Frame{.frame = std::move(frame)};
 }
 
 } // namespace proto

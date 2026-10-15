@@ -137,20 +137,25 @@ using Message = std::variant<
     LobbyStatus,
     LobbyList>;
 
-enum class TakeStatus : std::uint8_t {
-  Ok,
-  Incomplete,
-  Error,
+struct Frame {
+  std::string frame;
+
+  bool operator==(const Frame &) const = default;
 };
 
-struct TakeResult {
-  TakeStatus status;
-  std::string frame; // valid only when status == Ok
+struct IncompleteFrame {
+  bool operator==(const IncompleteFrame &) const = default;
 };
 
-// Pure line framing on '\n'. No magic validation here; use
-// serde::deserialize<proto::Message> for that. Overlong lines (> MAX_LINE)
-// yield Error and are dropped.
+struct DroppedFrame {
+  bool operator==(const DroppedFrame &) const = default;
+};
+
+using TakeResult = std::variant<Frame, IncompleteFrame, DroppedFrame>;
+
+// Read up to MAX_LINE bytes from the buffer until a newline is found.
+//
+// Removes the read bytes from the buffer.
 TakeResult take_frame(std::string &buffer);
 
 namespace wire {

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <proto/message.h>
 #include <utils/serde.h>
+#include <variant>
 
 namespace {
 
@@ -202,62 +203,77 @@ TEST(ProtoTest, InvalidWireRoundTrip) {
 
 TEST(ProtoTest, TakeFramePartialAndCoalesced) {
   std::string buffer = "HIVE PL";
-  auto first = proto::take_frame(buffer);
-  EXPECT_EQ(first.status, proto::TakeStatus::Incomplete);
+  EXPECT_TRUE(
+      std::holds_alternative<proto::IncompleteFrame>(proto::take_frame(buffer))
+  );
   EXPECT_TRUE(buffer == "HIVE PL");
 
   buffer += "ACE 0 0 Q\nHIVE ACK\n";
-  first = proto::take_frame(buffer);
-  ASSERT_EQ(first.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(first.frame, "HIVE PLACE 0 0 Q\n");
+  auto first = proto::take_frame(buffer);
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(first));
+  EXPECT_EQ(std::get<proto::Frame>(first).frame, "HIVE PLACE 0 0 Q\n");
 
   auto second = proto::take_frame(buffer);
-  ASSERT_EQ(second.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(second.frame, "HIVE ACK\n");
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(second));
+  EXPECT_EQ(std::get<proto::Frame>(second).frame, "HIVE ACK\n");
   EXPECT_TRUE(buffer.empty());
 
-  auto third = proto::take_frame(buffer);
-  EXPECT_EQ(third.status, proto::TakeStatus::Incomplete);
+  EXPECT_TRUE(
+      std::holds_alternative<proto::IncompleteFrame>(proto::take_frame(buffer))
+  );
 }
 
 TEST(ProtoTest, TakeFrameIsPureFraming) {
   // Framing splits on '\n' only; magic validation lives in deserialization.
   std::string buffer = "GARBAGE\nHIVE ACK\n";
   auto first = proto::take_frame(buffer);
-  ASSERT_EQ(first.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(first.frame, "GARBAGE\n");
-  EXPECT_FALSE(serde::deserialize<proto::Message>(first.frame).has_value());
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(first));
+  EXPECT_EQ(std::get<proto::Frame>(first).frame, "GARBAGE\n");
+  EXPECT_FALSE(
+      serde::deserialize<proto::Message>(std::get<proto::Frame>(first).frame)
+          .has_value()
+  );
   auto next = proto::take_frame(buffer);
-  ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACK\n");
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(next));
+  EXPECT_EQ(std::get<proto::Frame>(next).frame, "HIVE ACK\n");
   EXPECT_TRUE(buffer.empty());
 
   std::string no_space = "HIVEACK\nHIVE ACK\n";
   first = proto::take_frame(no_space);
-  ASSERT_EQ(first.status, proto::TakeStatus::Ok);
-  EXPECT_FALSE(serde::deserialize<proto::Message>(first.frame).has_value());
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(first));
+  EXPECT_FALSE(
+      serde::deserialize<proto::Message>(std::get<proto::Frame>(first).frame)
+          .has_value()
+  );
   next = proto::take_frame(no_space);
-  ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACK\n");
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(next));
+  EXPECT_EQ(std::get<proto::Frame>(next).frame, "HIVE ACK\n");
 
   std::string blank = "\nHIVE ACK\n";
   first = proto::take_frame(blank);
-  ASSERT_EQ(first.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(first.frame, "\n");
-  EXPECT_FALSE(serde::deserialize<proto::Message>(first.frame).has_value());
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(first));
+  EXPECT_EQ(std::get<proto::Frame>(first).frame, "\n");
+  EXPECT_FALSE(
+      serde::deserialize<proto::Message>(std::get<proto::Frame>(first).frame)
+          .has_value()
+  );
   next = proto::take_frame(blank);
-  ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACK\n");
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(next));
+  EXPECT_EQ(std::get<proto::Frame>(next).frame, "HIVE ACK\n");
 }
 
 TEST(ProtoTest, TakeFrameEnforcesLineCap) {
   std::string buffer(proto::MAX_LINE + 1, 'X');
-  EXPECT_EQ(proto::take_frame(buffer).status, proto::TakeStatus::Error);
+  EXPECT_TRUE(
+      std::holds_alternative<proto::DroppedFrame>(proto::take_frame(buffer))
+  );
   EXPECT_TRUE(buffer.empty());
 
   auto capped = "HIVE " + std::string(proto::MAX_LINE, 'X') + "\nHIVE ACK\n";
-  EXPECT_EQ(proto::take_frame(capped).status, proto::TakeStatus::Error);
+  EXPECT_TRUE(
+      std::holds_alternative<proto::DroppedFrame>(proto::take_frame(capped))
+  );
   auto next = proto::take_frame(capped);
-  ASSERT_EQ(next.status, proto::TakeStatus::Ok);
-  EXPECT_EQ(next.frame, "HIVE ACK\n");
+  ASSERT_TRUE(std::holds_alternative<proto::Frame>(next));
+  EXPECT_EQ(std::get<proto::Frame>(next).frame, "HIVE ACK\n");
 }
