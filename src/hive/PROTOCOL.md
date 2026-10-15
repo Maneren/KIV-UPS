@@ -105,9 +105,9 @@ lobby_status ::= SEQUENCE {
     [sep, count]
 }
 -- entries: lobby-name + nplayers each;
--- outer count = number of entries
+-- outer count = number of entries;
 list_resp ::= SEQUENCE {
-    "LIST",
+    "LOBBIES",
     sep,
     count,
     ( sep, lobby_entry ) *

@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <utils/functional.h>
 #include <utils/match.h>
 #include <utils/parse.h>
 #include <utils/serde.h>
@@ -45,6 +46,8 @@ enum class LobbyState : std::uint8_t {
 };
 
 struct Login {
+  static constexpr std::string_view KEYWORD = "LOGIN";
+
   std::string nick;
   std::string lobby;
 
@@ -52,6 +55,8 @@ struct Login {
 };
 
 struct Place {
+  static constexpr std::string_view KEYWORD = "PLACE";
+
   hive::TilePointer pos;
   hive::PieceKind piece;
 
@@ -59,6 +64,8 @@ struct Place {
 };
 
 struct Move {
+  static constexpr std::string_view KEYWORD = "MOVE";
+
   hive::TilePointer from;
   hive::TilePointer to;
   hive::PieceKind piece;
@@ -67,28 +74,40 @@ struct Move {
 };
 
 struct RematchVote {
+  static constexpr std::string_view KEYWORD = "REMATCH";
+
   bool operator==(const RematchVote &) const = default;
 };
 
 struct Leave {
+  static constexpr std::string_view KEYWORD = "LEAVE";
+
   bool operator==(const Leave &) const = default;
 };
 
 struct ListLobbies {
+  static constexpr std::string_view KEYWORD = "LIST";
+
   bool operator==(const ListLobbies &) const = default;
 };
 
 struct Ack {
+  static constexpr std::string_view KEYWORD = "ACK";
+
   bool operator==(const Ack &) const = default;
 };
 
 struct Reject {
+  static constexpr std::string_view KEYWORD = "REJECT";
+
   RejectCode code;
 
   bool operator==(const Reject &) const = default;
 };
 
 struct GameStart {
+  static constexpr std::string_view KEYWORD = "START";
+
   hive::Player color;
   std::string opponent;
 
@@ -96,6 +115,8 @@ struct GameStart {
 };
 
 struct GameOver {
+  static constexpr std::string_view KEYWORD = "OVER";
+
   hive::Player winner;
   EndReason reason;
 
@@ -103,6 +124,8 @@ struct GameOver {
 };
 
 struct LobbyStatus {
+  static constexpr std::string_view KEYWORD = "LOBBY";
+
   LobbyState state;
   // Queue position, 1-based. Set iff state == Queued.
   std::optional<unsigned> position;
@@ -118,6 +141,8 @@ struct LobbyEntry {
 };
 
 struct LobbyList {
+  static constexpr std::string_view KEYWORD = "LOBBIES";
+
   std::vector<LobbyEntry> entries;
 
   bool operator==(const LobbyList &) const = default;
@@ -369,7 +394,7 @@ template <> struct serde::deserializer<proto::LobbyState> {
 template <typename O> struct serde::serializer<proto::Login, O> {
   static auto serialize_to(const proto::Login &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "LOGIN ");
+    it = std::format_to(it, "{} ", proto::Login::KEYWORD);
     it = proto::wire::write_name(msg.nick, it);
     it = proto::wire::write_sep(it);
     return proto::wire::write_name(msg.lobby, it);
@@ -379,7 +404,7 @@ template <typename O> struct serde::serializer<proto::Login, O> {
 template <> struct serde::deserializer<proto::Login> {
   static std::optional<proto::Login> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("LOGIN")) {
+    if (!ctx.assert_prefix(proto::Login::KEYWORD)) {
       return std::nullopt;
     }
     if (!proto::wire::read_sep(ctx)) {
@@ -401,7 +426,7 @@ template <> struct serde::deserializer<proto::Login> {
 template <typename O> struct serde::serializer<proto::Place, O> {
   static auto serialize_to(const proto::Place &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "PLACE ");
+    it = std::format_to(it, "{} ", proto::Place::KEYWORD);
     it = proto::wire::write_pos(msg.pos, it);
     it = proto::wire::write_sep(it);
     return serde::write_keyword(msg.piece, it, proto::keywords::PIECE);
@@ -411,7 +436,8 @@ template <typename O> struct serde::serializer<proto::Place, O> {
 template <> struct serde::deserializer<proto::Place> {
   static std::optional<proto::Place> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("PLACE") || !proto::wire::read_sep(ctx)) {
+    if (!ctx.assert_prefix(proto::Place::KEYWORD) ||
+        !proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     auto pos = serde::deserialize<hive::TilePointer>(ctx);
@@ -430,7 +456,7 @@ template <> struct serde::deserializer<proto::Place> {
 template <typename O> struct serde::serializer<proto::Move, O> {
   static auto serialize_to(const proto::Move &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "MOVE ");
+    it = std::format_to(it, "{} ", proto::Move::KEYWORD);
     it = proto::wire::write_pos(msg.from, it);
     it = proto::wire::write_sep(it);
     it = proto::wire::write_pos(msg.to, it);
@@ -442,7 +468,8 @@ template <typename O> struct serde::serializer<proto::Move, O> {
 template <> struct serde::deserializer<proto::Move> {
   static std::optional<proto::Move> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("MOVE") || !proto::wire::read_sep(ctx)) {
+    if (!ctx.assert_prefix(proto::Move::KEYWORD) ||
+        !proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     auto from = serde::deserialize<hive::TilePointer>(ctx);
@@ -464,13 +491,13 @@ template <> struct serde::deserializer<proto::Move> {
 
 template <typename O> struct serde::serializer<proto::RematchVote, O> {
   static auto serialize_to(auto /*unused*/, auto &ctx) {
-    return std::format_to(ctx.out(), "REMATCH");
+    return std::format_to(ctx.out(), "{}", proto::RematchVote::KEYWORD);
   }
 };
 
 template <> struct serde::deserializer<proto::RematchVote> {
   static std::optional<proto::RematchVote> deserialize(auto &ctx) {
-    if (!ctx.assert_prefix("REMATCH")) {
+    if (!ctx.assert_prefix(proto::RematchVote::KEYWORD)) {
       return std::nullopt;
     }
     return proto::RematchVote{};
@@ -479,13 +506,13 @@ template <> struct serde::deserializer<proto::RematchVote> {
 
 template <typename O> struct serde::serializer<proto::Leave, O> {
   static auto serialize_to(auto /*unused*/, auto &ctx) {
-    return std::format_to(ctx.out(), "LEAVE");
+    return std::format_to(ctx.out(), "{}", proto::Leave::KEYWORD);
   }
 };
 
 template <> struct serde::deserializer<proto::Leave> {
   static std::optional<proto::Leave> deserialize(auto &ctx) {
-    if (!ctx.assert_prefix("LEAVE")) {
+    if (!ctx.assert_prefix(proto::Leave::KEYWORD)) {
       return std::nullopt;
     }
     return proto::Leave{};
@@ -494,13 +521,13 @@ template <> struct serde::deserializer<proto::Leave> {
 
 template <typename O> struct serde::serializer<proto::ListLobbies, O> {
   static auto serialize_to(auto /*unused*/, auto &ctx) {
-    return std::format_to(ctx.out(), "LIST");
+    return std::format_to(ctx.out(), "{}", proto::ListLobbies::KEYWORD);
   }
 };
 
 template <> struct serde::deserializer<proto::ListLobbies> {
   static std::optional<proto::ListLobbies> deserialize(auto &ctx) {
-    if (!ctx.assert_prefix("LIST")) {
+    if (!ctx.assert_prefix(proto::ListLobbies::KEYWORD)) {
       return std::nullopt;
     }
     return proto::ListLobbies{};
@@ -509,13 +536,13 @@ template <> struct serde::deserializer<proto::ListLobbies> {
 
 template <typename O> struct serde::serializer<proto::Ack, O> {
   static auto serialize_to(auto /*unused*/, auto &ctx) {
-    return std::format_to(ctx.out(), "ACK");
+    return std::format_to(ctx.out(), "{}", proto::Ack::KEYWORD);
   }
 };
 
 template <> struct serde::deserializer<proto::Ack> {
   static std::optional<proto::Ack> deserialize(auto &ctx) {
-    if (!ctx.assert_prefix("ACK")) {
+    if (!ctx.assert_prefix(proto::Ack::KEYWORD)) {
       return std::nullopt;
     }
     return proto::Ack{};
@@ -525,7 +552,7 @@ template <> struct serde::deserializer<proto::Ack> {
 template <typename O> struct serde::serializer<proto::Reject, O> {
   static auto serialize_to(const proto::Reject &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "REJECT ");
+    it = std::format_to(it, "{} ", proto::Reject::KEYWORD);
     return serde::write_keyword(msg.code, it, proto::keywords::REJECT_CODE);
   }
 };
@@ -533,7 +560,8 @@ template <typename O> struct serde::serializer<proto::Reject, O> {
 template <> struct serde::deserializer<proto::Reject> {
   static std::optional<proto::Reject> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("REJECT") || !proto::wire::read_sep(ctx)) {
+    if (!ctx.assert_prefix(proto::Reject::KEYWORD) ||
+        !proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     auto code = serde::deserialize<proto::RejectCode>(ctx);
@@ -548,7 +576,7 @@ template <> struct serde::deserializer<proto::Reject> {
 template <typename O> struct serde::serializer<proto::GameStart, O> {
   static auto serialize_to(const proto::GameStart &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "START ");
+    it = std::format_to(it, "{} ", proto::GameStart::KEYWORD);
     it = serde::write_keyword(msg.color, it, proto::keywords::PLAYER);
     it = proto::wire::write_sep(it);
     return proto::wire::write_name(msg.opponent, it);
@@ -558,7 +586,8 @@ template <typename O> struct serde::serializer<proto::GameStart, O> {
 template <> struct serde::deserializer<proto::GameStart> {
   static std::optional<proto::GameStart> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("START") || !proto::wire::read_sep(ctx)) {
+    if (!ctx.assert_prefix(proto::GameStart::KEYWORD) ||
+        !proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     auto color = serde::deserialize<hive::Player>(ctx);
@@ -577,7 +606,7 @@ template <> struct serde::deserializer<proto::GameStart> {
 template <typename O> struct serde::serializer<proto::GameOver, O> {
   static auto serialize_to(const proto::GameOver &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "OVER ");
+    it = std::format_to(it, "{} ", proto::GameOver::KEYWORD);
     it = serde::write_keyword(msg.winner, it, proto::keywords::PLAYER);
     it = proto::wire::write_sep(it);
     return serde::write_keyword(msg.reason, it, proto::keywords::END_REASON);
@@ -587,7 +616,8 @@ template <typename O> struct serde::serializer<proto::GameOver, O> {
 template <> struct serde::deserializer<proto::GameOver> {
   static std::optional<proto::GameOver> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("OVER") || !proto::wire::read_sep(ctx)) {
+    if (!ctx.assert_prefix(proto::GameOver::KEYWORD) ||
+        !proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     auto winner = serde::deserialize<hive::Player>(ctx);
@@ -606,7 +636,7 @@ template <> struct serde::deserializer<proto::GameOver> {
 template <typename O> struct serde::serializer<proto::LobbyStatus, O> {
   static auto serialize_to(const proto::LobbyStatus &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "LOBBY ");
+    it = std::format_to(it, "{} ", proto::LobbyStatus::KEYWORD);
     it = serde::write_keyword(msg.state, it, proto::keywords::LOBBY_STATE);
     if (msg.state == proto::LobbyState::Queued) {
       it = proto::wire::write_sep(it);
@@ -619,7 +649,8 @@ template <typename O> struct serde::serializer<proto::LobbyStatus, O> {
 template <> struct serde::deserializer<proto::LobbyStatus> {
   static std::optional<proto::LobbyStatus> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("LOBBY") || !proto::wire::read_sep(ctx)) {
+    if (!ctx.assert_prefix(proto::LobbyStatus::KEYWORD) ||
+        !proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     auto state = serde::deserialize<proto::LobbyState>(ctx);
@@ -670,7 +701,7 @@ template <> struct serde::deserializer<proto::LobbyEntry> {
 template <typename O> struct serde::serializer<proto::LobbyList, O> {
   static auto serialize_to(const proto::LobbyList &msg, auto &ctx) {
     auto it = ctx.out();
-    it = std::format_to(it, "LIST ");
+    it = std::format_to(it, "{} ", proto::LobbyList::KEYWORD);
     it = proto::wire::write_fixed2(
         static_cast<unsigned>(msg.entries.size()), it
     );
@@ -687,7 +718,8 @@ template <typename O> struct serde::serializer<proto::LobbyList, O> {
 template <> struct serde::deserializer<proto::LobbyList> {
   static std::optional<proto::LobbyList> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
-    if (!ctx.assert_prefix("LIST") || !proto::wire::read_sep(ctx)) {
+    if (!ctx.assert_prefix(proto::LobbyList::KEYWORD) ||
+        !proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     auto count = proto::wire::read_fixed2(ctx);
@@ -719,6 +751,33 @@ template <typename O> struct serde::serializer<proto::Message, O> {
 };
 
 template <> struct serde::deserializer<proto::Message> {
+  using BodyParser =
+      std::optional<proto::Message> (*)(serde::DeserializationContext &);
+
+  // Compile-time loop over types in a variant.
+  // Source - https://stackoverflow.com/a/57643845
+  // Posted by Piotr Skotnicki, modified by community.
+  template <std::size_t I = 0>
+  static std::optional<proto::Message>
+  try_parse(const auto &keyword, const auto &msg) {
+    if constexpr (I < std::variant_size_v<proto::Message>) {
+      using T = std::variant_alternative_t<I, proto::Message>;
+
+      if (keyword != T::KEYWORD) {
+        return try_parse<I + 1>(keyword, msg);
+      }
+
+      DeserializationContext tmp(msg);
+      auto result = serde::deserialize<T>(tmp);
+      return tmp.empty()
+                 ? result.transform(functional::Constructor<proto::Message>())
+                 : std::nullopt;
+    }
+
+    // all options were tried and none succeeded
+    return std::nullopt;
+  }
+
   static std::optional<proto::Message> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
     if (!ctx.assert_prefix(proto::MAGIC)) {
@@ -735,78 +794,7 @@ template <> struct serde::deserializer<proto::Message> {
       return std::nullopt;
     }
     raw.remove_suffix(1);
-    const auto try_body = [&]<typename T>() -> std::optional<proto::Message> {
-      serde::DeserializationContext tmp(raw);
-      auto body = serde::deserialize<T>(tmp);
-      if (body.has_value() && tmp.empty()) {
-        return proto::Message{*body};
-      }
-      return std::nullopt;
-    };
-    if (auto m = try_body.template operator()<proto::Login>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::Place>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::Move>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::RematchVote>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::Leave>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::ListLobbies>()) {
-      // Bare LIST must not be shadowed by LIST-response prefix: LIST-response
-      // requires "LIST SP ...", bare request is exactly "LIST".
-      if (raw == "LIST") {
-        ctx.remove_prefix(ctx.size());
-        tx.commit();
-        return m;
-      }
-    }
-    if (auto m = try_body.template operator()<proto::Ack>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::Reject>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::GameStart>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::GameOver>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::LobbyStatus>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    if (auto m = try_body.template operator()<proto::LobbyList>()) {
-      ctx.remove_prefix(ctx.size());
-      tx.commit();
-      return m;
-    }
-    return std::nullopt;
+    const auto word = raw.substr(0, raw.find(' '));
+    return try_parse(word, raw);
   }
 };

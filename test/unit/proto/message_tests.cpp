@@ -79,7 +79,13 @@ TEST(ProtoTest, LobbyListWireFormat) {
   const proto::Message msg{proto::LobbyList{
       .entries = {proto::LobbyEntry{.name = "my-lobby", .occupants = 3}},
   }};
-  EXPECT_EQ(serde::serialize(msg), "HIVE LIST 01 08my-lobby 03\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE LOBBIES 01 08my-lobby 03\n");
+  expect_round_trip(msg);
+}
+
+TEST(ProtoTest, LobbyListEmptyWireFormat) {
+  const proto::Message msg{proto::LobbyList{.entries = {}}};
+  EXPECT_EQ(serde::serialize(msg), "HIVE LOBBIES 00\n");
   expect_round_trip(msg);
 }
 
@@ -164,6 +170,8 @@ TEST(ProtoTest, InvalidFramesRejected) {
   expect_invalid("HIVE REJECT BADV\n");
   expect_invalid("HIVE LIST 01\n");
   expect_invalid("HIVE LIST 00 X\n");
+  expect_invalid("HIVE LOBBIES\n");
+  expect_invalid("HIVE LOBBIES 01\n");
   // Magic is part of deserialization, not framing.
   expect_invalid("GARBAGE\n");
   expect_invalid("HIVEACK\n");
