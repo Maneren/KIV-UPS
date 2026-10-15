@@ -5,7 +5,7 @@
 namespace {
 
 void expect_round_trip(const proto::Message &msg) {
-  const auto frame = serde::serialize<std::string>(msg);
+  const auto frame = serde::serialize(msg);
   const auto decoded = serde::deserialize<proto::Message>(frame);
   ASSERT_TRUE(decoded.has_value()) << frame;
   EXPECT_EQ(*decoded, msg);
@@ -19,9 +19,7 @@ void expect_invalid(std::string_view frame) {
 
 TEST(ProtoTest, LoginWireFormat) {
   const proto::Message msg{proto::Login{.nick = "alice", .lobby = "my-lobby"}};
-  EXPECT_EQ(
-      serde::serialize<std::string>(msg), "HIVE LOGIN 05alice 08my-lobby\n"
-  );
+  EXPECT_EQ(serde::serialize(msg), "HIVE LOGIN 05alice 08my-lobby\n");
   expect_round_trip(msg);
 }
 
@@ -29,7 +27,7 @@ TEST(ProtoTest, PlaceWireFormat) {
   const proto::Message msg{
       proto::Place{.pos = {.p = 0, .q = 0}, .piece = hive::PieceKind::Queen}
   };
-  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE PLACE 0 0 Q\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE PLACE 0 0 Q\n");
   expect_round_trip(msg);
 }
 
@@ -39,7 +37,7 @@ TEST(ProtoTest, MoveWireFormat) {
       .to = {.p = 1, .q = 0},
       .piece = hive::PieceKind::Grasshopper,
   }};
-  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE MOVE 0 1 1 0 G\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE MOVE 0 1 1 0 G\n");
   expect_round_trip(msg);
 }
 
@@ -47,7 +45,7 @@ TEST(ProtoTest, GameStartWireFormat) {
   const proto::Message msg{
       proto::GameStart{.color = hive::Player::White, .opponent = "bob"}
   };
-  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE START W 03bob\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE START W 03bob\n");
   expect_round_trip(msg);
 }
 
@@ -56,7 +54,7 @@ TEST(ProtoTest, GameOverWireFormat) {
       .winner = hive::Player::White,
       .reason = proto::EndReason::Surround,
   }};
-  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE OVER W SURROUND\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE OVER W SURROUND\n");
   expect_round_trip(msg);
 }
 
@@ -64,7 +62,7 @@ TEST(ProtoTest, RejectWireFormat) {
   const proto::Message msg{
       proto::Reject{.code = proto::RejectCode::NotYourTurn}
   };
-  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE REJECT NOT_YOUR_TURN\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE REJECT NOT_YOUR_TURN\n");
   expect_round_trip(msg);
 }
 
@@ -72,7 +70,7 @@ TEST(ProtoTest, LobbyQueuedWireFormat) {
   const proto::Message msg{
       proto::LobbyStatus{.state = proto::LobbyState::Queued, .position = 1}
   };
-  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE LOBBY QUEUED 01\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE LOBBY QUEUED 01\n");
   expect_round_trip(msg);
 }
 
@@ -80,7 +78,7 @@ TEST(ProtoTest, LobbyListWireFormat) {
   const proto::Message msg{proto::LobbyList{
       .entries = {proto::LobbyEntry{.name = "my-lobby", .occupants = 3}},
   }};
-  EXPECT_EQ(serde::serialize<std::string>(msg), "HIVE LIST 01 08my-lobby 03\n");
+  EXPECT_EQ(serde::serialize(msg), "HIVE LIST 01 08my-lobby 03\n");
   expect_round_trip(msg);
 }
 
@@ -89,9 +87,7 @@ TEST(ProtoTest, BareCommandsRoundTrip) {
   expect_round_trip(proto::Message{proto::Leave{}});
   expect_round_trip(proto::Message{proto::ListLobbies{}});
   expect_round_trip(proto::Message{proto::Ack{}});
-  EXPECT_EQ(
-      serde::serialize<std::string>(proto::Message{proto::Ack{}}), "HIVE ACK\n"
-  );
+  EXPECT_EQ(serde::serialize(proto::Message{proto::Ack{}}), "HIVE ACK\n");
 }
 
 TEST(ProtoTest, AllRejectCodesRoundTrip) {
@@ -200,10 +196,7 @@ TEST(ProtoTest, InvalidWireRoundTrip) {
       proto::Login{.nick = "this-nick-is-way-too-long", .lobby = "l"}
   };
   EXPECT_FALSE(
-      serde::deserialize<proto::Message>(
-          serde::serialize<std::string>(bad_nick)
-      )
-          .has_value()
+      serde::deserialize<proto::Message>(serde::serialize(bad_nick)).has_value()
   );
 }
 
