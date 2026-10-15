@@ -5,6 +5,7 @@
 #include <format>
 #include <hive/types.h>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -160,13 +161,13 @@ constexpr bool is_name_char(char c) {
          (c >= '0' && c <= '9') || c == '_' || c == '-';
 }
 
-inline void write_sep(auto &ctx) { std::format_to(ctx.out(), " "); }
+inline auto write_sep(auto it) { return std::format_to(it, " "); }
 
 inline bool read_sep(auto &ctx) { return ctx.assert_prefix(" "); }
 
 // Fixed two-digit count, 00-99.
-inline void write_fixed2(unsigned value, auto &ctx) {
-  std::format_to(ctx.out(), "{:02}", value);
+inline auto write_fixed2(unsigned value, auto it) {
+  return std::format_to(it, "{:02}", value);
 }
 
 inline std::optional<unsigned> read_fixed2(auto &ctx) {
@@ -183,8 +184,8 @@ inline std::optional<unsigned> read_fixed2(auto &ctx) {
 }
 
 // Length-prefixed name: 2-digit len + raw chars.
-inline void write_name(std::string_view name, auto &ctx) {
-  std::format_to(ctx.out(), "{:02}{}", name.size(), name);
+inline auto write_name(std::string_view name, auto it) {
+  return std::format_to(it, "{:02}{}", name.size(), name);
 }
 
 inline std::optional<std::string> read_name(auto &ctx, std::size_t max_len) {
@@ -206,19 +207,34 @@ inline std::optional<std::string> read_name(auto &ctx, std::size_t max_len) {
   return out;
 }
 
-inline void write_pos(hive::TilePointer pos, auto &ctx) {
-  std::format_to(ctx.out(), "{}", pos.p);
-  write_sep(ctx);
-  std::format_to(ctx.out(), "{}", pos.q);
+inline auto write_coord(hive::Coordinate value, auto it) {
+  return std::format_to(it, "{}", value);
+}
+
+inline auto write_pos(hive::TilePointer pos, auto it) {
+  it = write_coord(pos.p, it);
+  it = write_sep(it);
+  return write_coord(pos.q, it);
+}
+
+// Variable-width int32 coordinate
+inline std::optional<hive::Coordinate> read_coord(auto &ctx) {
+  const auto token = ctx.substr(0, ctx.find(' '));
+  const auto value = utils::parse_number<hive::Coordinate>(token);
+  if (!value.has_value()) {
+    return std::nullopt;
+  }
+  ctx.remove_prefix(token.size());
+  return value;
 }
 
 inline std::optional<hive::TilePointer> read_pos(auto &ctx) {
   serde::DeserializationTransaction tx(ctx);
-  auto p = serde::deserialize<hive::Coordinate>(ctx);
+  auto p = read_coord(ctx);
   if (!p.has_value() || !read_sep(ctx)) {
     return std::nullopt;
   }
-  auto q = serde::deserialize<hive::Coordinate>(ctx);
+  auto q = read_coord(ctx);
   if (!q.has_value()) {
     return std::nullopt;
   }
@@ -269,9 +285,8 @@ inline constexpr std::pair<std::string_view, LobbyState> LOBBY_STATE[] = {
 } // namespace proto
 
 template <typename O> struct serde::serializer<hive::Player, O> {
-  static auto serialize_to(hive::Player msg, auto ctx) {
-    serde::write_keyword(msg, ctx, proto::keywords::PLAYER);
-    return ctx;
+  static auto serialize_to(hive::Player msg, auto &ctx) {
+    return serde::write_keyword(msg, ctx.out(), proto::keywords::PLAYER);
   }
 };
 
@@ -282,9 +297,8 @@ template <> struct serde::deserializer<hive::Player> {
 };
 
 template <typename O> struct serde::serializer<hive::PieceKind, O> {
-  static auto serialize_to(hive::PieceKind msg, auto ctx) {
-    serde::write_keyword(msg, ctx, proto::keywords::PIECE);
-    return ctx;
+  static auto serialize_to(hive::PieceKind msg, auto &ctx) {
+    return serde::write_keyword(msg, ctx.out(), proto::keywords::PIECE);
   }
 };
 
@@ -295,9 +309,8 @@ template <> struct serde::deserializer<hive::PieceKind> {
 };
 
 template <typename O> struct serde::serializer<hive::TilePointer, O> {
-  static auto serialize_to(hive::TilePointer msg, auto ctx) {
-    proto::wire::write_pos(msg, ctx);
-    return ctx;
+  static auto serialize_to(hive::TilePointer msg, auto &ctx) {
+    return proto::wire::write_pos(msg, ctx.out());
   }
 };
 
@@ -308,9 +321,8 @@ template <> struct serde::deserializer<hive::TilePointer> {
 };
 
 template <typename O> struct serde::serializer<proto::RejectCode, O> {
-  static auto serialize_to(proto::RejectCode msg, auto ctx) {
-    serde::write_keyword(msg, ctx, proto::keywords::REJECT_CODE);
-    return ctx;
+  static auto serialize_to(proto::RejectCode msg, auto &ctx) {
+    return serde::write_keyword(msg, ctx.out(), proto::keywords::REJECT_CODE);
   }
 };
 
@@ -323,9 +335,8 @@ template <> struct serde::deserializer<proto::RejectCode> {
 };
 
 template <typename O> struct serde::serializer<proto::EndReason, O> {
-  static auto serialize_to(proto::EndReason msg, auto ctx) {
-    serde::write_keyword(msg, ctx, proto::keywords::END_REASON);
-    return ctx;
+  static auto serialize_to(proto::EndReason msg, auto &ctx) {
+    return serde::write_keyword(msg, ctx.out(), proto::keywords::END_REASON);
   }
 };
 
@@ -338,9 +349,8 @@ template <> struct serde::deserializer<proto::EndReason> {
 };
 
 template <typename O> struct serde::serializer<proto::LobbyState, O> {
-  static auto serialize_to(proto::LobbyState msg, auto ctx) {
-    serde::write_keyword(msg, ctx, proto::keywords::LOBBY_STATE);
-    return ctx;
+  static auto serialize_to(proto::LobbyState msg, auto &ctx) {
+    return serde::write_keyword(msg, ctx.out(), proto::keywords::LOBBY_STATE);
   }
 };
 
@@ -353,12 +363,12 @@ template <> struct serde::deserializer<proto::LobbyState> {
 };
 
 template <typename O> struct serde::serializer<proto::Login, O> {
-  static auto serialize_to(const proto::Login &msg, auto ctx) {
-    std::format_to(ctx.out(), "LOGIN ");
-    proto::wire::write_name(msg.nick, ctx);
-    proto::wire::write_sep(ctx);
-    proto::wire::write_name(msg.lobby, ctx);
-    return ctx;
+  static auto serialize_to(const proto::Login &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "LOGIN ");
+    it = proto::wire::write_name(msg.nick, it);
+    it = proto::wire::write_sep(it);
+    return proto::wire::write_name(msg.lobby, it);
   }
 };
 
@@ -385,12 +395,12 @@ template <> struct serde::deserializer<proto::Login> {
 };
 
 template <typename O> struct serde::serializer<proto::Place, O> {
-  static auto serialize_to(const proto::Place &msg, auto ctx) {
-    std::format_to(ctx.out(), "PLACE ");
-    proto::wire::write_pos(msg.pos, ctx);
-    proto::wire::write_sep(ctx);
-    serde::write_keyword(msg.piece, ctx, proto::keywords::PIECE);
-    return ctx;
+  static auto serialize_to(const proto::Place &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "PLACE ");
+    it = proto::wire::write_pos(msg.pos, it);
+    it = proto::wire::write_sep(it);
+    return serde::write_keyword(msg.piece, it, proto::keywords::PIECE);
   }
 };
 
@@ -414,14 +424,14 @@ template <> struct serde::deserializer<proto::Place> {
 };
 
 template <typename O> struct serde::serializer<proto::Move, O> {
-  static auto serialize_to(const proto::Move &msg, auto ctx) {
-    std::format_to(ctx.out(), "MOVE ");
-    proto::wire::write_pos(msg.from, ctx);
-    proto::wire::write_sep(ctx);
-    proto::wire::write_pos(msg.to, ctx);
-    proto::wire::write_sep(ctx);
-    serde::write_keyword(msg.piece, ctx, proto::keywords::PIECE);
-    return ctx;
+  static auto serialize_to(const proto::Move &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "MOVE ");
+    it = proto::wire::write_pos(msg.from, it);
+    it = proto::wire::write_sep(it);
+    it = proto::wire::write_pos(msg.to, it);
+    it = proto::wire::write_sep(it);
+    return serde::write_keyword(msg.piece, it, proto::keywords::PIECE);
   }
 };
 
@@ -449,7 +459,7 @@ template <> struct serde::deserializer<proto::Move> {
 };
 
 template <typename O> struct serde::serializer<proto::RematchVote, O> {
-  static auto serialize_to(auto /*unused*/, auto ctx) {
+  static auto serialize_to(auto /*unused*/, auto &ctx) {
     return std::format_to(ctx.out(), "REMATCH");
   }
 };
@@ -464,7 +474,7 @@ template <> struct serde::deserializer<proto::RematchVote> {
 };
 
 template <typename O> struct serde::serializer<proto::Leave, O> {
-  static auto serialize_to(auto /*unused*/, auto ctx) {
+  static auto serialize_to(auto /*unused*/, auto &ctx) {
     return std::format_to(ctx.out(), "LEAVE");
   }
 };
@@ -479,7 +489,7 @@ template <> struct serde::deserializer<proto::Leave> {
 };
 
 template <typename O> struct serde::serializer<proto::ListLobbies, O> {
-  static auto serialize_to(auto /*unused*/, auto ctx) {
+  static auto serialize_to(auto /*unused*/, auto &ctx) {
     return std::format_to(ctx.out(), "LIST");
   }
 };
@@ -494,7 +504,7 @@ template <> struct serde::deserializer<proto::ListLobbies> {
 };
 
 template <typename O> struct serde::serializer<proto::Ack, O> {
-  static auto serialize_to(auto /*unused*/, auto ctx) {
+  static auto serialize_to(auto /*unused*/, auto &ctx) {
     return std::format_to(ctx.out(), "ACK");
   }
 };
@@ -509,10 +519,10 @@ template <> struct serde::deserializer<proto::Ack> {
 };
 
 template <typename O> struct serde::serializer<proto::Reject, O> {
-  static auto serialize_to(const proto::Reject &msg, auto ctx) {
-    std::format_to(ctx.out(), "REJECT ");
-    serde::write_keyword(msg.code, ctx, proto::keywords::REJECT_CODE);
-    return ctx;
+  static auto serialize_to(const proto::Reject &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "REJECT ");
+    return serde::write_keyword(msg.code, it, proto::keywords::REJECT_CODE);
   }
 };
 
@@ -532,12 +542,12 @@ template <> struct serde::deserializer<proto::Reject> {
 };
 
 template <typename O> struct serde::serializer<proto::GameStart, O> {
-  static auto serialize_to(const proto::GameStart &msg, auto ctx) {
-    std::format_to(ctx.out(), "START ");
-    serde::write_keyword(msg.color, ctx, proto::keywords::PLAYER);
-    proto::wire::write_sep(ctx);
-    proto::wire::write_name(msg.opponent, ctx);
-    return ctx;
+  static auto serialize_to(const proto::GameStart &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "START ");
+    it = serde::write_keyword(msg.color, it, proto::keywords::PLAYER);
+    it = proto::wire::write_sep(it);
+    return proto::wire::write_name(msg.opponent, it);
   }
 };
 
@@ -561,12 +571,12 @@ template <> struct serde::deserializer<proto::GameStart> {
 };
 
 template <typename O> struct serde::serializer<proto::GameOver, O> {
-  static auto serialize_to(const proto::GameOver &msg, auto ctx) {
-    std::format_to(ctx.out(), "OVER ");
-    serde::write_keyword(msg.winner, ctx, proto::keywords::PLAYER);
-    proto::wire::write_sep(ctx);
-    serde::write_keyword(msg.reason, ctx, proto::keywords::END_REASON);
-    return ctx;
+  static auto serialize_to(const proto::GameOver &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "OVER ");
+    it = serde::write_keyword(msg.winner, it, proto::keywords::PLAYER);
+    it = proto::wire::write_sep(it);
+    return serde::write_keyword(msg.reason, it, proto::keywords::END_REASON);
   }
 };
 
@@ -590,14 +600,15 @@ template <> struct serde::deserializer<proto::GameOver> {
 };
 
 template <typename O> struct serde::serializer<proto::LobbyStatus, O> {
-  static auto serialize_to(const proto::LobbyStatus &msg, auto ctx) {
-    std::format_to(ctx.out(), "LOBBY ");
-    serde::write_keyword(msg.state, ctx, proto::keywords::LOBBY_STATE);
+  static auto serialize_to(const proto::LobbyStatus &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "LOBBY ");
+    it = serde::write_keyword(msg.state, it, proto::keywords::LOBBY_STATE);
     if (msg.state == proto::LobbyState::Queued) {
-      proto::wire::write_sep(ctx);
-      proto::wire::write_fixed2(msg.position.value_or(0), ctx);
+      it = proto::wire::write_sep(it);
+      it = proto::wire::write_fixed2(msg.position.value_or(0), it);
     }
-    return ctx;
+    return it;
   }
 };
 
@@ -628,11 +639,11 @@ template <> struct serde::deserializer<proto::LobbyStatus> {
 };
 
 template <typename O> struct serde::serializer<proto::LobbyEntry, O> {
-  static auto serialize_to(const proto::LobbyEntry &msg, auto ctx) {
-    proto::wire::write_name(msg.name, ctx);
-    proto::wire::write_sep(ctx);
-    proto::wire::write_fixed2(msg.occupants, ctx);
-    return ctx;
+  static auto serialize_to(const proto::LobbyEntry &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = proto::wire::write_name(msg.name, it);
+    it = proto::wire::write_sep(it);
+    return proto::wire::write_fixed2(msg.occupants, it);
   }
 };
 
@@ -653,16 +664,19 @@ template <> struct serde::deserializer<proto::LobbyEntry> {
 };
 
 template <typename O> struct serde::serializer<proto::LobbyList, O> {
-  static auto serialize_to(const proto::LobbyList &msg, auto ctx) {
-    std::format_to(ctx.out(), "LIST ");
-    proto::wire::write_fixed2(static_cast<unsigned>(msg.entries.size()), ctx);
+  static auto serialize_to(const proto::LobbyList &msg, auto &ctx) {
+    auto it = ctx.out();
+    it = std::format_to(it, "LIST ");
+    it = proto::wire::write_fixed2(
+        static_cast<unsigned>(msg.entries.size()), it
+    );
     for (const auto &entry : msg.entries) {
-      proto::wire::write_sep(ctx);
-      proto::wire::write_name(entry.name, ctx);
-      proto::wire::write_sep(ctx);
-      proto::wire::write_fixed2(entry.occupants, ctx);
+      it = proto::wire::write_sep(it);
+      it = proto::wire::write_name(entry.name, it);
+      it = proto::wire::write_sep(it);
+      it = proto::wire::write_fixed2(entry.occupants, it);
     }
-    return ctx;
+    return it;
   }
 };
 
@@ -677,7 +691,7 @@ template <> struct serde::deserializer<proto::LobbyList> {
       return std::nullopt;
     }
     proto::LobbyList out;
-    for (auto i = 0u; i < *count; ++i) {
+    for (auto i : std::views::iota(0U, *count)) {
       if (!proto::wire::read_sep(ctx)) {
         return std::nullopt;
       }
@@ -693,12 +707,10 @@ template <> struct serde::deserializer<proto::LobbyList> {
 };
 
 template <typename O> struct serde::serializer<proto::Message, O> {
-  static auto serialize_to(const proto::Message &msg, auto ctx) {
-    auto body = match::match(msg, [](const auto &b) {
-      return serde::serialize<std::string>(b);
-    });
-    std::format_to(ctx.out(), "{}{}\n", proto::MAGIC, body);
-    return ctx;
+  static auto serialize_to(const proto::Message &msg, auto &ctx) {
+    auto body =
+        match::match(msg, [](const auto &b) { return serde::serialize(b); });
+    return std::format_to(ctx.out(), "{}{}\n", proto::MAGIC, body);
   }
 };
 

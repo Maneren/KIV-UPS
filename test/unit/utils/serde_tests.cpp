@@ -1,9 +1,8 @@
+#include <array>
 #include <cstdint>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <numeric>
 #include <optional>
-#include <print>
 #include <string>
 #include <utility>
 #include <utils/serde.h>
@@ -94,108 +93,24 @@ TEST_F(SerdeTest, SerializationContextMoveSemantics) {
   EXPECT_NO_THROW(auto out = ctx3.out());
 }
 
-// ===== Serializer/Deserializer Template Tests =====
+// ===== AssertPrefix Edge Cases =====
 
-TEST_F(SerdeTest, IntSerializationDeserialization) {
-  constexpr int original = 42;
-
-  // Test serialization
-  std::string serialized = serialize(original);
-  EXPECT_EQ(serialized, "42");
-
-  // Test deserialization
-  auto deserialized = deserialize<int>(serialized);
-  ASSERT_TRUE(deserialized.has_value());
-  EXPECT_EQ(deserialized.value(), original);
-}
-
-TEST_F(SerdeTest, IntDeserializationInvalid) {
-  std::string invalid_data = "not_a_number";
-  auto result = deserialize<int>(invalid_data);
-  EXPECT_FALSE(result.has_value());
-}
-
-TEST_F(SerdeTest, StringSerializationDeserialization) {
-  std::string original = "Hello, World!";
-
-  // Test serialization
-  std::string serialized = serialize(original);
-  EXPECT_EQ(serialized, "\"Hello, World!\"");
-
-  // Test deserialization
-  auto deserialized = deserialize<std::string>(serialized);
-  ASSERT_TRUE(deserialized.has_value());
-  EXPECT_EQ(deserialized.value(), original);
-}
-
-TEST_F(SerdeTest, EmptyStringSerializationDeserialization) {
-  std::string original;
-
-  std::string serialized = serialize(original);
-  EXPECT_EQ(serialized, "\"\"");
-
-  auto deserialized = deserialize<std::string>(serialized);
-  ASSERT_TRUE(deserialized.has_value());
-  EXPECT_EQ(deserialized.value(), original);
-}
-
-TEST_F(SerdeTest, VectorIntSerializationDeserialization) {
-  std::vector<int> original = {1, 2, 3, 42, -5};
-
-  std::string serialized = serialize(original);
-  EXPECT_EQ(serialized, "[5,1,2,3,42,-5]");
-
-  auto deserialized = deserialize<std::vector<int>>(serialized);
-  ASSERT_TRUE(deserialized.has_value());
-  EXPECT_EQ(deserialized.value(), original);
-}
-
-TEST_F(SerdeTest, EmptyVectorSerializationDeserialization) {
-  std::vector<int> original = {};
-
-  std::string serialized = serialize(original);
-  EXPECT_EQ(serialized, "[0]");
-
-  auto deserialized = deserialize<std::vector<int>>(serialized);
-  ASSERT_TRUE(deserialized.has_value());
-  EXPECT_EQ(deserialized.value(), original);
-}
-
-// ===== Edge Cases and Error Handling =====
-
-TEST_F(SerdeTest, DeserializationPartialConsumption) {
-  std::string data = "42extra_data";
+TEST_F(SerdeTest, AssertPrefixTruncatedInput) {
+  // Remaining input is a strict prefix of the needle: must fail without
+  // reading past the end of the input (previously an out-of-bounds read).
+  std::string data = "HEL";
   DeserializationContext ctx(data);
 
-  auto result = deserializer<int>::deserialize(ctx);
-  EXPECT_TRUE(result.has_value());
-  EXPECT_FALSE(ctx.empty());
+  EXPECT_FALSE(ctx.assert_prefix("HELLO WORLD, THIS IS LONG"));
+  EXPECT_EQ(std::string(ctx), "HEL");
 }
 
-TEST_F(SerdeTest, SerializationLargeData) {
-  std::string large_string(10000, 'a');
+TEST_F(SerdeTest, AssertPrefixExactMatch) {
+  std::string data = "HELLO";
+  DeserializationContext ctx(data);
 
-  std::string serialized = serialize(large_string);
-  auto deserialized = deserialize<std::string>(serialized);
-
-  ASSERT_TRUE(deserialized.has_value());
-  EXPECT_EQ(deserialized.value(), large_string);
-}
-
-TEST_F(SerdeTest, RoundTripConsistency) {
-  // Test multiple round trips don't corrupt data
-  std::string original = "test_data_123";
-
-  for (int i = 0; i < 5; ++i) {
-    std::string serialized = serialize(original);
-    auto deserialized = deserialize<std::string>(serialized);
-
-    ASSERT_TRUE(deserialized.has_value());
-    EXPECT_EQ(deserialized.value(), original);
-
-    original =
-        deserialized.value(); // Use deserialized as input for next iteration
-  }
+  EXPECT_TRUE(ctx.assert_prefix("HELLO"));
+  EXPECT_TRUE(ctx.empty());
 }
 
 // ===== Keyword Table Tests =====
@@ -218,11 +133,45 @@ std::string write_test_keyword(TestKeyword value) {
   std::string out;
   auto it = std::back_inserter(out);
   SerializationContext ctx(it);
-  write_keyword(value, ctx, TEST_KEYWORD_TABLE);
+  write_keyword(value, ctx.out(), TEST_KEYWORD_TABLE);
   return out;
 }
 
 } // namespace
+
+template <> struct serde::deserializer<TestKeyword> {
+  static std::optional<TestKeyword> deserialize(auto &ctx) {
+    return serde::read_keyword<TestKeyword>(ctx, TEST_KEYWORD_TABLE);
+  }
+};
+
+TEST_F(SerdeTest, ChainedWritesThreadPosition) {
+  // std::format_to parity: the returned iterator is authoritative, so
+  // chained writes append even into single-pass sinks (here a raw
+  // buffer) that cannot re-query their position.
+  std::array<char, 16> buf{};
+  SerializationContext<char *> ctx(buf.data());
+  auto it = ctx.out();
+  it = write_keyword(TestKeyword::Alpha, it, TEST_KEYWORD_TABLE);
+  it = write_keyword(TestKeyword::Beta, it, TEST_KEYWORD_TABLE);
+  EXPECT_EQ(it, buf.data() + 9);
+  EXPECT_EQ(std::string_view(buf.data(), 9), "ALPHABETA");
+}
+
+// ===== DeserializeFull Tests =====
+
+TEST_F(SerdeTest, DeserializeFullAcceptsExactInput) {
+  const auto result = deserialize_full<TestKeyword>(std::string_view{"BETA"});
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(*result, TestKeyword::Beta);
+}
+
+TEST_F(SerdeTest, DeserializeFullRejectsTrailingGarbage) {
+  EXPECT_FALSE(
+      deserialize_full<TestKeyword>(std::string_view{"BETA!"}).has_value()
+  );
+  EXPECT_FALSE(deserialize_full<TestKeyword>(std::string_view{""}).has_value());
+}
 
 TEST_F(SerdeTest, ReadKeywordMatch) {
   DeserializationContext ctx("BETA rest");
@@ -270,27 +219,4 @@ TEST_F(SerdeTest, TransactionKeepsProgressOnCommit) {
     tx.commit();
   }
   EXPECT_EQ(std::string(ctx), "05alice");
-}
-
-// ===== Performance Tests (optional) =====
-
-TEST_F(SerdeTest, SerializationPerformance) {
-  std::vector<int> large_vector(1000);
-  std::iota(large_vector.begin(), large_vector.end(), 1);
-
-  auto start = std::chrono::high_resolution_clock::now();
-
-  for (int i = 0; i < 100; ++i) {
-    std::string serialized = serialize(large_vector);
-    // Prevent optimization
-    volatile size_t size = serialized.size();
-    (void)size;
-  }
-
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration =
-      std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-  // Just ensure it completes in reasonable time (adjust threshold as needed)
-  EXPECT_LT(duration.count(), 100000); // Less than 100ms
 }
