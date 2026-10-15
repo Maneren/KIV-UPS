@@ -22,7 +22,7 @@ public:
   /**
    * @brief Checks if the string starts with the given prefix and removes it
    *
-   * Bounds-safe: a prefix longer than the remaining input simply fails.
+   * A prefix longer than the remaining input simply fails.
    *
    * @param prefix Prefix to check for
    * @return true if the prefix was found, false otherwise
@@ -32,6 +32,20 @@ public:
       return false;
     }
     this->remove_prefix(prefix.size());
+    return true;
+  }
+
+  /**
+   * @brief Checks if the string starts with the given char and removes it
+   *
+   * @param prefix Prefix to check for
+   * @return true if the prefix was found, false otherwise
+   */
+  [[nodiscard]] bool assert_prefix(C prefix) {
+    if (!this->starts_with(prefix)) {
+      return false;
+    }
+    this->remove_prefix(1);
     return true;
   }
 };

@@ -17,7 +17,7 @@
 
 namespace proto {
 
-constexpr std::string_view MAGIC = "HIVE ";
+constexpr std::string_view MAGIC = "HIVE";
 constexpr std::size_t MAX_NICK_LEN = 16;
 constexpr std::size_t MAX_LOBBY_LEN = 32;
 constexpr std::size_t MAX_BODY_LEN = 9999;
@@ -167,7 +167,7 @@ constexpr bool is_name_char(char c) {
 
 inline auto write_sep(auto it) { return std::format_to(it, " "); }
 
-inline bool read_sep(auto &ctx) { return ctx.assert_prefix(" "); }
+inline bool read_sep(auto &ctx) { return ctx.assert_prefix(' '); }
 
 // Fixed two-digit count, 00-99.
 inline auto write_fixed2(unsigned value, auto it) {
@@ -695,7 +695,7 @@ template <> struct serde::deserializer<proto::LobbyList> {
       return std::nullopt;
     }
     proto::LobbyList out;
-    for (auto i : std::views::iota(0U, *count)) {
+    for (auto _ : std::views::iota(0U, *count)) {
       if (!proto::wire::read_sep(ctx)) {
         return std::nullopt;
       }
@@ -712,9 +712,9 @@ template <> struct serde::deserializer<proto::LobbyList> {
 
 template <typename O> struct serde::serializer<proto::Message, O> {
   static auto serialize_to(const proto::Message &msg, auto &ctx) {
-    auto body =
-        match::match(msg, [](const auto &b) { return serde::serialize(b); });
-    return std::format_to(ctx.out(), "{}{}\n", proto::MAGIC, body);
+    std::format_to(ctx.out(), "{} ", proto::MAGIC);
+    std::visit([&](const auto &m) { return serde::serialize_to(m, ctx); }, msg);
+    return std::format_to(ctx.out(), "\n");
   }
 };
 
@@ -722,6 +722,9 @@ template <> struct serde::deserializer<proto::Message> {
   static std::optional<proto::Message> deserialize(auto &ctx) {
     serde::DeserializationTransaction tx(ctx);
     if (!ctx.assert_prefix(proto::MAGIC)) {
+      return std::nullopt;
+    }
+    if (!proto::wire::read_sep(ctx)) {
       return std::nullopt;
     }
     std::string_view raw = ctx;
