@@ -17,12 +17,11 @@
 
 namespace proto {
 
-// Wire limits, see src/hive/PROTOCOL.md.
 constexpr std::string_view MAGIC = "HIVE ";
 constexpr std::size_t MAX_NICK_LEN = 16;
 constexpr std::size_t MAX_LOBBY_LEN = 32;
 constexpr std::size_t MAX_BODY_LEN = 9999;
-constexpr std::size_t MAX_LINE = 16 * 1024;
+constexpr std::size_t MAX_LINE = 16UZ * 1024UZ;
 constexpr unsigned MAX_COUNT = 99;
 
 enum class RejectCode : std::uint8_t {

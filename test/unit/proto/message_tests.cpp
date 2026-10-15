@@ -251,11 +251,11 @@ TEST(ProtoTest, TakeFrameIsPureFraming) {
 }
 
 TEST(ProtoTest, TakeFrameEnforcesLineCap) {
-  std::string buffer(16 * 1024 + 1, 'X');
+  std::string buffer(proto::MAX_LINE + 1, 'X');
   EXPECT_EQ(proto::take_frame(buffer).status, proto::TakeStatus::Error);
   EXPECT_TRUE(buffer.empty());
 
-  auto capped = "HIVE " + std::string(16 * 1024, 'X') + "\nHIVE ACK\n";
+  auto capped = "HIVE " + std::string(proto::MAX_LINE, 'X') + "\nHIVE ACK\n";
   EXPECT_EQ(proto::take_frame(capped).status, proto::TakeStatus::Error);
   auto next = proto::take_frame(capped);
   ASSERT_EQ(next.status, proto::TakeStatus::Ok);
