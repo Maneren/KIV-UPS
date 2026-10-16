@@ -18,12 +18,19 @@ function(create_test_executable TARGET)
         endif()
     endif()
 
+    # gmock ships with googletest, but is a distinct target (and a separate
+    # package on some distros), so only link it when it is actually available.
+    set(TEST_FRAMEWORK_DEPS GTest::gtest GTest::gtest_main)
+    if(TARGET GTest::gmock)
+        list(APPEND TEST_FRAMEWORK_DEPS GTest::gmock)
+    endif()
+
     create_executable(
         ${TARGET}
         "${TEST_SOURCES}"
         TEST
         CXX_STD ${TEST_CXX_STD}
-        DEPENDS GTest::gtest GTest::gtest_main ${TEST_DEPENDS}
+        DEPENDS ${TEST_FRAMEWORK_DEPS} ${TEST_DEPENDS}
         COMPILE_DEFS
             ${TEST_COMPILE_DEFS}
             TESTING_ENABLED=1
