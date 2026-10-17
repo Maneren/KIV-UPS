@@ -43,5 +43,5 @@ function(create_test_executable TARGET)
         target_precompile_headers(${TARGET} PRIVATE <gtest/gtest.h>)
     endif()
 
-    gtest_discover_tests(${TARGET})
+    gtest_discover_tests(${TARGET} PROPERTIES LABELS "gtest")
 endfunction()

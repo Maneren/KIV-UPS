@@ -7,7 +7,8 @@ function(set_compiler_and_linker_flags TARGET)
             $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall
             -Wextra
             -Wpedantic
-            -Wconversion>
+            -Wconversion
+            -Wformat>
             $<$<CXX_COMPILER_ID:MSVC>:/W4>
     )
 
@@ -28,6 +29,15 @@ function(set_compiler_and_linker_flags TARGET)
     set(USE_DEBUG_INFO $<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>)
 
     target_compile_options(
+        ${TARGET}
+        PRIVATE
+            -Wl,-z,relro
+            -Wl,-z,now
+            -Wl,--as-needed
+            -Wl,--no-copy-dt-needed-entries
+    )
+
+    target_link_options(
         ${TARGET}
         PRIVATE
             $<$<CONFIG:Debug>:${CXX_DEBUG_FLAGS}>
