@@ -16,8 +16,11 @@ public:
 
   BaseDeserializationContext(std::basic_string_view<C> str)
       : std::basic_string_view<C>(str) {}
-  BaseDeserializationContext(const std::string &str)
+  BaseDeserializationContext(const std::basic_string<C> &str)
       : std::basic_string_view<C>(str) {}
+  // Prevent accidental use-after-scope-end from pr-values since the context
+  // stores only reference, not the string itself.
+  BaseDeserializationContext(std::basic_string<C> &&str) = delete;
 
   /**
    * @brief Checks if the string starts with the given prefix and removes it
