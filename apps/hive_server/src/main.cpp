@@ -16,7 +16,7 @@ void handle_client(
       client_stream.socket().raw_fd()
   );
 
-  std::vector<std::byte> buffer(128);
+  std::vector<char> buffer(128);
 
   while (true) {
     const auto read_result = client_stream.read(std::span(buffer));
@@ -45,7 +45,7 @@ void handle_client(
         bytes_read,
         client_address,
         ss.str(),
-        std::string(received_bytes.begin(), received_bytes.end())
+        std::string(received_bytes.data(), received_bytes.size())
     );
   }
 }
