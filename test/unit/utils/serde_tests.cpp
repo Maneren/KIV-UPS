@@ -7,12 +7,9 @@
 #include <utility>
 #include <utils/serde.h>
 
-// Test fixture for serde tests
-class SerdeTest : public ::testing::Test {
-protected:
-  void SetUp() override {}
-  void TearDown() override {}
-};
+namespace {
+class SerdeTest : public ::testing::Test {};
+} // namespace
 
 using namespace serde;
 
@@ -149,13 +146,17 @@ TEST_F(SerdeTest, ChainedWritesThreadPosition) {
   // std::format_to parity: the returned iterator is authoritative, so
   // chained writes append even into single-pass sinks (here a raw
   // buffer) that cannot re-query their position.
-  std::array<char, 16> buf{};
+  constexpr std::string_view expected{"ALPHABETA"};
+  constexpr size_t expected_size = expected.size();
+  constexpr size_t buf_size = 16; // larger than expected
+
+  std::array<char, buf_size> buf{};
   SerializationContext<char *> ctx(buf.data());
-  auto it = ctx.out();
+  auto *it = ctx.out();
   it = write_keyword(TestKeyword::Alpha, it, TEST_KEYWORD_TABLE);
   it = write_keyword(TestKeyword::Beta, it, TEST_KEYWORD_TABLE);
-  EXPECT_EQ(it, buf.data() + 9);
-  EXPECT_EQ(std::string_view(buf.data(), 9), "ALPHABETA");
+  EXPECT_EQ(it, &std::get<expected_size>(buf));
+  EXPECT_EQ(std::string_view(buf.data(), expected_size), "ALPHABETA");
 }
 
 // ===== DeserializeFull Tests =====
