@@ -70,15 +70,14 @@ TEST_F(StreamTest, ClientConnectsToServer) {
 
   const auto &stream = result.value();
 
-  std::array<std::byte, 128> buffer{};
+  std::array<char, 128> buffer{};
 
-  const auto read_result = stream.read(std::span<std::byte>(buffer));
+  const auto read_result = stream.read(std::span<char>(buffer));
 
   ASSERT_TRUE(read_result);
 
-  const auto recvd_message = std::string_view(
-      reinterpret_cast<const char *>(buffer.data()), read_result.value()
-  );
+  const auto recvd_message =
+      std::string_view(buffer.data(), read_result.value());
 
   std::println("Received message: {}", recvd_message);
 

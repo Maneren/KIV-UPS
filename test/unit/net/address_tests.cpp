@@ -4,13 +4,9 @@
 #include <net/ip_addr.h>
 #include <net/socket_addr.h>
 
-class AddressTest : public ::testing::Test {
-
-protected:
-  void SetUp() override {};
-
-  void TearDown() override {};
-};
+namespace {
+class AddressTest : public ::testing::Test {};
+} // namespace
 
 namespace net {
 
