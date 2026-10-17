@@ -200,7 +200,7 @@ template <> struct std::formatter<net::Ipv6Addr> {
     const auto *const result = inet_ntop(
         net::Ipv6Addr::FAMILY,
         obj.octets.data(),
-        static_cast<char *const>(buffer),
+        static_cast<char *>(buffer),
         static_cast<socklen_t>(sizeof(buffer))
     );
 
