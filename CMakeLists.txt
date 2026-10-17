@@ -17,7 +17,7 @@ endif()
 option(THIN_ARCHIVE "Create thin archive" ON)
 set_property(GLOBAL PROPERTY THIN_ARCHIVE ${THIN_ARCHIVE})
 
-option(USE_IPO "Enable IPO" OFF)
+option(USE_IPO "Enable IPO" ON)
 if(USE_IPO)
     include(CheckIPOSupported)
 
@@ -26,7 +26,7 @@ if(USE_IPO)
         message(SEND_ERROR "IPO is not supported: ${ipo_error}")
     endif()
 
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif()
 
 option(USE_CCACHE "Use ccache" ON)
