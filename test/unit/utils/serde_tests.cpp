@@ -191,7 +191,8 @@ TEST_F(SerdeTest, WriteKeywordRoundTrip) {
   EXPECT_EQ(write_test_keyword(TestKeyword::Alpha), "ALPHA");
   EXPECT_EQ(write_test_keyword(TestKeyword::Gamma), "GAMMA");
 
-  DeserializationContext ctx(write_test_keyword(TestKeyword::Beta));
+  const auto beta = write_test_keyword(TestKeyword::Beta);
+  DeserializationContext ctx(beta);
   const auto result = read_keyword<TestKeyword>(ctx, TEST_KEYWORD_TABLE);
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(*result, TestKeyword::Beta);
