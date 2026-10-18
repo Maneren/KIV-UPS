@@ -34,6 +34,15 @@ function(set_compiler_and_linker_flags TARGET)
             $<${USE_DEBUG_INFO}:${CXX_DEBUG_INFO}>
     )
 
+    target_link_options(
+        ${TARGET}
+        PRIVATE
+            -Wl,-z,relro
+            -Wl,-z,now
+            -Wl,--as-needed
+            -Wl,--no-copy-dt-needed-entries
+    )
+
     if(USE_PCH)
         # Shared PCH: heavy + frequently included std headers
         target_precompile_headers(
