@@ -116,7 +116,7 @@ list_resp ::= SEQUENCE {
 command ::= alternative {
   login, place, move, rematch, leave, list_req,
   ack, reject, start, over, lobby_status, list_resp,
-  place, move
+  place
 }
 
 message ::= SEQUENCE { magic, command, "\n" }
