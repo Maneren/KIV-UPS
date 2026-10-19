@@ -22,7 +22,7 @@ std::optional<T> parse_number(std::basic_string_view<C> string) {
 
 template <typename T, typename C = char>
   requires std::is_arithmetic_v<T>
-std::optional<T> parse_number(std::basic_string<C> string) {
+std::optional<T> parse_number(const std::basic_string<C> &string) {
   return parse_number<T>(std::basic_string_view<C>{string});
 }
 
