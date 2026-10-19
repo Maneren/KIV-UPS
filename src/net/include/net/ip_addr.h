@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <utility>
+#include <utils/format.h>
 #include <utils/match.h>
 #include <variant>
 
@@ -177,23 +178,15 @@ private:
 
 } // namespace net
 
-template <> struct std::formatter<net::Ipv4Addr> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const net::Ipv4Addr &obj, std::format_context &ctx) {
+template <> struct std::formatter<net::Ipv4Addr> : utils::formatter_base {
+  static auto format(const net::Ipv4Addr &obj, auto &ctx) {
     const auto [a, b, c, d] = obj.octets_;
     return std::format_to(ctx.out(), "{}.{}.{}.{}", a, b, c, d);
   }
 };
 
-template <> struct std::formatter<net::Ipv6Addr> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const net::Ipv6Addr &obj, std::format_context &ctx) {
+template <> struct std::formatter<net::Ipv6Addr> : utils::formatter_base {
+  static auto format(const net::Ipv6Addr &obj, auto &ctx) {
     // Stack buffer: no heap allocation per format.
     char buffer[INET6_ADDRSTRLEN]{};
 
@@ -212,12 +205,8 @@ template <> struct std::formatter<net::Ipv6Addr> {
   }
 };
 
-template <> struct std::formatter<net::IpAddr> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const net::IpAddr &obj, std::format_context &ctx) {
+template <> struct std::formatter<net::IpAddr> : utils::formatter_base {
+  static auto format(const net::IpAddr &obj, auto &ctx) {
     return obj.visit([&ctx](const auto &addr) {
       return std::format_to(ctx.out(), "{}", addr);
     });

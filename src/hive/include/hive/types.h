@@ -1,10 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <format>
 #include <functional>
 #include <map>
+#include <utils/format.h>
 #include <variant>
 
 namespace hive {
@@ -74,54 +76,41 @@ constexpr std::array<Direction, 6> DIRECTIONS{
 
 } // namespace hive
 
-template <> struct std::formatter<hive::Player> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
+template <> struct std::formatter<hive::Player> : utils::formatter_base {
+  static auto format(auto &obj, auto &ctx) {
+    const auto index = static_cast<uint_fast8_t>(obj);
+    constexpr static std::array<std::string_view, 2> names{"White", "Black"};
 
-  static auto format(auto &obj, std::format_context &ctx) {
-    switch (obj) {
-    case hive::Player::White:
-      return std::format_to(ctx.out(), "White");
-    case hive::Player::Black:
-      return std::format_to(ctx.out(), "Black");
-    default:
-      return std::format_to(ctx.out(), "Unknown Player");
-    }
+    return std::format_to(
+        ctx.out(), "{}", index < 2 ? names.at(index) : "UNKNOWN"
+    );
   }
 };
 
-template <> struct std::formatter<hive::PieceKind> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
+template <> struct std::formatter<hive::PieceKind> : utils::formatter_base {
+  static auto format(const hive::PieceKind &obj, auto &ctx) {
+    const auto index = static_cast<uint_fast8_t>(obj);
+    constexpr static std::array<std::string_view, hive::NUMBER_OF_PIECES> names{
+        "Queen",
+        "Spider",
+        "Beetle",
+        "Grasshopper",
+        "Ant",
+    };
 
-  static auto format(auto &obj, std::format_context &ctx) {
-    switch (obj) {
-    case hive::PieceKind::Queen:
-      return std::format_to(ctx.out(), "Queen");
-    case hive::PieceKind::Spider:
-      return std::format_to(ctx.out(), "Spider");
-    case hive::PieceKind::Beetle:
-      return std::format_to(ctx.out(), "Beetle");
-    case hive::PieceKind::Grasshopper:
-      return std::format_to(ctx.out(), "Grasshopper");
-    case hive::PieceKind::Ant:
-      return std::format_to(ctx.out(), "Ant");
-    default:
-      return std::format_to(ctx.out(), "Unknown Piece");
-    }
+    return std::format_to(
+        ctx.out(),
+        "{}",
+        index < hive::NUMBER_OF_PIECES ? names.at(index) : "Unknown"
+    );
   }
 };
 
-template <> struct std::formatter<hive::Piece> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-  static auto format(auto &obj, std::format_context &ctx) {
+template <> struct std::formatter<hive::Piece> : utils::formatter_base {
+  static auto format(const hive::Piece &obj, auto &ctx) {
     if (obj.owner == hive::Player::White) {
       auto str = std::format("{}", obj.kind);
-      std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+      std::ranges::transform(str, str.begin(), ::toupper);
       return std::format_to(ctx.out(), "{}", str);
     }
 
@@ -135,44 +124,28 @@ template <> struct std::hash<hive::TilePointer> {
   }
 };
 
-template <> struct std::formatter<hive::TilePointer> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(auto &obj, std::format_context &ctx) {
+template <> struct std::formatter<hive::TilePointer> : utils::formatter_base {
+  static auto format(const hive::TilePointer &obj, auto &ctx) {
     return std::format_to(ctx.out(), "({}, {})", obj.p, obj.q);
   }
 };
 
-template <> struct std::formatter<hive::MovePiece> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const hive::MovePiece &obj, std::format_context &ctx) {
+template <> struct std::formatter<hive::MovePiece> : utils::formatter_base {
+  static auto format(const hive::MovePiece &obj, auto &ctx) {
     return std::format_to(
         ctx.out(), "{}: {} -> {}", obj.piece_kind, obj.from, obj.to
     );
   }
 };
 
-template <> struct std::formatter<hive::PlacePiece> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const hive::PlacePiece &obj, std::format_context &ctx) {
+template <> struct std::formatter<hive::PlacePiece> : utils::formatter_base {
+  static auto format(const hive::PlacePiece &obj, auto &ctx) {
     return std::format_to(ctx.out(), "{}: {}", obj.piece_kind, obj.pos);
   }
 };
 
-template <> struct std::formatter<hive::Move> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const hive::Move &obj, std::format_context &ctx) {
+template <> struct std::formatter<hive::Move> : utils::formatter_base {
+  static auto format(const hive::Move &obj, auto &ctx) {
     return std::visit(
         [&ctx](const auto &move) {
           return std::format_to(ctx.out(), "{}", move);

@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <tuple>
 #include <utility>
+#include <utils/format.h>
 #include <utils/match.h>
 #include <variant>
 #include <vector>
@@ -181,22 +182,14 @@ private:
 
 } // namespace net
 
-template <> struct std::formatter<net::SocketAddrV4> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const net::SocketAddrV4 &obj, std::format_context &ctx) {
+template <> struct std::formatter<net::SocketAddrV4> : utils::formatter_base {
+  static auto format(const net::SocketAddrV4 &obj, auto &ctx) {
     return std::format_to(ctx.out(), "{}:{}", obj.ip(), obj.port());
   }
 };
 
-template <> struct std::formatter<net::SocketAddrV6> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const net::SocketAddrV6 &obj, std::format_context &ctx) {
+template <> struct std::formatter<net::SocketAddrV6> : utils::formatter_base {
+  static auto format(const net::SocketAddrV6 &obj, auto &ctx) {
     if (obj.scope_id() != 0) {
       return std::format_to(
           ctx.out(), "[{}%{}]:{}", obj.ip(), obj.scope_id(), obj.port()
@@ -206,12 +199,8 @@ template <> struct std::formatter<net::SocketAddrV6> {
   }
 };
 
-template <> struct std::formatter<net::SocketAddr> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const net::SocketAddr &obj, std::format_context &ctx) {
+template <> struct std::formatter<net::SocketAddr> : utils::formatter_base {
+  static auto format(const net::SocketAddr &obj, auto &ctx) {
     return obj.visit([&ctx](const auto &addr) {
       return std::format_to(ctx.out(), "{}", addr);
     });

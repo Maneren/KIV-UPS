@@ -7,28 +7,22 @@
 #include <utility>
 #include <vector>
 
-namespace detail {
+namespace utils {
 
-template <typename T>
-concept formattable = std::semiregular<std::formatter<T>>;
-
-template <typename... Args>
-concept all_formattable = (formattable<Args> && ...);
-
-// base formatter template that handles the parse boilerplate
-template <typename t> struct static_formatter {
-  static constexpr auto parse(std::format_parse_context &ctx) {
+// Base formatter for types that do not accept a format spec.
+struct formatter_base {
+  constexpr auto parse(std::format_parse_context &ctx)
+      -> std::format_parse_context::const_iterator {
     return ctx.begin();
   }
 };
 
-} // namespace detail
+} // namespace utils
 
 template <typename T, typename A>
-  requires(detail::formattable<T>)
-struct std::formatter<std::vector<T, A>>
-    : detail::static_formatter<std::vector<T, A>> {
-  static auto format(auto &obj, std::format_context &ctx) {
+  requires std::formattable<T, char>
+struct std::formatter<std::vector<T, A>> : utils::formatter_base {
+  static auto format(auto &obj, auto &ctx) {
     std::format_to(ctx.out(), "[");
     for (const auto &item : obj) {
       if (&item != &obj.front()) {
@@ -41,10 +35,9 @@ struct std::formatter<std::vector<T, A>>
 };
 
 template <typename T, typename H, typename P, typename A>
-  requires(detail::formattable<T>)
-struct std::formatter<std::unordered_set<T, H, P, A>>
-    : detail::static_formatter<std::unordered_set<T, H, P, A>> {
-  static auto format(auto &obj, std::format_context &ctx) {
+  requires std::formattable<T, char>
+struct std::formatter<std::unordered_set<T, H, P, A>> : utils::formatter_base {
+  static auto format(auto &obj, auto &ctx) {
     std::format_to(ctx.out(), "{{");
     bool first = true;
     for (const auto &item : obj) {
@@ -59,10 +52,10 @@ struct std::formatter<std::unordered_set<T, H, P, A>>
 };
 
 template <typename T, typename U, typename H, typename P, typename A>
-  requires(detail::all_formattable<T, U>)
+  requires std::formattable<T, char> && std::formattable<U, char>
 struct std::formatter<std::unordered_map<T, U, H, P, A>>
-    : detail::static_formatter<std::unordered_map<T, U, H, P, A>> {
-  static auto format(auto &obj, std::format_context &ctx) {
+    : utils::formatter_base {
+  static auto format(auto &obj, auto &ctx) {
     std::format_to(ctx.out(), "{{");
     bool first = true;
     for (const auto &[key, value] : obj) {
@@ -77,10 +70,9 @@ struct std::formatter<std::unordered_map<T, U, H, P, A>>
 };
 
 template <typename T>
-  requires(detail::formattable<T>)
-struct std::formatter<std::optional<T>>
-    : detail::static_formatter<std::optional<T>> {
-  static auto format(auto &obj, std::format_context &ctx) {
+  requires std::formattable<T, char>
+struct std::formatter<std::optional<T>> : utils::formatter_base {
+  static auto format(auto &obj, auto &ctx) {
     if (obj.has_value()) {
       return std::format_to(ctx.out(), "{}", obj.value());
     }
@@ -89,10 +81,9 @@ struct std::formatter<std::optional<T>>
 };
 
 template <typename T, typename U>
-  requires(detail::all_formattable<T, U>)
-struct std::formatter<std::pair<T, U>>
-    : detail::static_formatter<std::pair<T, U>> {
-  static auto format(auto &obj, std::format_context &ctx) {
+  requires std::formattable<T, char> && std::formattable<U, char>
+struct std::formatter<std::pair<T, U>> : utils::formatter_base {
+  static auto format(auto &obj, auto &ctx) {
     return std::format_to(ctx.out(), "({}, {})", obj.first, obj.second);
   }
 };

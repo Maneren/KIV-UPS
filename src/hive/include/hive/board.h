@@ -128,12 +128,8 @@ private:
 
 } // namespace hive
 
-template <> struct std::formatter<hive::Board> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
-
-  static auto format(const hive::Board &obj, std::format_context &ctx) {
+template <> struct std::formatter<hive::Board> : utils::formatter_base {
+  static auto format(const hive::Board &obj, auto &ctx) {
     return std::format_to(ctx.out(), "{}", obj.data);
   }
 };

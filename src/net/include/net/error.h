@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <utils/format.h>
 #include <utils/match.h>
 #include <variant>
 
@@ -147,32 +148,29 @@ template <typename T> result<T> from_os(T code) {
 IoError last_os_error();
 } // namespace net::error
 
-template <> struct std::formatter<net::error::IoError> {
-  static constexpr auto parse(std::format_parse_context &ctx) {
-    return ctx.begin();
-  }
+template <> struct std::formatter<net::error::IoError> : utils::formatter_base {
+  static auto
+  format_simple(net::error::ErrorKind kind, std::string_view msg, auto &ctx) {
+    if (msg.empty()) {
+      return std::format_to(ctx.out(), "{}", net::error::to_string(kind));
+    }
+    return std::format_to(
+        ctx.out(), "{}: {}", net::error::to_string(kind), msg
+    );
+  };
 
-  static auto format(const net::error::IoError &err, std::format_context &ctx) {
-    auto format_simple =
-        [&ctx](net::error::ErrorKind kind, std::string_view msg) {
-          if (msg.empty()) {
-            return std::format_to(ctx.out(), "{}", net::error::to_string(kind));
-          }
-          return std::format_to(
-              ctx.out(), "{}: {}", net::error::to_string(kind), msg
-          );
-        };
+  static auto format(const net::error::IoError &err, auto &ctx) {
     return err.visit(
         [&ctx](const net::error::Os &os) {
           return std::format_to(
-              ctx.out(), "{} - {}", os.code, std::strerror(os.code)
+              ctx.out(), "{}: {}", os.code, std::strerror(os.code)
           );
         },
         [&](const net::error::Simple &simple) {
-          return format_simple(simple.kind, simple.msg);
+          return format_simple(simple.kind, simple.msg, ctx);
         },
         [&](const net::error::SimpleMessage &simple) {
-          return format_simple(simple.kind, simple.msg);
+          return format_simple(simple.kind, simple.msg, ctx);
         }
     );
   }
