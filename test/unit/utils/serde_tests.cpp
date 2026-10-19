@@ -70,7 +70,7 @@ TEST_F(SerdeTest, SerializationContextConstruction) {
   SerializationContext ctx(inserter);
 
   // Basic construction test - context should be valid
-  EXPECT_NO_THROW(auto out = ctx.out());
+  EXPECT_NO_THROW((void)ctx.out());
 }
 
 TEST_F(SerdeTest, SerializationContextMoveSemantics) {
@@ -80,14 +80,14 @@ TEST_F(SerdeTest, SerializationContextMoveSemantics) {
 
   // Test move constructor
   SerializationContext ctx2 = std::move(ctx1);
-  EXPECT_NO_THROW(auto out = ctx2.out());
+  EXPECT_NO_THROW((void)ctx2.out());
 
   // Test move assignment
   std::string output2;
   auto inserter2 = std::back_inserter(output2);
   SerializationContext ctx3(inserter2);
   ctx3 = std::move(ctx2);
-  EXPECT_NO_THROW(auto out = ctx3.out());
+  EXPECT_NO_THROW((void)ctx3.out());
 }
 
 // ===== AssertPrefix Edge Cases =====

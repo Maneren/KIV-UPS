@@ -60,7 +60,15 @@ function(create_library TARGET)
 
         set_compiler_and_linker_flags(${TARGET} CXX_STD ${LIB_CXX_STD})
 
-        set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME ${TARGET})
+        if(LIB_SHARED)
+            set_target_properties(
+                ${TARGET}
+                PROPERTIES
+                    CXX_VISIBILITY_PRESET hidden
+                    VISIBILITY_INLINES_HIDDEN ON
+            )
+        endif()
+
         set_output_directories(${TARGET} LIBRARY)
         set_version_properties(${TARGET} "${LIB_VERSION}")
     endif()

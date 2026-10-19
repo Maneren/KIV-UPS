@@ -52,9 +52,9 @@ error::result<std::tuple<TcpStream, SocketAddr>> TcpListener::accept() const {
   sockaddr_union storage{};
   auto len = sockaddr_union::SIZE;
 
-  auto sock = this->sock.accept(storage, len);
-  if (!sock) {
-    return std::unexpected(std::move(sock).error());
+  auto accepted = this->sock.accept(storage, len);
+  if (!accepted) {
+    return std::unexpected(std::move(accepted).error());
   }
 
   auto addr = SocketAddr::from_sockaddr(storage, len);
@@ -62,7 +62,7 @@ error::result<std::tuple<TcpStream, SocketAddr>> TcpListener::accept() const {
     return std::unexpected(std::move(addr).error());
   }
 
-  return std::make_tuple(TcpStream(std::move(*sock)), *addr);
+  return std::make_tuple(TcpStream(std::move(*accepted)), *addr);
 }
 
 error::result<SocketAddr> TcpListener::local_addr() const {

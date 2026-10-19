@@ -1,5 +1,9 @@
 include_guard(GLOBAL)
 
+# Find the uv package manager
+find_program(UV uv REQUIRED DOC "uv package manager")
+message(STATUS "Found uv: ${UV}")
+
 # Integrates a uv-managed Python project into the build:
 # - build time: `uv sync` (venv in build/venvs/<TARGET>)
 # - run time: launcher at `build/bin/<Config>/<TARGET>` running

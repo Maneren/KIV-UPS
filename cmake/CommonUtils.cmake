@@ -1,15 +1,9 @@
+include_guard(GLOBAL)
+
+include(${CMAKE_SOURCE_DIR}/cmake/CompilerFlags.cmake)
+
 function(set_compiler_and_linker_flags TARGET)
     cmake_parse_arguments(ARGS "" "CXX_STD" "" ${ARGN})
-
-    target_compile_options(
-        ${TARGET}
-        PRIVATE
-            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall
-            -Wextra
-            -Wpedantic
-            -Wconversion>
-            $<$<CXX_COMPILER_ID:MSVC>:/W4>
-    )
 
     set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -17,30 +11,37 @@ function(set_compiler_and_linker_flags TARGET)
         set_target_properties(${TARGET} PROPERTIES CXX_STANDARD ${ARGS_CXX_STD})
     endif()
 
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        set(CXX_GNU_DEBUG_INFO -g3 -gdwarf-5 -fno-omit-frame-pointer)
-        set(CXX_DEBUG_FLAGS -Og)
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-        set(CXX_GNU_DEBUG_INFO /Zi)
-        set(CXX_DEBUG_FLAGS /Od)
+    target_compile_options(${TARGET} PRIVATE ${CXX_WARNING_FLAGS})
+    if(WERROR)
+        target_compile_options(${TARGET} PRIVATE ${CXX_WERROR_FLAGS})
     endif()
 
-    set(USE_DEBUG_INFO $<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>)
+    # Debug information for debug-ish configs.
+    set(USE_DEBUG_INFO $<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>)
 
     target_compile_options(
         ${TARGET}
         PRIVATE
-            $<$<CONFIG:Debug>:${CXX_DEBUG_FLAGS}>
-            $<${USE_DEBUG_INFO}:${CXX_DEBUG_INFO}>
+            $<$<CONFIG:Debug>:${CXX_DEBUG_OPT_FLAGS}>
+            $<${USE_DEBUG_INFO}>:${CXX_DEBUG_INFO_FLAGS}>
+            ${CXX_HARDENING_FLAGS}
+            $<$<CONFIG:Release>:${CXX_SECTION_FLAGS}>
     )
+
+    # _FORTIFY_SOURCE only works with optimisation and fights ASan.
+    if(FORTIFY_FLAGS AND NOT SANITIZERS)
+        target_compile_options(
+            ${TARGET}
+            PRIVATE $<$<NOT:$<CONFIG:Debug>>:${FORTIFY_FLAGS}>
+        )
+    endif()
 
     target_link_options(
         ${TARGET}
         PRIVATE
-            -Wl,-z,relro
-            -Wl,-z,now
-            -Wl,--as-needed
-            -Wl,--no-copy-dt-needed-entries
+            ${CXX_LINK_HARDENING_FLAGS}
+            $<$<CONFIG:Release>:${CXX_LINK_GC_FLAGS}>
+            $<$<CONFIG:Release>:${CXX_LINK_ICF_FLAGS}>
     )
 
     if(USE_PCH)
@@ -63,8 +64,10 @@ function(set_compiler_and_linker_flags TARGET)
                 <vector>
         )
     endif()
+
     get_property(THIN_ARCHIVE GLOBAL PROPERTY THIN_ARCHIVE)
-    if(THIN_ARCHIVE)
+    # --thin is a GNU/LLVM ar extension
+    if(THIN_ARCHIVE AND NOT MSVC AND NOT APPLE)
         set_property(
             TARGET ${TARGET}
             APPEND
@@ -105,9 +108,11 @@ endfunction()
 
 function(set_version_properties TARGET VERSION)
     if(VERSION)
+        # SOVERSION is the ABI major; VERSION is the full release string.
+        string(REGEX MATCH "^[0-9]+" SOVERSION "${VERSION}")
         set_target_properties(
             ${TARGET}
-            PROPERTIES VERSION ${VERSION} SOVERSION ${VERSION}
+            PROPERTIES VERSION ${VERSION} SOVERSION ${SOVERSION}
         )
     endif()
 endfunction()
