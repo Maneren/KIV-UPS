@@ -20,7 +20,7 @@ function(create_executable TARGET SOURCES)
     endif()
 
     add_include_directories(${TARGET} PRIVATE "${EXE_INCLUDE_DIRS}")
-    set_compiler_and_linker_flags(${TARGET} ${EXE_TEST} CXX_STD ${EXE_CXX_STD})
+    set_compiler_and_linker_flags(${TARGET} CXX_STD ${EXE_CXX_STD})
     target_compile_definitions(${TARGET} PRIVATE "${EXE_COMPILE_DEFS}")
     target_link_libraries(${TARGET} PRIVATE "${EXE_DEPENDS}")
 

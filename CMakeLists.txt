@@ -1,64 +1,37 @@
-cmake_minimum_required(VERSION 3.31..4.4)
+cmake_minimum_required(VERSION 3.31...4.4)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
-set(CMAKE_INSTALL_MESSAGE LAZY)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(PROJECT "kiv-ups")
 project(${PROJECT} LANGUAGES CXX)
 
-option(SANITIZERS "Enable sanitizers" OFF)
-if(SANITIZERS)
-    add_compile_options(-fsanitize=address,undefined,leak)
-    add_link_options(-fsanitize=address,undefined,leak)
-endif()
+set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
+set(CMAKE_INSTALL_MESSAGE LAZY)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(THIN_ARCHIVE "Create thin archive" ON)
-set_property(GLOBAL PROPERTY THIN_ARCHIVE ${THIN_ARCHIVE})
-
-option(USE_IPO "Enable IPO" ON)
-if(USE_IPO)
-    include(CheckIPOSupported)
-
-    check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error LANGUAGES CXX)
-    if(NOT ipo_supported)
-        message(SEND_ERROR "IPO is not supported: ${ipo_error}")
-    endif()
-
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()
-
-option(USE_CCACHE "Use ccache" ON)
-if(USE_CCACHE)
-    find_program(CCACHE ccache)
-    find_program(SCCACHE sccache)
-    if(CCACHE)
-        message(STATUS "Found ccache: ${CCACHE}")
-        set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE})
-        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
-    elseif(SCCACHE)
-        message(STATUS "Found sccache: ${SCCACHE}")
-        set(CMAKE_C_COMPILER_LAUNCHER ${SCCACHE})
-        set(CMAKE_CXX_COMPILER_LAUNCHER ${SCCACHE})
-    else()
-        message(WARNING "ccache not found")
-    endif()
-endif()
-
+# Feature toggles
+option(SANITIZERS "Enable Address/UB/Leak sanitizers" OFF)
+option(WERROR "Treat compiler warnings as errors" OFF)
+option(THIN_ARCHIVE "Create thin static archives" ON)
+option(USE_IPO "Enable interprocedural optimisation for optimised configs" ON)
+option(USE_CCACHE "Use ccache/sccache as a compiler launcher" ON)
 option(USE_PCH "Use precompiled headers to speed up compilation" ON)
+option(BUILD_TESTS "Build test executables" ON)
 
-find_program(UV uv REQUIRED DOC "uv package manager")
-message(STATUS "Found uv: ${UV}")
+# Toolchain helpers
+include(cmake/CommonUtils.cmake)
 
+# Target templates
 include(cmake/ExecutableTemplate.cmake)
 include(cmake/LibraryTemplate.cmake)
 include(cmake/PythonAppTemplate.cmake)
 
+# Libraries
 add_subdirectory(src)
+# Apps
 add_subdirectory(apps)
 
-option(BUILD_TESTS "Build test executables" ON)
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)

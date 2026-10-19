@@ -138,7 +138,7 @@ TEST(ProtoTest, AllLobbyStatesRoundTrip) {
 TEST(ProtoTest, NegativeCoordinatesRoundTrip) {
   expect_round_trip(
       proto::Message{proto::Place{
-          .pos = {.p = -INT32_MIN, .q = INT32_MAX},
+          .pos = {.p = INT32_MIN, .q = INT32_MAX},
           .piece = hive::PieceKind::Ant,
       }}
   );
