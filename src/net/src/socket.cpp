@@ -102,8 +102,8 @@ struct timespec to_timespec(std::chrono::nanoseconds timeout) {
   const auto secs = std::chrono::duration_cast<std::chrono::seconds>(timeout);
   const auto nsecs = timeout - secs;
   return {
-      .tv_sec = static_cast<time_t>(secs.count()),
-      .tv_nsec = static_cast<long>(nsecs.count()),
+      .tv_sec = secs.count(),
+      .tv_nsec = nsecs.count(),
   };
 }
 

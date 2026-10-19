@@ -378,7 +378,7 @@ bool Board::has_neighbor(
 
 std::generator<Move> Board::grasshopper_moves(TilePointer grasshopper) const {
   // for each direction
-  for (const auto [dp, dq] : DIRECTIONS) {
+  for (const auto &[dp, dq] : DIRECTIONS) {
     // start at grasshopper's position
     auto current = grasshopper;
     bool skipped = false;
