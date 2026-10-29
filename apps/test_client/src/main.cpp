@@ -4,6 +4,7 @@
 #include <net/listener.h>
 #include <net/tcp_iostream.h>
 #include <print>
+#include <utils/parse.h>
 
 constexpr auto ECHO_PORT = 2001;
 constexpr auto REVERSE_PORT = 2002;
@@ -35,8 +36,13 @@ int test_calculate(
     return 1;
   }
 
-  const auto a = std::stol(args->positional()[0]);
-  const auto b = std::stol(args->positional()[1]);
+  const auto a = utils::parse_number<long>(args->positional()[0]);
+  const auto b = utils::parse_number<long>(args->positional()[1]);
+
+  if (!a.has_value() || !b.has_value()) {
+    std::println("Invalid number");
+    return 1;
+  }
 
   std::println("Connecting to {}:{}", address, CALCULATE_PORT);
   auto stream = net::TcpStream::connect_host(address, CALCULATE_PORT);
@@ -57,7 +63,7 @@ int test_calculate(
   }
 
   std::println("Sending: {}|{}|{}", *operation, a, b);
-  iostream << *operation << '|' << a << '|' << b << '\n' << std::flush;
+  iostream << *operation << '|' << *a << '|' << *b << '\n' << std::flush;
 
   std::getline(iostream, received);
   std::println("Received: {}", received);
