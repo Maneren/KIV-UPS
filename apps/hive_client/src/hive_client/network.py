@@ -3,12 +3,26 @@ TCP client for the Hive game protocol (see src/hive/PROTOCOL.md).
 
 Every message is HIVE <command><newline>.  The client connects to a server,
 sends commands, and parses the server's responses into small dataclasses.
+
+Piece kinds use the `PieceKind` enum internally; wire letters are converted
+via `hive_client.protocol`.
 """
 
 from __future__ import annotations
 
 import socket
 from dataclasses import dataclass
+
+from hive_client.game import (
+    MovePiece,
+    PieceKind,
+    PlacePiece,
+    TilePointer,
+)
+from hive_client.protocol import (
+    piece_kind_from_letter,
+    piece_letter_from_kind,
+)
 
 __all__ = [
     "Ack",
@@ -44,7 +58,7 @@ class Place:
 
     p: int
     q: int
-    piece: str  # "Q" / "S" / "B" / "G" / "A"
+    piece: PieceKind
 
 
 @dataclass(frozen=True)
@@ -55,7 +69,7 @@ class Move:
     from_q: int
     to_p: int
     to_q: int
-    piece: str
+    piece: PieceKind
 
 
 @dataclass(frozen=True)
@@ -119,6 +133,44 @@ class Lobbies:
 Command = Login | Place | Move | Rematch | Leave | ListRequest
 
 
+def place_from_wire(p: int, q: int, piece_letter: str) -> PlacePiece:
+    """Create a PlacePiece from wire-protocol coordinates and piece letter."""
+    kind = piece_kind_from_letter(piece_letter)
+    return PlacePiece(pos=TilePointer(p, q), piece_kind=kind)
+
+
+def place_to_wire(place: PlacePiece) -> tuple[int, int, str]:
+    """Convert a PlacePiece to wire-protocol coordinates and piece letter."""
+    return (
+        place.pos.p,
+        place.pos.q,
+        piece_letter_from_kind(place.piece_kind),
+    )
+
+
+def move_from_wire(
+    from_p: int, from_q: int, to_p: int, to_q: int, piece_letter: str
+) -> MovePiece:
+    """Create a MovePiece from wire-protocol coordinates and piece letter."""
+    kind = piece_kind_from_letter(piece_letter)
+    return MovePiece(
+        from_=TilePointer(from_p, from_q),
+        to=TilePointer(to_p, to_q),
+        piece_kind=kind,
+    )
+
+
+def move_to_wire(move: MovePiece) -> tuple[int, int, int, int, str]:
+    """Convert a MovePiece to wire-protocol coordinates and piece letter."""
+    return (
+        move.from_.p,
+        move.from_.q,
+        move.to.p,
+        move.to.q,
+        piece_letter_from_kind(move.piece_kind),
+    )
+
+
 def _read_nick_or_lobby(tokens: list[str], index: int) -> tuple[str, int]:
     """Read a length-prefixed name field (2 digit length + chars)."""
     field = tokens[index]
@@ -135,7 +187,7 @@ def _parse_login(rest: list[str]) -> Login:
 
 def _parse_place(rest: list[str]) -> Place:
     p, q = int(rest[0]), int(rest[1])
-    return Place(p=p, q=q, piece=rest[2])
+    return Place(p=p, q=q, piece=piece_kind_from_letter(rest[2]))
 
 
 def _parse_move(rest: list[str]) -> Move:
@@ -144,7 +196,7 @@ def _parse_move(rest: list[str]) -> Move:
         from_q=int(rest[1]),
         to_p=int(rest[2]),
         to_q=int(rest[3]),
-        piece=rest[4],
+        piece=piece_kind_from_letter(rest[4]),
     )
 
 
@@ -228,11 +280,13 @@ def _serialize_login(cmd: Login) -> str:
 
 
 def _serialize_place(cmd: Place) -> str:
-    return f"{MAGIC} PLACE {cmd.p} {cmd.q} {cmd.piece}"
+    letter = piece_letter_from_kind(cmd.piece)
+    return f"{MAGIC} PLACE {cmd.p} {cmd.q} {letter}"
 
 
 def _serialize_move(cmd: Move) -> str:
-    return f"{MAGIC} MOVE {cmd.from_p} {cmd.from_q} {cmd.to_p} {cmd.to_q} {cmd.piece}"
+    letter = piece_letter_from_kind(cmd.piece)
+    return f"{MAGIC} MOVE {cmd.from_p} {cmd.from_q} {cmd.to_p} {cmd.to_q} {letter}"
 
 
 class HiveClient:

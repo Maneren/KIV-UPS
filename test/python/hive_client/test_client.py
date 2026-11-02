@@ -156,7 +156,7 @@ def test_parse_place() -> None:
     assert isinstance(cmd, Place)
     assert cmd.p == 1
     assert cmd.q == -2
-    assert cmd.piece == "Q"
+    assert cmd.piece == PieceKind.Queen
 
 
 def test_parse_move() -> None:
@@ -167,7 +167,7 @@ def test_parse_move() -> None:
     assert cmd.from_q == 0
     assert cmd.to_p == 1
     assert cmd.to_q == 0
-    assert cmd.piece == "Q"
+    assert cmd.piece == PieceKind.Queen
 
 
 def test_parse_reject() -> None:
@@ -191,7 +191,7 @@ def test_parse_over() -> None:
 
 
 def test_serialize_place() -> None:
-    wire = serialize(Place(p=1, q=-2, piece="Q"))
+    wire = serialize(Place(p=1, q=-2, piece=PieceKind.Queen))
     assert wire == "HIVE PLACE 1 -2 Q"
 
 
@@ -206,7 +206,7 @@ def test_serialize_rematch() -> None:
 
 
 def test_roundtrip_place() -> None:
-    original = Place(p=3, q=-1, piece="A")
+    original = Place(p=3, q=-1, piece=PieceKind.Ant)
     wire = serialize(original)
     # Re-parse: the wire format for PLACE is "HIVE PLACE p q piece"
     cmd = parse_command(wire.split(" ")[1:])
