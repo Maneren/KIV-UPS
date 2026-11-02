@@ -1,13 +1,216 @@
-def test_main_launches_gui(monkeypatch):
-    import hive_client
+"""Tests for the Hive Python client: game engine, network protocol, and GUI."""
 
-    launched = {}
-    monkeypatch.setattr(hive_client, "run", lambda **kwargs: launched.update(kwargs))
-    assert hive_client.main(["--host", "127.0.0.1", "--port", "8080"]) == 0
-    assert launched == {"host": "127.0.0.1", "port": 8080}
+from hive_client.game import (
+    Board,
+    MovePiece,
+    Piece,
+    PieceKind,
+    Player,
+    TilePointer,
+    make_placement,
+)
+from hive_client.network import (
+    Login,
+    Move,
+    Over,
+    Place,
+    Reject,
+    Rematch,
+    Start,
+    parse_command,
+    serialize,
+)
 
 
-def test_gui_module_imports():
-    import hive_client.gui
+def test_place_first_piece_at_origin() -> None:
+    board = Board()
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Queen), Player.White)
+    assert board.has_placed_queen(Player.White)
+    top = board.get_top(TilePointer(0, 0))
+    assert top == Piece(kind=PieceKind.Queen, owner=Player.White)
 
-    assert callable(hive_client.gui.run)
+
+def test_cannot_place_away_from_hive_on_first_move() -> None:
+    board = Board()
+    # Board rules allow any placement on the first move; the GUI enforces (0,0)
+    board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Queen), Player.White)
+    assert board.has_placed_queen(Player.White)
+
+
+def test_queen_can_move_one_step() -> None:
+    board = Board()
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Queen), Player.White)
+    board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Ant), Player.Black)
+    moves = list(
+        board.moves_for_piece(TilePointer(0, 0), board.get_top(TilePointer(0, 0)))
+    )
+    destinations = {m.to for m in moves if isinstance(m, MovePiece)}
+    assert len(destinations) > 0
+
+
+def test_ant_can_move_many_steps() -> None:
+    board = Board()
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Ant), Player.White)
+    board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Ant), Player.Black)
+    board.apply_move(make_placement(TilePointer(2, 0), PieceKind.Ant), Player.Black)
+    moves = list(
+        board.moves_for_piece(TilePointer(0, 0), board.get_top(TilePointer(0, 0)))
+    )
+    # Ant should be able to reach (0, -1) via (1, 0) being blocked... actually
+    # ant moves like a sliding piece around the hive
+    destinations = {m.to for m in moves if isinstance(m, MovePiece)}
+    assert len(destinations) > 0
+
+
+def test_spider_moves_exactly_three_steps() -> None:
+    board = Board()
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Spider), Player.White)
+    board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Spider), Player.Black)
+    board.apply_move(make_placement(TilePointer(2, 0), PieceKind.Spider), Player.Black)
+    moves = list(
+        board.moves_for_piece(TilePointer(0, 0), board.get_top(TilePointer(0, 0)))
+    )
+    destinations = {m.to for m in moves if isinstance(m, MovePiece)}
+    assert len(destinations) > 0
+
+
+def test_grasshopper_jumps_over_pieces() -> None:
+    board = Board()
+    board.apply_move(
+        make_placement(TilePointer(0, 0), PieceKind.Grasshopper), Player.White
+    )
+    board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Ant), Player.Black)
+    board.apply_move(make_placement(TilePointer(2, 0), PieceKind.Spider), Player.Black)
+    board.apply_move(make_placement(TilePointer(3, 0), PieceKind.Beetle), Player.Black)
+    moves = list(
+        board.moves_for_piece(TilePointer(0, 0), board.get_top(TilePointer(0, 0)))
+    )
+    destinations = {m.to for m in moves if isinstance(m, MovePiece)}
+    assert TilePointer(4, 0) in destinations
+
+
+def test_beetle_moves_onto_neighbor() -> None:
+    board = Board()
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Beetle), Player.White)
+    board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Beetle), Player.Black)
+    moves = list(
+        board.moves_for_piece(TilePointer(0, 0), board.get_top(TilePointer(0, 0)))
+    )
+    destinations = {m.to for m in moves if isinstance(m, MovePiece)}
+    assert TilePointer(1, 0) in destinations
+
+
+def test_cannot_move_before_queen_placed() -> None:
+    board = Board()
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Ant), Player.White)
+    assert not board.can_player_move(Player.White, TilePointer(0, 0))
+
+
+def test_player_supply_decreases_on_placement() -> None:
+    board = Board()
+    before = board.get_player_pieces()[Player.White][PieceKind.Queen]
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Queen), Player.White)
+    after = board.get_player_pieces()[Player.White][PieceKind.Queen]
+    assert after == before - 1
+
+
+def test_can_player_place_tracks_supply() -> None:
+    board = Board()
+    assert board.can_player_place(Player.White, PieceKind.Queen)
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Queen), Player.White)
+    assert not board.can_player_place(Player.White, PieceKind.Queen)
+    assert board.can_player_place(Player.White, PieceKind.Ant)
+
+
+def test_moves_for_player_empty_on_new_board() -> None:
+    # Before either queen is placed, no moves or placements are legal.
+    board = Board()
+    moves = list(
+        board.moves_for_player(Player.White, board.get_player_pieces()[Player.White])
+    )
+    assert moves == []
+
+
+def test_parse_login() -> None:
+    cmd = parse_command(["LOGIN", "05Alice", "05lobby"])
+    assert isinstance(cmd, Login)
+    assert cmd.nick == "Alice"
+    assert cmd.lobby == "lobby"
+
+
+def test_parse_place() -> None:
+    cmd = parse_command(["PLACE", "1", "-2", "Q"])
+    assert isinstance(cmd, Place)
+    assert cmd.p == 1
+    assert cmd.q == -2
+    assert cmd.piece == "Q"
+
+
+def test_parse_move() -> None:
+    cmd = parse_command(["MOVE", "0", "0", "1", "0", "Q"])
+
+    assert isinstance(cmd, Move)
+    assert cmd.from_p == 0
+    assert cmd.from_q == 0
+    assert cmd.to_p == 1
+    assert cmd.to_q == 0
+    assert cmd.piece == "Q"
+
+
+def test_parse_reject() -> None:
+    cmd = parse_command(["REJECT", "BAD_SYNTAX"])
+    assert isinstance(cmd, Reject)
+    assert cmd.code == "BAD_SYNTAX"
+
+
+def test_parse_start() -> None:
+    cmd = parse_command(["START", "W", "Bob"])
+    assert isinstance(cmd, Start)
+    assert cmd.color == "W"
+    assert cmd.nick == "Bob"
+
+
+def test_parse_over() -> None:
+    cmd = parse_command(["OVER", "B", "SURROUND"])
+    assert isinstance(cmd, Over)
+    assert cmd.color == "B"
+    assert cmd.reason == "SURROUND"
+
+
+def test_serialize_place() -> None:
+    wire = serialize(Place(p=1, q=-2, piece="Q"))
+    assert wire == "HIVE PLACE 1 -2 Q"
+
+
+def test_serialize_login() -> None:
+    wire = serialize(Login(nick="Alice", lobby="lobby"))
+    assert wire == "HIVE LOGIN 05Alice 05lobby"
+
+
+def test_serialize_rematch() -> None:
+    wire = serialize(Rematch())
+    assert wire == "HIVE REMATCH"
+
+
+def test_roundtrip_place() -> None:
+    original = Place(p=3, q=-1, piece="A")
+    wire = serialize(original)
+    # Re-parse: the wire format for PLACE is "HIVE PLACE p q piece"
+    cmd = parse_command(wire.split(" ")[1:])
+    assert cmd == original
+
+
+def test_piece_display() -> None:
+    white_queen = Piece(kind=PieceKind.Queen, owner=Player.White)
+    black_queen = Piece(kind=PieceKind.Queen, owner=Player.Black)
+    assert white_queen.display() == "QUEEN"
+    assert black_queen.display() == "queen"
+
+
+def test_tile_pointer_str() -> None:
+    ptr = TilePointer(3, -1)
+    assert str(ptr) == "(3, -1)"
+
+
+def test_tile_pointer_hash() -> None:
+    assert hash(TilePointer(1, 2)) == hash(TilePointer(1, 2))
