@@ -2,6 +2,8 @@
 
 from hive_client.game import (
     Board,
+    GameResult,
+    GameState,
     MovePiece,
     Piece,
     PieceKind,
@@ -137,9 +139,7 @@ def test_moving_breaks_hive_detected() -> None:
     board = Board()
     board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Queen), Player.White)
     board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Ant), Player.Black)
-    board.apply_move(
-        make_placement(TilePointer(-1, 0), PieceKind.Spider), Player.Black
-    )
+    board.apply_move(make_placement(TilePointer(-1, 0), PieceKind.Spider), Player.Black)
     assert board.moving_breaks_hive(TilePointer(0, 0))
     assert not board.can_player_move(Player.White, TilePointer(0, 0))
 
@@ -227,3 +227,49 @@ def test_tile_pointer_str() -> None:
 
 def test_tile_pointer_hash() -> None:
     assert hash(TilePointer(1, 2)) == hash(TilePointer(1, 2))
+
+
+def test_game_state_initial_state() -> None:
+    state = GameState()
+    assert state.result is GameResult.ONGOING
+    assert state.current_player is Player.White
+    assert state.board.is_empty_all()
+
+
+def test_game_state_apply_move_switches_player() -> None:
+    state = GameState()
+    state.apply(make_placement(TilePointer(0, 0), PieceKind.Queen))
+    assert state.current_player is Player.Black
+    assert state.result is GameResult.ONGOING
+
+
+def test_game_state_queen_surrounded_black_wins() -> None:
+    # White queen at (0,0) surrounded by 6 black pieces -> black wins.
+    state = GameState()
+    state.apply(make_placement(TilePointer(0, 0), PieceKind.Queen))  # White Q
+    # Surround with black pieces at all 6 neighbors (direct board placement).
+    neighbors = [
+        TilePointer(1, 0),
+        TilePointer(0, 1),
+        TilePointer(-1, 1),
+        TilePointer(-1, 0),
+        TilePointer(0, -1),
+        TilePointer(1, -1),
+    ]
+    kinds = [
+        PieceKind.Ant,
+        PieceKind.Spider,
+        PieceKind.Beetle,
+        PieceKind.Grasshopper,
+        PieceKind.Ant,
+        PieceKind.Spider,
+    ]
+    for ptr, kind in zip(neighbors, kinds):
+        state.board.apply_move(make_placement(ptr, kind), Player.Black)
+    state._check_win()
+    assert state.result is GameResult.BLACK_WINS
+
+
+def test_game_state_legal_moves_empty_board() -> None:
+    state = GameState()
+    assert state.legal_moves() == []

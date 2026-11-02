@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from enum import Enum
+from typing import overload
 
 __all__ = [
     "DEFAULT_PIECES_PER_PLAYER",
@@ -26,16 +27,24 @@ __all__ = [
     "make_placement",
 ]
 
-DIRECTIONS: tuple[tuple[int, int], ...] = (
-    (1, 0),
-    (0, 1),
-    (-1, 1),
-    (-1, 0),
-    (0, -1),
-    (1, -1),
+
+@dataclass(frozen=True)
+class Direction:
+    p: int
+    q: int
+
+
+DIRECTIONS: tuple[Direction, ...] = (
+    Direction(1, 0),
+    Direction(0, 1),
+    Direction(-1, 1),
+    Direction(-1, 0),
+    Direction(0, -1),
+    Direction(1, -1),
 )
 
 MAX_STACK_IGNORE = 2
+HEX_SIDES = 6
 
 
 class Player(Enum):
@@ -100,6 +109,20 @@ class TilePointer:
         """Return coordinate as ``(p, q)``."""
         return f"({self.p}, {self.q})"
 
+    def __add__(self, other: Direction) -> TilePointer:
+        """Add a direction to a tile pointer."""
+        return TilePointer(self.p + other.p, self.q + other.q)
+
+    @overload
+    def __sub__(self, other: Direction) -> TilePointer: ...
+
+    @overload
+    def __sub__(self, other: TilePointer) -> Direction: ...
+
+    def __sub__(self, other: Direction | TilePointer) -> Direction | TilePointer:
+        """Subtract a direction or another tile from a tile pointer."""
+        return TilePointer(self.p - other.p, self.q - other.q)
+
 
 @dataclass(frozen=True)
 class PlacePiece:
@@ -131,22 +154,20 @@ def make_placement(pos: TilePointer, piece_kind: PieceKind) -> Move:
     return PlacePiece(pos=pos, piece_kind=piece_kind)
 
 
-def rotate_left(direction: tuple[int, int]) -> tuple[int, int]:
+def rotate_left(direction: Direction) -> Direction:
     """Rotate a direction 60 degrees counter-clockwise."""
-    dp, dq = direction
-    return (dp + dq, -dp)
+    return Direction(direction.p + direction.q, -direction.p)
 
 
-def rotate_right(direction: tuple[int, int]) -> tuple[int, int]:
+def rotate_right(direction: Direction) -> Direction:
     """Rotate a direction 60 degrees clockwise."""
-    dp, dq = direction
-    return (-dq, dp + dq)
+    return Direction(-direction.q, direction.p + direction.q)
 
 
 def neighboring_cells(ptr: TilePointer) -> Iterator[TilePointer]:
     """Yield the six neighboring hex cells of ``ptr``."""
-    for dp, dq in DIRECTIONS:
-        yield TilePointer(ptr.p + dp, ptr.q + dq)
+    for direction in DIRECTIONS:
+        yield ptr + direction
 
 
 class Board:
@@ -402,15 +423,10 @@ class Board:
         ignored: TilePointer | None = None,
     ) -> bool:
         """Return True if a piece may step from ``from_`` to ``to``."""
-        fp, fq = from_.p, from_.q
-        tp, tq = to.p, to.q
-        direction = (tp - fp, tq - fq)
+        direction = to - from_
 
-        lp, lq = rotate_left(direction)
-        rp, rq = rotate_right(direction)
-
-        left = TilePointer(fp + lp, fq + lq)
-        right = TilePointer(fp + rp, fq + rq)
+        left = from_ + rotate_left(direction)
+        right = from_ + rotate_right(direction)
 
         left_empty = self.is_empty(left, ignored)
         right_empty = self.is_empty(right, ignored)
@@ -436,19 +452,13 @@ class Board:
     def has_neighbor_in_direction(
         self,
         cell: TilePointer,
-        direction: tuple[int, int],
+        direction: Direction,
         ignored: TilePointer | None = None,
     ) -> bool:
         """Return True if any cell in the ``direction`` arc of ``cell`` is occupied."""
-        cp, cq = cell.p, cell.q
-        dp, dq = direction
-
-        lp, lq = rotate_left(direction)
-        rp, rq = rotate_right(direction)
-
-        left = TilePointer(cp + lp, cq + lq)
-        right = TilePointer(cp + rp, cq + rq)
-        center = TilePointer(cp + dp, cq + dq)
+        center = cell + direction
+        left = cell + rotate_left(direction)
+        right = cell + rotate_right(direction)
 
         return (
             not self.is_empty(left, ignored)
@@ -470,11 +480,11 @@ class Board:
         self, grasshopper: TilePointer
     ) -> Generator[Move, None, None]:
         """Yield grasshopper moves: jump over a line of pieces."""
-        for dp, dq in DIRECTIONS:
+        for direction in DIRECTIONS:
             current = grasshopper
             skipped = False
             while True:
-                current = TilePointer(current.p + dp, current.q + dq)
+                current = current + direction
                 if self.is_empty(current, grasshopper):
                     if skipped:
                         yield MovePiece(
@@ -579,10 +589,10 @@ class GameState:
             queen_pos = self._find_queen(player)
             if queen_pos is None:
                 continue
-            if all(
-                not self.board.is_empty(n)
-                for n in self.board.neighbors(queen_pos)
-            ):
+            occupied_neighbors = sum(
+                not self.board.is_empty(n) for n in self.board.neighbors(queen_pos)
+            )
+            if occupied_neighbors == HEX_SIDES:
                 self.result = (
                     GameResult.BLACK_WINS
                     if player is Player.White
