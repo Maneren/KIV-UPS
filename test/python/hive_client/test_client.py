@@ -131,6 +131,19 @@ def test_moves_for_player_empty_on_new_board() -> None:
     assert moves == []
 
 
+def test_moving_breaks_hive_detected() -> None:
+    # Three pieces in a line: (1,0)-(0,0)-(-1,0). The piece at (0,0) connects
+    # the two outer pieces; lifting it splits the hive.
+    board = Board()
+    board.apply_move(make_placement(TilePointer(0, 0), PieceKind.Queen), Player.White)
+    board.apply_move(make_placement(TilePointer(1, 0), PieceKind.Ant), Player.Black)
+    board.apply_move(
+        make_placement(TilePointer(-1, 0), PieceKind.Spider), Player.Black
+    )
+    assert board.moving_breaks_hive(TilePointer(0, 0))
+    assert not board.can_player_move(Player.White, TilePointer(0, 0))
+
+
 def test_parse_login() -> None:
     cmd = parse_command(["LOGIN", "05Alice", "05lobby"])
     assert isinstance(cmd, Login)

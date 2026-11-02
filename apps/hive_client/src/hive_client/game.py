@@ -364,8 +364,16 @@ class Board:
         if len(tile) > 1:
             return False
 
+        # Seed the BFS from a single neighbor only. If we seeded from all
+        # neighbors simultaneously, pieces adjacent to ``ptr`` would always be
+        # marked reachable even when they're only connected through ``ptr``.
+        first_neighbor = next(self.neighbors(ptr, ptr), None)
+        assert first_neighbor is not None, (
+            "There should be at least one neighbor, unless the hive is already split."
+        )
+
         visited: set[TilePointer] = set()
-        stack: list[TilePointer] = list(self.neighbors(ptr, ptr))
+        stack = [first_neighbor]
 
         while stack:
             current = stack.pop()
@@ -532,3 +540,59 @@ _PIECE_HANDLERS = (
     Board.grasshopper_moves,
     Board.ant_moves,
 )
+
+
+class GameResult(Enum):
+    """Outcome of a Hive game."""
+
+    ONGOING = 0
+    WHITE_WINS = 1
+    BLACK_WINS = 2
+    DRAW = 3
+
+
+class GameState:
+    """Hive game state: board, current player, and win/draw detection."""
+
+    def __init__(self) -> None:
+        self.board = Board()
+        self.current_player = Player.White
+        self.result = GameResult.ONGOING
+
+    def legal_moves(self) -> list[Move]:
+        """Return all legal moves for the current player."""
+        return list(
+            self.board.moves_for_player(
+                self.current_player, self.board.get_player_pieces()[self.current_player]
+            )
+        )
+
+    def apply(self, move: Move) -> None:
+        """Apply ``move`` on behalf of the current player, then switch turns."""
+        self.board.apply_move(move, self.current_player)
+        self.current_player = self.current_player.other()
+        self._check_win()
+
+    def _check_win(self) -> None:
+        """Set ``result`` if either queen is surrounded."""
+        for player in (Player.White, Player.Black):
+            queen_pos = self._find_queen(player)
+            if queen_pos is None:
+                continue
+            if all(
+                not self.board.is_empty(n)
+                for n in self.board.neighbors(queen_pos)
+            ):
+                self.result = (
+                    GameResult.BLACK_WINS
+                    if player is Player.White
+                    else GameResult.WHITE_WINS
+                )
+                return
+
+    def _find_queen(self, player: Player) -> TilePointer | None:
+        """Return the tile of ``player``'s queen, or None if not placed."""
+        for ptr, piece in self.board.pieces():
+            if piece.owner is player and piece.kind is PieceKind.Queen:
+                return ptr
+        return None
