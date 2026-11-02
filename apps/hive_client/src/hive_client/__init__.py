@@ -27,6 +27,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     port: int = args.port
 
     with contextlib.suppress(KeyboardInterrupt):
-        run(host=host, port=port)
+        run(host, port)
 
     return 0
