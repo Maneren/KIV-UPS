@@ -281,6 +281,15 @@ class Board:
         """Return the per-player remaining piece counts."""
         return self._player_pieces
 
+    def clone(self) -> Board:
+        """Return a deep copy of this board."""
+        clone = Board()
+        clone._data = {ptr: list(stack) for ptr, stack in self._data.items()}
+        clone._player_pieces = {
+            player: dict(kinds) for player, kinds in self._player_pieces.items()
+        }
+        return clone
+
     # -- rules ----------------------------------------------------------
 
     def can_player_place(self, player: Player, kind: PieceKind) -> bool:

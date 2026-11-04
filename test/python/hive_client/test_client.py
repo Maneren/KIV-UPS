@@ -331,10 +331,7 @@ def test_prop_every_generated_move_is_legal(board: Board) -> None:
     """Every move returned by moves_for_player must be applicable."""
     for player in (Player.White, Player.Black):
         for move in board.moves_for_player(player, board.get_player_pieces()[player]):
-            # Copy the board to avoid mutating the hypothesis-generated one.
-            trial = Board()
-            trial._data = {k: list(v) for k, v in board._data.items()}
-            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial = board.clone()
             trial.apply_move(move, player)
 
 
@@ -346,9 +343,7 @@ def test_prop_hive_stays_connected_after_move(board: Board) -> None:
         return
     for player in (Player.White, Player.Black):
         for move in board.moves_for_player(player, board.get_player_pieces()[player]):
-            trial = Board()
-            trial._data = {k: list(v) for k, v in board._data.items()}
-            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial = board.clone()
             trial.apply_move(move, player)
             # Collect all occupied tiles.
             occupied = set(trial._data.keys())
@@ -376,9 +371,7 @@ def test_prop_place_decrements_count(board: Board) -> None:
         for move in board.moves_for_player(player, board.get_player_pieces()[player]):
             if isinstance(move, MovePiece):
                 continue  # skip moves, only test placements
-            trial = Board()
-            trial._data = {k: list(v) for k, v in board._data.items()}
-            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial = board.clone()
             trial.apply_move(move, player)
             after = trial.get_player_pieces()[player]
             assert after[move.piece_kind] == before[move.piece_kind] - 1
@@ -397,9 +390,7 @@ def test_prop_move_preserves_counts(board: Board) -> None:
         for move in board.moves_for_player(player, board.get_player_pieces()[player]):
             if not isinstance(move, MovePiece):
                 continue  # skip placements, only test moves
-            trial = Board()
-            trial._data = {k: list(v) for k, v in board._data.items()}
-            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial = board.clone()
             trial.apply_move(move, player)
             after = trial.get_player_pieces()[player]
             assert after == before, "Moving a piece changed supply counts"
