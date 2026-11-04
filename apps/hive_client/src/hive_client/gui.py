@@ -176,6 +176,32 @@ def draw_hex_outline(
         draw_line_ex(start, end, thickness, color)
 
 
+def _palette_tiles() -> list[tuple[PieceKind, Rectangle]]:
+    """Bounding rects for each draggable piece tile in the palette."""
+    rects: list[tuple[PieceKind, Rectangle]] = []
+    piece_kinds = (
+        PieceKind.Queen,
+        PieceKind.Spider,
+        PieceKind.Beetle,
+        PieceKind.Ant,
+        PieceKind.Grasshopper,
+    )
+    for i, kind in enumerate(piece_kinds):
+        y = PALETTE_Y_OFFSET + i * PALETTE_ROW_HEIGHT
+        rects.append(
+            (
+                kind,
+                Rectangle(
+                    PALETTE_X_OFFSET,
+                    y,
+                    PALETTE_TILE_SIZE,
+                    PALETTE_TILE_SIZE,
+                ),
+            )
+        )
+    return rects
+
+
 @dataclass
 class MouseEvent:
     """Mouse event state for a single frame."""
@@ -348,16 +374,9 @@ class HexRenderer:
     ) -> None:
         """Draw draggable piece tiles with remaining counts."""
         available = board.get_player_pieces()[current_player]
-        y = PALETTE_Y_OFFSET
-        for kind in (
-            PieceKind.Queen,
-            PieceKind.Spider,
-            PieceKind.Beetle,
-            PieceKind.Ant,
-            PieceKind.Grasshopper,
-        ):
-            center_x = PALETTE_X_OFFSET + PALETTE_TILE_SIZE / 2
-            center_y = y + PALETTE_TILE_SIZE / 2
+        for kind, rect in _palette_tiles():
+            center_x = rect.x + PALETTE_TILE_SIZE / 2
+            center_y = rect.y + PALETTE_TILE_SIZE / 2
             is_dragging = gui.dragging_kind is kind
             color = self._piece_color(Piece(kind=kind, owner=current_player))
 
@@ -391,8 +410,8 @@ class HexRenderer:
             count = available.get(kind, 0)
             draw_text(
                 f": {count}",
-                int(PALETTE_X_OFFSET + PALETTE_TILE_SIZE + 6),
-                int(y + PALETTE_TILE_SIZE / 2 - 8),
+                int(rect.x + PALETTE_TILE_SIZE + 6),
+                int(center_y - 8),
                 TEXT_FONT_SIZE,
                 DARKGRAY,
             )
@@ -405,11 +424,9 @@ class HexRenderer:
                     PALETTE_TILE_SIZE / 2,
                 )
 
-            y += PALETTE_ROW_HEIGHT
-
     def _draw_drag_piece(self, mouse: Vector2, kind: PieceKind) -> None:
         """Draw the piece being dragged, following the mouse."""
-        color = PIECE_COLORS[kind.name]
+        color = self._piece_color(Piece(kind=kind, owner=Player.White))
         draw_poly(mouse, HEX_SIDES, HEX_SIZE * 0.9, 0.0, color)
         letter = PIECE_LETTERS[kind.name]
         draw_text(
@@ -442,7 +459,7 @@ class InputController:
     """Mouse/keyboard input -> GameState mutations."""
 
     def __init__(self) -> None:
-        self.selected_kind = PieceKind.Queen
+        pass
 
     def handle_input(
         self,
@@ -564,28 +581,7 @@ class InputController:
 
     def _palette_rects(self) -> list[tuple[Rectangle, PieceKind]]:
         """Bounding rects for each draggable piece tile in the palette."""
-        rects: list[tuple[Rectangle, PieceKind]] = []
-        piece_kinds = (
-            PieceKind.Queen,
-            PieceKind.Spider,
-            PieceKind.Beetle,
-            PieceKind.Ant,
-            PieceKind.Grasshopper,
-        )
-        for i, kind in enumerate(piece_kinds):
-            y = PALETTE_Y_OFFSET + i * PALETTE_ROW_HEIGHT
-            rects.append(
-                (
-                    Rectangle(
-                        PALETTE_X_OFFSET,
-                        y,
-                        PALETTE_TILE_SIZE,
-                        PALETTE_TILE_SIZE,
-                    ),
-                    kind,
-                )
-            )
-        return rects
+        return [(rect, kind) for kind, rect in _palette_tiles()]
 
     def _find_clicked_tile(
         self,
