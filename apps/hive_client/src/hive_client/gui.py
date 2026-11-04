@@ -13,7 +13,7 @@ A short tutorial is drawn on the right side of the window.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pyray import (
     BLACK,
@@ -28,6 +28,7 @@ from pyray import (
     WHITE,
     Color,
     ConfigFlags,
+    Rectangle,
     Vector2,
     begin_drawing,
     check_collision_point_circle,
@@ -44,6 +45,7 @@ from pyray import (
     init_window,
     is_key_pressed,
     is_mouse_button_pressed,
+    is_mouse_button_released,
     set_config_flags,
     set_target_fps,
     window_should_close,
@@ -84,6 +86,10 @@ PIECE_SELECT_KEYS = {
 }
 AVAILABLE_X_OFFSET = 20.0
 AVAILABLE_Y_OFFSET = 20.0
+PALETTE_X_OFFSET = 20.0
+PALETTE_Y_OFFSET = 130.0
+PALETTE_TILE_SIZE = 34.0
+PALETTE_ROW_HEIGHT = 46.0
 TUTORIAL_PANEL_WIDTH = 320.0
 TUTORIAL_X_OFFSET = 16.0
 TUTORIAL_Y_OFFSET = 100.0
@@ -168,6 +174,15 @@ def draw_hex_outline(
 
 
 @dataclass
+class MouseEvent:
+    """Mouse event state for a single frame."""
+
+    pressed: bool
+    released: bool
+    position: Vector2
+
+
+@dataclass
 class GuiState:
     """Transient UI state owned by HiveGUI."""
 
@@ -177,6 +192,8 @@ class GuiState:
     selected_kind: PieceKind = PieceKind.Queen
     valid_moves: list[Move] | None = None
     tutorial_visible: bool = True
+    dragging_kind: PieceKind | None = None
+    drag_targets: list[TilePointer] = field(default_factory=list)
 
 
 class HexRenderer:
@@ -199,6 +216,15 @@ class HexRenderer:
         self._draw_turn_label(game.current_player, gui.window_center.x)
         self._draw_tiles(game.board, gui)
         self._draw_available(game.board, gui, game.current_player)
+        self._draw_palette(gui, game.board, game.current_player)
+
+        # Highlight drag targets while dragging.
+        if gui.dragging_kind is not None:
+            for ptr in gui.drag_targets:
+                pos = hex_to_pixel(ptr, gui.window_center)
+                draw_hex_outline(pos, GREEN, OUTLINE_THICKNESS_SPECIAL)
+            mouse = get_mouse_position()
+            self._draw_drag_piece(mouse, gui.dragging_kind)
 
         end_drawing()
 
@@ -301,6 +327,83 @@ class HexRenderer:
             )
             y += TEXT_FONT_SIZE + 4
 
+    def _draw_palette(
+        self, gui: GuiState, board: Board, current_player: Player
+    ) -> None:
+        """Draw draggable piece tiles with remaining counts."""
+        available = board.get_player_pieces()[current_player]
+        y = PALETTE_Y_OFFSET
+        for kind in (
+            PieceKind.Queen,
+            PieceKind.Spider,
+            PieceKind.Beetle,
+            PieceKind.Ant,
+            PieceKind.Grasshopper,
+        ):
+            x = PALETTE_X_OFFSET
+            is_dragging = gui.dragging_kind is kind
+            color = self._piece_color(Piece(kind=kind, owner=current_player))
+
+            # Tile background.
+            draw_rectangle(
+                int(x),
+                int(y),
+                int(PALETTE_TILE_SIZE),
+                int(PALETTE_TILE_SIZE),
+                color,
+            )
+            draw_hex_outline(
+                Vector2(x + PALETTE_TILE_SIZE / 2, y + PALETTE_TILE_SIZE / 2),
+                DARKGRAY,
+                OUTLINE_THICKNESS,
+                PALETTE_TILE_SIZE / 2,
+            )
+
+            # Piece letter.
+            letter = PIECE_LETTERS[kind.name]
+            text_color = WHITE if current_player is Player.White else BLACK
+            draw_text(
+                letter,
+                int(x + PALETTE_TILE_SIZE / 2 - 8),
+                int(y + PALETTE_TILE_SIZE / 2 - 10),
+                int(PALETTE_TILE_SIZE * 0.8),
+                text_color,
+            )
+
+            # Count next to tile.
+            count = available.get(kind, 0)
+            draw_text(
+                f": {count}",
+                int(x + PALETTE_TILE_SIZE + 6),
+                int(y + PALETTE_TILE_SIZE / 2 - 8),
+                TEXT_FONT_SIZE,
+                DARKGRAY,
+            )
+
+            if is_dragging:
+                draw_hex_outline(
+                    Vector2(x + PALETTE_TILE_SIZE / 2, y + PALETTE_TILE_SIZE / 2),
+                    GREEN,
+                    OUTLINE_THICKNESS_SPECIAL,
+                    PALETTE_TILE_SIZE / 2,
+                )
+
+            y += PALETTE_ROW_HEIGHT
+
+    def _draw_drag_piece(self, mouse: Vector2, kind: PieceKind) -> None:
+        """Draw the piece being dragged, following the mouse."""
+        color = PIECE_COLORS[kind.name]
+        draw_poly(mouse, HEX_SIDES, HEX_SIZE * 0.9, 0.0, color)
+        letter = PIECE_LETTERS[kind.name]
+        draw_text(
+            letter,
+            int(mouse.x) - 6,
+            int(mouse.y) - 8,
+            int(TEXT_FONT_SIZE * 0.9),
+            WHITE,
+        )
+        draw_hex_outline(mouse, DARKGRAY, OUTLINE_THICKNESS, HEX_SIZE * 0.9)
+
     def _piece_color(self, piece: Piece) -> Color:
         """Return the piece color: base kind color for White, darkened for Black."""
         base = PIECE_COLORS[piece.kind.name]
@@ -328,11 +431,30 @@ class InputController:
         self,
         game: GameState,
         gui: GuiState,
-        mouse: Vector2,
+        event: MouseEvent,
     ) -> None:
+        mouse = event.position
+
         # Empty board: first piece always goes at (0, 0).
         if game.board.is_empty_all():
-            game.apply(make_placement(TilePointer(0, 0), gui.selected_kind))
+            if event.pressed:
+                game.apply(make_placement(TilePointer(0, 0), gui.selected_kind))
+            return
+
+        palette_rects = self._palette_rects()
+
+        # Start a drag from the piece palette.
+        if event.pressed:
+            self._start_drag(gui, game, mouse, palette_rects)
+            return
+
+        # Complete a drag: place on a legal target hex, otherwise cancel.
+        if event.released and gui.dragging_kind is not None:
+            self._complete_drag(game, gui, mouse)
+            return
+
+        # While dragging, highlight targets but don't process board clicks.
+        if gui.dragging_kind is not None:
             return
 
         ptr = self._find_clicked_tile(game.board, gui, mouse)
@@ -340,18 +462,70 @@ class InputController:
             return
 
         # If moves are highlighted and we click a move target, execute it.
+        move_executed = False
         if gui.valid_moves is not None:
-            result = self._execute_highlighted_move(game, gui, ptr)
-            if result:
+            move_executed = self._execute_highlighted_move(game, gui, ptr)
+
+        if not move_executed:
+            if game.board.is_empty(ptr):
+                self._try_place_piece(game, gui, ptr)
+            else:
+                self._select_or_deselect_tile(game, gui, ptr)
+
+    def _start_drag(
+        self,
+        gui: GuiState,
+        game: GameState,
+        mouse: Vector2,
+        palette_rects: list[tuple[Rectangle, PieceKind]],
+    ) -> None:
+        for rect, kind in palette_rects:
+            if (
+                rect.x <= mouse.x <= rect.x + rect.width
+                and rect.y <= mouse.y <= rect.y + rect.height
+            ):
+                gui.dragging_kind = kind
+                gui.drag_targets = [
+                    ptr
+                    for ptr in game.board.valid_placements(game.current_player)
+                    if game.board.can_player_place_at(game.current_player, ptr)
+                ]
                 return
 
-        # Empty tile -> try to place the selected kind.
-        if game.board.is_empty(ptr):
-            self._try_place_piece(game, gui, ptr)
+    def _complete_drag(self, game: GameState, gui: GuiState, mouse: Vector2) -> None:
+        kind = gui.dragging_kind
+        if kind is None:
             return
+        ptr = self._find_clicked_tile(game.board, gui, mouse)
+        if ptr is not None and ptr in gui.drag_targets:
+            game.apply(make_placement(ptr, kind))
+        gui.dragging_kind = None
+        gui.drag_targets = []
 
-        # Occupied tile belonging to us -> select it and show valid moves.
-        self._select_or_deselect_tile(game, gui, ptr)
+    def _palette_rects(self) -> list[tuple[Rectangle, PieceKind]]:
+        """Bounding rects for each draggable piece tile in the palette."""
+        rects: list[tuple[Rectangle, PieceKind]] = []
+        piece_kinds = (
+            PieceKind.Queen,
+            PieceKind.Spider,
+            PieceKind.Beetle,
+            PieceKind.Ant,
+            PieceKind.Grasshopper,
+        )
+        for i, kind in enumerate(piece_kinds):
+            y = PALETTE_Y_OFFSET + i * PALETTE_ROW_HEIGHT
+            rects.append(
+                (
+                    Rectangle(
+                        PALETTE_X_OFFSET,
+                        y,
+                        PALETTE_TILE_SIZE,
+                        PALETTE_TILE_SIZE,
+                    ),
+                    kind,
+                )
+            )
+        return rects
 
     def _find_clicked_tile(
         self,
@@ -454,6 +628,12 @@ class HiveGUI:
 
             mouse = get_mouse_position()
 
+            event = MouseEvent(
+                pressed=is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
+                released=is_mouse_button_released(MOUSE_BUTTON_LEFT),
+                position=mouse,
+            )
+
             # Forced pass: once the game has started, if current player has no
             # legal move or placement (e.g. all their pieces are covered by
             # beetles), skip their turn. On the empty board the first piece is
@@ -470,8 +650,7 @@ class HiveGUI:
             if is_key_pressed(TUTORIAL_TOGGLE_KEY):
                 self.gui.tutorial_visible = not self.gui.tutorial_visible
 
-            if is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-                self.controller.handle_input(self.game, self.gui, mouse)
+            self.controller.handle_input(self.game, self.gui, event)
 
             self.renderer.draw(
                 self.gui,
