@@ -175,6 +175,19 @@ def draw_hex_outline(
         draw_line_ex(start, end, thickness, color)
 
 
+def snap_to_hex(mouse: Vector2, center: Vector2) -> Vector2:
+    """Snap a screen position to the nearest hex grid center."""
+    dx = mouse.x - center.x
+    dy = mouse.y - center.y
+    p = dx / (HEX_X_FACTOR * HEX_SIZE)
+    q = dy / (HEX_Y_FACTOR * HEX_SIZE) - p / 2.0
+    p_rounded = round(p)
+    q_rounded = round(q)
+    snapped_x = center.x + HEX_X_FACTOR * p_rounded * HEX_SIZE
+    snapped_y = center.y + HEX_Y_FACTOR * (q_rounded + p_rounded / 2.0) * HEX_SIZE
+    return Vector2(snapped_x, snapped_y)
+
+
 def _palette_tiles() -> list[tuple[PieceKind, Rectangle]]:
     """Bounding rects for each draggable piece tile in the palette."""
     rects: list[tuple[PieceKind, Rectangle]] = []
@@ -253,14 +266,16 @@ class HexRenderer:
                 pos = hex_to_pixel(ptr, gui.window_center)
                 draw_hex_outline(pos, GREEN, OUTLINE_THICKNESS_SPECIAL)
             mouse = get_mouse_position()
-            self._draw_drag_piece(mouse, gui.dragging_kind, game.current_player)
+            snapped = snap_to_hex(mouse, gui.window_center)
+            self._draw_drag_piece(snapped, gui.dragging_kind, game.current_player)
         elif gui.dragging_from is not None:
             for ptr in gui.drag_targets:
                 pos = hex_to_pixel(ptr, gui.window_center)
                 draw_hex_outline(pos, GREEN, OUTLINE_THICKNESS_SPECIAL)
             mouse = get_mouse_position()
+            snapped = snap_to_hex(mouse, gui.window_center)
             top = game.board.get_top(gui.dragging_from)
-            self._draw_drag_piece(mouse, top.kind, top.owner)
+            self._draw_drag_piece(snapped, top.kind, top.owner)
 
         end_drawing()
 
