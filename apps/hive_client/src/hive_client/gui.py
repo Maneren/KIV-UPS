@@ -475,6 +475,19 @@ class InputController:
         if gui.dragging_kind is not None or gui.dragging_from is not None:
             return
 
+        # Board clicks only happen on press; hovering should only update
+        # selection/highlights visually without executing moves.
+        if not event.pressed:
+            return
+
+        self._handle_board_click(game, gui, mouse)
+
+    def _handle_board_click(
+        self,
+        game: GameState,
+        gui: GuiState,
+        mouse: Vector2,
+    ) -> None:
         ptr = self._find_clicked_tile(game.board, gui, mouse)
         if ptr is None:
             return
