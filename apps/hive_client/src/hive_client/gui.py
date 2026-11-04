@@ -254,14 +254,14 @@ class HexRenderer:
                 pos = hex_to_pixel(ptr, gui.window_center)
                 draw_hex_outline(pos, GREEN, OUTLINE_THICKNESS_SPECIAL)
             mouse = get_mouse_position()
-            self._draw_drag_piece(mouse, gui.dragging_kind)
+            self._draw_drag_piece(mouse, gui.dragging_kind, game.current_player)
         elif gui.dragging_from is not None:
             for ptr in gui.drag_targets:
                 pos = hex_to_pixel(ptr, gui.window_center)
                 draw_hex_outline(pos, GREEN, OUTLINE_THICKNESS_SPECIAL)
             mouse = get_mouse_position()
             top = game.board.get_top(gui.dragging_from)
-            self._draw_drag_piece(mouse, top.kind)
+            self._draw_drag_piece(mouse, top.kind, top.owner)
 
         end_drawing()
 
@@ -424,9 +424,9 @@ class HexRenderer:
                     PALETTE_TILE_SIZE / 2,
                 )
 
-    def _draw_drag_piece(self, mouse: Vector2, kind: PieceKind) -> None:
+    def _draw_drag_piece(self, mouse: Vector2, kind: PieceKind, owner: Player) -> None:
         """Draw the piece being dragged, following the mouse."""
-        color = self._piece_color(Piece(kind=kind, owner=Player.White))
+        color = self._piece_color(Piece(kind=kind, owner=owner))
         draw_poly(mouse, HEX_SIDES, HEX_SIZE * 0.9, 0.0, color)
         letter = PIECE_LETTERS[kind.name]
         draw_text(
