@@ -54,7 +54,6 @@ from raylib import MOUSE_BUTTON_LEFT
 
 from hive_client.game import (
     Board,
-    GameResult,
     GameState,
     Move,
     MovePiece,
@@ -713,10 +712,6 @@ class HiveGUI:
                 self.game,
                 float(get_screen_width()),
             )
-
-            if self.game.result is not GameResult.ONGOING:
-                # Game over — wait for window close.
-                pass
 
         close_window()
 
