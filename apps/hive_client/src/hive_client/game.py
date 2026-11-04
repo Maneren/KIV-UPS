@@ -7,7 +7,7 @@ coordinates (p, q).
 
 from __future__ import annotations
 
-from collections.abc import Generator, Iterator
+from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from typing import overload
@@ -322,7 +322,7 @@ class Board:
         self, pos: TilePointer, piece: Piece
     ) -> Generator[Move, None, None]:
         """Yield all legal moves for the piece at ``pos``."""
-        handler = _PIECE_HANDLERS[piece.kind.value]
+        handler = _PIECE_MOVE_GENERATORS[piece.kind]
         yield from handler(self, pos)
 
     def moves_for_player(
@@ -552,13 +552,15 @@ class Board:
             queue.extend(self.valid_steps(current, ant))
 
 
-_PIECE_HANDLERS = (
-    Board.queens_moves,
-    Board.spider_moves,
-    Board.beetle_moves,
-    Board.grasshopper_moves,
-    Board.ant_moves,
-)
+_PIECE_MOVE_GENERATORS: dict[
+    PieceKind, Callable[[Board, TilePointer], Generator[Move, None, None]]
+] = {
+    PieceKind.Queen: Board.queens_moves,
+    PieceKind.Spider: Board.spider_moves,
+    PieceKind.Beetle: Board.beetle_moves,
+    PieceKind.Grasshopper: Board.grasshopper_moves,
+    PieceKind.Ant: Board.ant_moves,
+}
 
 
 class GameResult(Enum):
