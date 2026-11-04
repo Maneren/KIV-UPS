@@ -608,9 +608,13 @@ class InputController:
             clickable.append(ptr)
         clickable.extend(board.tiles_around_hive())
 
+        # Snap to the nearest hex center so the whole tile counts as a target,
+        # not just the middle.
+        snapped = snap_to_hex(mouse, gui.window_center)
+
         for ptr in clickable:
             pos = hex_to_pixel(ptr, gui.window_center)
-            if check_collision_point_circle(mouse, pos, BOARD_CLICK_RADIUS):
+            if check_collision_point_circle(snapped, pos, BOARD_CLICK_RADIUS):
                 return ptr
         return None
 
