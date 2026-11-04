@@ -312,6 +312,8 @@ class HexRenderer:
 
     def _draw_tiles(self, board: Board, gui: GuiState) -> None:
         for ptr, _piece in board.pieces():
+            if ptr == gui.dragging_from:
+                continue
             pos = hex_to_pixel(ptr, gui.window_center)
             stack = board.get(ptr)
 
