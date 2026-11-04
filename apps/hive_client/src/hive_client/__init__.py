@@ -1,32 +1,10 @@
-"""Hive game client."""
+"""
+Hive game client.
 
-import argparse
-import contextlib
-from collections.abc import Sequence
+Importing this package is side-effect free and does not import raylib; the GUI
+is loaded lazily by :func:`hive_client.cli.main`.
+"""
 
-from hive_client.gui import run
+from hive_client.cli import DEFAULT_HOST, DEFAULT_PORT, main
 
-__all__ = ["main"]
-
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8080
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    """Run the Hive client."""
-    parser = argparse.ArgumentParser(
-        prog="hive_client",
-        description="Hive game client (Python)",
-    )
-    _ = parser.add_argument("--host", default=DEFAULT_HOST, help="Server host")
-    _ = parser.add_argument(
-        "--port", type=int, default=DEFAULT_PORT, help="Server port"
-    )
-    args = parser.parse_args(argv)
-    host: str = args.host
-    port: int = args.port
-
-    with contextlib.suppress(KeyboardInterrupt):
-        run(host, port)
-
-    return 0
+__all__ = ["DEFAULT_HOST", "DEFAULT_PORT", "main"]
