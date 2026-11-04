@@ -312,12 +312,13 @@ class HexRenderer:
 
     def _draw_tiles(self, board: Board, gui: GuiState) -> None:
         for ptr, _piece in board.pieces():
-            if ptr == gui.dragging_from:
-                continue
             pos = hex_to_pixel(ptr, gui.window_center)
             stack = board.get(ptr)
 
             for i, stack_piece in enumerate(stack):
+                # Skip the top piece at dragging_from (it's being dragged).
+                if ptr == gui.dragging_from and i == len(stack) - 1:
+                    continue
                 size = HEX_SIZE * math.pow(0.85, i)
                 tile_color = self._piece_color(stack_piece)
                 draw_poly(
