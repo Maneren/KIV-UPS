@@ -11,8 +11,12 @@ from hive_client.game import (
     Player,
     TilePointer,
     make_placement,
+    rotate_left,
+    rotate_right,
 )
 from hive_client.network import (
+    Leave,
+    ListRequest,
     Login,
     Move,
     Over,
@@ -411,8 +415,6 @@ def test_prop_move_preserves_counts(board: Board) -> None:
 @settings(max_examples=100)
 def test_prop_rotate_inverse(direction: Direction) -> None:
     """rotate_right(rotate_left(d)) == d and vice versa."""
-    from hive_client.game import rotate_left, rotate_right
-
     assert rotate_right(rotate_left(direction)) == direction
     assert rotate_left(rotate_right(direction)) == direction
 
@@ -430,8 +432,6 @@ def test_prop_tile_pointer_hash_consistent(ptr: TilePointer) -> None:
 @settings(max_examples=100)
 def test_prop_serialize_parse_roundtrip(piece_letter: str) -> None:
     """serialize(parse_command(tokens)) should reproduce the wire format."""
-    from hive_client.network import parse_command, serialize
-
     cmd = parse_command(["PLACE", "3", "-1", piece_letter])
     assert isinstance(cmd, Place)
     wire = serialize(cmd)
@@ -444,15 +444,6 @@ def test_prop_serialize_parse_roundtrip(piece_letter: str) -> None:
 @settings(max_examples=100)
 def test_prop_command_roundtrip(command: str) -> None:
     """Every serializable command round-trips through parse/serialize."""
-    from hive_client.network import (
-        Leave,
-        ListRequest,
-        Login,
-        Place,
-        Rematch,
-        serialize,
-    )
-
     cmd_map = {
         "LOGIN": Login(nick="A", lobby="B"),
         "PLACE": Place(p=1, q=2, piece=PieceKind.Queen),
