@@ -10,7 +10,7 @@ dependencies = ["raylib~=6.0"]
 hive_client = "hive_client.__main__:main"
 
 [dependency-groups]
-dev = ["pytest~=9.1", "ruff~=0.17", "ty~=0.0"]
+dev = ["pytest~=9.1", "ruff~=0.17", "ty~=0.0", "hypothesis~=6.120"]
 
 [build-system]
 requires = ["uv_build~=0.13"]

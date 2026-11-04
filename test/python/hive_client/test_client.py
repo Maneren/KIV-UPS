@@ -2,6 +2,7 @@
 
 from hive_client.game import (
     Board,
+    Direction,
     GameResult,
     GameState,
     MovePiece,
@@ -273,3 +274,203 @@ def test_game_state_queen_surrounded_black_wins() -> None:
 def test_game_state_legal_moves_empty_board() -> None:
     state = GameState()
     assert state.legal_moves() == []
+
+
+# ---------------------------------------------------------------------------
+# Property-based tests (hypothesis)
+# ---------------------------------------------------------------------------
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+
+@st.composite
+def tile_pointer(draw: st.DrawFn) -> TilePointer:
+    return TilePointer(draw(st.integers(-5, 5)), draw(st.integers(-5, 5)))
+
+
+@st.composite
+def piece_kind(draw: st.DrawFn) -> PieceKind:
+    return draw(
+        st.sampled_from(
+            [
+                PieceKind.Queen,
+                PieceKind.Spider,
+                PieceKind.Beetle,
+                PieceKind.Grasshopper,
+                PieceKind.Ant,
+            ]
+        )
+    )
+
+
+@st.composite
+def player(draw: st.DrawFn) -> Player:
+    return draw(st.sampled_from([Player.White, Player.Black]))
+
+
+@st.composite
+def reachable_board(draw: st.DrawFn) -> Board:
+    """Build a board by applying a sequence of legal placements/moves."""
+    board = Board()
+    player = Player.White
+    # Place up to 8 pieces, alternating players where legal.
+    for _ in range(draw(st.integers(0, 8))):
+        moves = list(board.moves_for_player(player, board.get_player_pieces()[player]))
+        if not moves:
+            break
+        move = draw(st.sampled_from(moves))
+        board.apply_move(move, player)
+        player = player.other()
+    return board
+
+
+@given(reachable_board())
+@settings(max_examples=200)
+def test_prop_every_generated_move_is_legal(board: Board) -> None:
+    """Every move returned by moves_for_player must be applicable."""
+    for player in (Player.White, Player.Black):
+        for move in board.moves_for_player(player, board.get_player_pieces()[player]):
+            # Copy the board to avoid mutating the hypothesis-generated one.
+            trial = Board()
+            trial._data = {k: list(v) for k, v in board._data.items()}
+            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial.apply_move(move, player)
+
+
+@given(reachable_board())
+@settings(max_examples=200)
+def test_prop_hive_stays_connected_after_move(board: Board) -> None:
+    """After any legal move, all pieces on the board must be connected."""
+    if board.is_empty_all():
+        return
+    for player in (Player.White, Player.Black):
+        for move in board.moves_for_player(player, board.get_player_pieces()[player]):
+            trial = Board()
+            trial._data = {k: list(v) for k, v in board._data.items()}
+            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial.apply_move(move, player)
+            # Collect all occupied tiles.
+            occupied = set(trial._data.keys())
+            if len(occupied) <= 1:
+                continue
+            # Flood-fill from an arbitrary tile.
+            start = next(iter(occupied))
+            seen: set[TilePointer] = {start}
+            stack = [start]
+            while stack:
+                cur = stack.pop()
+                for nb in trial.neighbors(cur):
+                    if nb not in seen:
+                        seen.add(nb)
+                        stack.append(nb)
+            assert seen == occupied, "Hive split into disconnected components"
+
+
+@given(reachable_board())
+@settings(max_examples=200)
+def test_prop_place_decrements_count(board: Board) -> None:
+    """Placing a piece decrements the remaining count for that kind."""
+    for player in (Player.White, Player.Black):
+        before = dict(board.get_player_pieces()[player])
+        for move in board.moves_for_player(player, board.get_player_pieces()[player]):
+            if isinstance(move, MovePiece):
+                continue  # skip moves, only test placements
+            trial = Board()
+            trial._data = {k: list(v) for k, v in board._data.items()}
+            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial.apply_move(move, player)
+            after = trial.get_player_pieces()[player]
+            assert after[move.piece_kind] == before[move.piece_kind] - 1
+            # Other kinds unchanged.
+            for k, v in before.items():
+                if k != move.piece_kind:
+                    assert after[k] == v
+
+
+@given(reachable_board())
+@settings(max_examples=200)
+def test_prop_move_preserves_counts(board: Board) -> None:
+    """Moving a piece must not change remaining piece counts."""
+    for player in (Player.White, Player.Black):
+        before = dict(board.get_player_pieces()[player])
+        for move in board.moves_for_player(player, board.get_player_pieces()[player]):
+            if not isinstance(move, MovePiece):
+                continue  # skip placements, only test moves
+            trial = Board()
+            trial._data = {k: list(v) for k, v in board._data.items()}
+            trial._player_pieces = {p: dict(v) for p, v in board._player_pieces.items()}
+            trial.apply_move(move, player)
+            after = trial.get_player_pieces()[player]
+            assert after == before, "Moving a piece changed supply counts"
+
+
+@given(
+    st.sampled_from(
+        [
+            Direction(0, 1),
+            Direction(1, 0),
+            Direction(-1, 1),
+            Direction(-1, 0),
+            Direction(0, -1),
+            Direction(1, -1),
+        ]
+    )
+)
+@settings(max_examples=100)
+def test_prop_rotate_inverse(direction: Direction) -> None:
+    """rotate_right(rotate_left(d)) == d and vice versa."""
+    from hive_client.game import rotate_left, rotate_right
+
+    assert rotate_right(rotate_left(direction)) == direction
+    assert rotate_left(rotate_right(direction)) == direction
+
+
+@given(tile_pointer())
+@settings(max_examples=200)
+def test_prop_tile_pointer_hash_consistent(ptr: TilePointer) -> None:
+    """Equal TilePointers have equal hashes."""
+    other = TilePointer(ptr.p, ptr.q)
+    assert hash(ptr) == hash(other)
+    assert ptr == other
+
+
+@given(st.sampled_from(["Q", "S", "B", "G", "A"]))
+@settings(max_examples=100)
+def test_prop_serialize_parse_roundtrip(piece_letter: str) -> None:
+    """serialize(parse_command(tokens)) should reproduce the wire format."""
+    from hive_client.network import parse_command, serialize
+
+    cmd = parse_command(["PLACE", "3", "-1", piece_letter])
+    assert isinstance(cmd, Place)
+    wire = serialize(cmd)
+    # Re-parse the wire format.
+    reparsed = parse_command(wire.split(" ")[1:])
+    assert reparsed == cmd
+
+
+@given(st.sampled_from(["LOGIN", "PLACE", "MOVE", "REMATCH", "LEAVE", "LIST"]))
+@settings(max_examples=100)
+def test_prop_command_roundtrip(command: str) -> None:
+    """Every serializable command round-trips through parse/serialize."""
+    from hive_client.network import (
+        Leave,
+        ListRequest,
+        Login,
+        Place,
+        Rematch,
+        serialize,
+    )
+
+    cmd_map = {
+        "LOGIN": Login(nick="A", lobby="B"),
+        "PLACE": Place(p=1, q=2, piece=PieceKind.Queen),
+        "MOVE": Move(from_p=0, from_q=0, to_p=1, to_q=0, piece=PieceKind.Queen),
+        "REMATCH": Rematch(),
+        "LEAVE": Leave(),
+        "LIST": ListRequest(),
+    }
+    cmd = cmd_map[command]
+    wire = serialize(cmd)
+    reparsed = parse_command(wire.split(" ")[1:])
+    assert reparsed == cmd
