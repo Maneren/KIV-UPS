@@ -561,6 +561,8 @@ class InputController:
         ptr = self._find_clicked_tile(game.board, gui, mouse)
         if ptr is None:
             return
+        if game.board.is_empty(ptr):
+            return
         top = game.board.get_top(ptr)
         if top.owner is game.current_player:
             assert ptr is not None
