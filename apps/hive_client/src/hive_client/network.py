@@ -314,7 +314,7 @@ class HiveClient:
         line = serialize(cmd) + "\n"
         self._sock.sendall(line.encode("ascii"))
 
-    def receive(self) -> object:
+    def receive(self) -> IncomingMessage:
         """Block until one full message is available and parse it."""
         if self._sock is None:
             raise RuntimeError("not connected")
