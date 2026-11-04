@@ -132,6 +132,11 @@ class Lobbies:
 
 Command = Login | Place | Move | Rematch | Leave | ListRequest
 
+# Server -> client messages (not sent by the client).
+ServerMessage = Ack | Reject | Start | Over | LobbyStatus | Lobbies
+
+IncomingMessage = Command | ServerMessage
+
 
 def place_from_wire(p: int, q: int, piece_letter: str) -> PlacePiece:
     """Create a PlacePiece from wire-protocol coordinates and piece letter."""
@@ -200,7 +205,7 @@ def _parse_move(rest: list[str]) -> Move:
     )
 
 
-def parse_command(tokens: list[str]) -> object:
+def parse_command(tokens: list[str]) -> IncomingMessage:
     """
     Parse a command line (without the HIVE magic) into a dataclass.
 
@@ -249,27 +254,19 @@ def _parse_lobbies(rest: list[str]) -> Lobbies:
 
 def serialize(cmd: Command) -> str:
     """Serialize a command dataclass into its wire representation."""
-    if isinstance(cmd, Login):
-        return _serialize_login(cmd)
-    if isinstance(cmd, Place):
-        return _serialize_place(cmd)
-    if isinstance(cmd, Move):
-        return _serialize_move(cmd)
-    if isinstance(cmd, (Rematch, Leave, ListRequest, Ack)):
-        return _serialize_simple(cmd)
-    raise TypeError(f"cannot serialize {cmd!r}")
-
-
-def _serialize_simple(cmd: Rematch | Leave | ListRequest | Ack) -> str:
     match cmd:
+        case Login():
+            return _serialize_login(cmd)
+        case Place():
+            return _serialize_place(cmd)
+        case Move():
+            return _serialize_move(cmd)
         case Rematch():
             return f"{MAGIC} REMATCH"
         case Leave():
             return f"{MAGIC} LEAVE"
         case ListRequest():
             return f"{MAGIC} LIST"
-        case Ack():
-            return f"{MAGIC} ACK"
     raise TypeError(f"cannot serialize {cmd!r}")
 
 
