@@ -176,13 +176,45 @@ def draw_hex_outline(
 
 
 def snap_to_hex(mouse: Vector2, center: Vector2) -> Vector2:
-    """Snap a screen position to the nearest hex grid center."""
+    """
+    Snap a screen position to the nearest hex grid center.
+
+    Uses cube-coordinate rounding (the standard approach for hex grids)
+    so that rounding at hex boundaries is consistent and doesn't snap
+    to the wrong tile when the mouse is exactly on a border.
+    """
     dx = mouse.x - center.x
     dy = mouse.y - center.y
+
+    # Axial coordinates from screen space.
     p = dx / (HEX_X_FACTOR * HEX_SIZE)
     q = dy / (HEX_Y_FACTOR * HEX_SIZE) - p / 2.0
-    p_rounded = round(p)
-    q_rounded = round(q)
+
+    # Convert axial (p, q) to cube (x, z) with y = -x - z.
+    x = p
+    z = q
+    y = -x - z
+
+    # Round all three cube coordinates.
+    rx = round(x)
+    ry = round(y)
+    rz = round(z)
+
+    # Fix rounding error so x + y + z == 0.
+    x_diff = abs(rx - x)
+    y_diff = abs(ry - y)
+    z_diff = abs(rz - z)
+
+    if x_diff > y_diff and x_diff > z_diff:
+        rx = -ry - rz
+    elif y_diff > z_diff:
+        ry = -rx - rz
+    else:
+        rz = -rx - ry
+
+    p_rounded = rx
+    q_rounded = rz
+
     snapped_x = center.x + HEX_X_FACTOR * p_rounded * HEX_SIZE
     snapped_y = center.y + HEX_Y_FACTOR * (q_rounded + p_rounded / 2.0) * HEX_SIZE
     return Vector2(snapped_x, snapped_y)
