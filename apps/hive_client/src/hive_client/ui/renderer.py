@@ -21,11 +21,12 @@ from pyray import (
     draw_rectangle,
     draw_text,
     end_drawing,
+    measure_text,
 )
 
 from hive_client.app.view import GameView
 from hive_client.domain.geometry import HEX_SIDES
-from hive_client.domain.pieces import Piece, PieceKind, Player
+from hive_client.domain.pieces import Piece, Player
 from hive_client.ui.geometry import (
     HEX_SIZE,
     Point,
@@ -34,8 +35,6 @@ from hive_client.ui.geometry import (
     snap_to_pixel,
 )
 from hive_client.ui.layout import (
-    AVAILABLE_X_OFFSET,
-    AVAILABLE_Y_OFFSET,
     PALETTE_TILE_SIZE,
     TUTORIAL_PANEL_WIDTH,
     TUTORIAL_X_OFFSET,
@@ -89,7 +88,6 @@ class HexRenderer:
             self._draw_tutorial(context.width, context.height)
         self._draw_turn_label(view.current_player, context.center[0])
         self._draw_tiles(view, context.center)
-        self._draw_available(view)
         self._draw_palette(view)
         self._draw_drag(view, context.center, context.mouse)
 
@@ -139,28 +137,16 @@ class HexRenderer:
 
         for stack in view.stacks:
             pos = hex_to_pixel(stack.tile, center)
-            for i, stack_piece in enumerate(stack.pieces):
-                # Skip the top piece at the drag origin (it follows the mouse).
-                if stack.tile == drag_from and i == len(stack.pieces) - 1:
-                    continue
+            # Skip the top piece at the drag origin (it follows the mouse).
+            pieces = stack.pieces if stack.tile != drag_from else stack.pieces[:-1]
+            for i, stack_piece in enumerate(pieces):
                 size = HEX_SIZE * math.pow(0.85, i)
-                draw_poly(
-                    Vector2(int(pos[0]), int(pos[1])),
-                    HEX_SIDES,
-                    size,
-                    0.0,
-                    piece_color(stack_piece),
+                _draw_piece_tile(
+                    pos,
+                    stack_piece,
+                    size=size,
+                    font_size=TEXT_FONT_SIZE,
                 )
-
-                text_color = WHITE if stack_piece.owner is Player.White else BLACK
-                draw_text(
-                    piece_letter(stack_piece),
-                    int(pos[0]) - 6,
-                    int(pos[1]) - 8,
-                    TEXT_FONT_SIZE,
-                    text_color,
-                )
-                _draw_hex_outline(pos, DARKGRAY, OUTLINE_THICKNESS, size)
 
         for ptr in view.move_targets:
             _draw_hex_outline(
@@ -183,28 +169,6 @@ class HexRenderer:
                 OUTLINE_THICKNESS_SPECIAL,
             )
 
-    def _draw_available(self, view: GameView) -> None:
-        y = AVAILABLE_Y_OFFSET
-        draw_text(
-            f"Selected: {view.selected_kind.name[0]}",
-            int(AVAILABLE_X_OFFSET),
-            int(y),
-            TEXT_FONT_SIZE,
-            DARKGRAY,
-        )
-        y += TEXT_FONT_SIZE + 4
-        for piece_kind, count in view.remaining:
-            if count == 0:
-                continue
-            draw_text(
-                f"{PIECE_LETTERS[piece_kind.name]}: {count}",
-                int(AVAILABLE_X_OFFSET),
-                int(y),
-                TEXT_FONT_SIZE,
-                DARKGRAY,
-            )
-            y += TEXT_FONT_SIZE + 4
-
     def _draw_palette(self, view: GameView) -> None:
         """Draw draggable piece tiles with remaining counts."""
         remaining = view.remaining_map
@@ -215,30 +179,12 @@ class HexRenderer:
                 and view.drag.from_tile is None
                 and view.drag.kind is kind
             )
-            color = piece_color(Piece(kind=kind, owner=view.current_player))
-
-            draw_poly(
-                Vector2(center_x, center_y),
-                HEX_SIDES,
-                PALETTE_TILE_SIZE / 2,
-                0.0,
-                color,
-            )
-            _draw_hex_outline(
+            _draw_piece_tile(
                 (center_x, center_y),
-                DARKGRAY,
-                OUTLINE_THICKNESS,
-                PALETTE_TILE_SIZE / 2,
-            )
-
-            letter = PIECE_LETTERS[kind.name]
-            text_color = WHITE if view.current_player is Player.White else BLACK
-            draw_text(
-                letter,
-                int(center_x - 8),
-                int(center_y - 10),
-                int(PALETTE_TILE_SIZE * 0.8),
-                text_color,
+                Piece(kind=kind, owner=view.current_player),
+                size=PALETTE_TILE_SIZE / 2,
+                font_size=int(PALETTE_TILE_SIZE * 0.5),
+                letter=PIECE_LETTERS[kind.name],
             )
 
             draw_text(
@@ -271,30 +217,45 @@ class HexRenderer:
             )
 
         snapped = snap_to_pixel(mouse, center)
-        self._draw_drag_piece(snapped, view.drag.kind, view.drag.owner)
+        _draw_piece_tile(
+            snapped,
+            Piece(kind=view.drag.kind, owner=view.drag.owner),
+            size=HEX_SIZE * 0.9,
+            font_size=int(TEXT_FONT_SIZE * 0.9),
+            letter=PIECE_LETTERS[view.drag.kind.name],
+            text_color=WHITE,
+        )
 
-    def _draw_drag_piece(
-        self,
-        position: Point,
-        kind: PieceKind,
-        owner: Player,
-    ) -> None:
-        """Draw the piece being dragged, following the mouse."""
-        color = piece_color(Piece(kind=kind, owner=owner))
-        draw_poly(_vec(position), HEX_SIDES, HEX_SIZE * 0.9, 0.0, color)
-        draw_text(
-            PIECE_LETTERS[kind.name],
-            int(position[0]) - 6,
-            int(position[1]) - 8,
-            int(TEXT_FONT_SIZE * 0.9),
-            WHITE,
-        )
-        _draw_hex_outline(
-            position,
-            DARKGRAY,
-            OUTLINE_THICKNESS,
-            HEX_SIZE * 0.9,
-        )
+
+def _draw_piece_tile(  # noqa: PLR0913 - visual style knobs shared by callers
+    position: Point,
+    piece: Piece,
+    *,
+    size: float,
+    font_size: int,
+    letter: str | None = None,
+    text_color: Color | None = None,
+) -> None:
+    """
+    Draw one hexagonal piece tile: fill, centred letter, and outline.
+
+    Shared by the board stacks, the palette, and the drag preview so all three
+    render pieces identically.
+    """
+    draw_poly(_vec(position), HEX_SIDES, size, 0.0, piece_color(piece))
+
+    glyph = piece_letter(piece) if letter is None else letter
+    if text_color is None:
+        text_color = WHITE if piece.owner is Player.White else BLACK
+    draw_text(
+        glyph,
+        int(position[0] - measure_text(glyph, font_size) / 2.0),
+        int(position[1] - font_size / 2.0),
+        font_size,
+        text_color,
+    )
+
+    _draw_hex_outline(position, DARKGRAY, OUTLINE_THICKNESS, size)
 
 
 def _draw_hex_outline(
