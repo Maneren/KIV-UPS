@@ -1,181 +1,70 @@
-# CMake C++ Project Template with Google-Test Unit Testing Library
+# kiv-ups
 
-## Division with a remainder library
+Implementation of the board game **Hive**: a C++ game engine and networked
+server (`src/`) with a Python/raylib client (`apps/hive_client`).
 
-Are you just starting with `CMake` or C++?
+## Rules of Hive
 
-Do you need some easy-to-use starting point, but one that has the basic moving
-parts you are likely going to need on any medium sized project?
+Hive is a two-player abstract strategy game played with hexagonal tiles
+representing various insects. There is no board: tiles are placed adjacent to
+one another, forming a shared hive. The goal is to completely surround your
+opponent's Queen Bee.
 
-Do you believe in test-driven development, or at the very least — write your
-tests _together_ with the feature code? If so you'd want to start your project
-pre-integrated with a good testing framework.
+- Each player starts with the same set of tiles: one Queen Bee, two Ants, two
+  Spiders, two Beetles, and three Grasshoppers.
+- On your turn you either place a new tile from your hand into the hive, or
+  move a tile already in play.
+- The Queen Bee must be placed within your first four turns.
+- Each insect moves differently:
+  - Queen Bees move one space at a time
+  - Ants move anywhere around the hive
+  - Spiders move around the hive, but only exactly three spaces
+  - Beetles move one space at a time, and can climb on top of other insects
+  - Grasshoppers jump in a straight line to the first empty space
+- An insect may only be moved if:
+  - it does not break the hive into two separate pieces,
+  - it is the top-most insect at its tile, and
+  - it physically fits through the gaps between adjacent tiles
+    (except for Beetles and Grasshoppers which physically move over
+    other insects).
+- You win by surrounding the enemy Queen Bee with tiles (of either color).
 
-Divider is a minimal project that's kept deliberately very small. When you build
-it using CMake/make (see below) it generates:
+See the [Wikipedia article](<https://en.wikipedia.org/wiki/Hive_(game)>) for the
+full rules.
 
-1. A tiny **static library** `lib/libdivision.a`,
-2. **A command line binary `bin/divider`**, which links with the library,
-
-## Usage
+## How to run
 
 ### Prerequisites
 
-You will need:
+- A C++23 compiler (GCC or Clang)
+- CMake 3.31+
+- Ninja
+- [just](https://github.com/casey/just)
+- [uv](https://docs.astral.sh/uv/) (for the Python client)
 
-- A modern C/C++ compiler
-- CMake 3.10+ installed (on a Mac, run `brew install cmake`)
-
-### Building The Project
-
-#### Git Clone
-
-First we need to check out the git repo:
+### Build
 
 ```bash
-❯ mkdir ~/workspace
-❯ cd ~/workspace
-❯ git clone \
-    https://github.com/Maneren/cmake-project-template \
-    my-project
-❯ cd my-project
+just configure   # configure the build in ./build
+just build       # compile everything (Debug)
 ```
 
-then either install GoogleTest from your favorite package manager (preferably)
-or fetch the git submodule:
+Without `just`:
 
 ```bash
-❯ git submodule update --init
+cmake -B build -G "Ninja Multi-Config"
+cmake --build build --config Debug
 ```
 
-#### Project Structure
-
-There are three empty folders: `lib`, `bin`, and `include`. Those are populated
-by `cmake` when you run `--install`.
-
-The rest should be obvious: `src` is for the source files, and `test` is where
-we put our unit tests.
-
-Now we can build this project, and below we show three separate ways to do so.
-
-#### Building
+### Run
 
 ```bash
-❯ just configure
-❯ cd build
-❯ cmake ..
-❯ make && make install
-❯ cd ..
+just run Debug hive_server   # C++ server
+just run Debug hive_client   # Python client (requires a display)
 ```
 
-There is a Just file that simplifies this process.
+### Test
 
 ```bash
-❯ just configure install
+just test
 ```
-
-#### Running the tests
-
-```bash
-❯ cd build && ctest
-    Start 1: DividerTest.5_DivideBy_2
-1/5 Test #1: DividerTest.5_DivideBy_2 .........   Passed    0.00 sec
-    Start 2: DividerTest.9_DivideBy_3
-2/5 Test #2: DividerTest.9_DivideBy_3 .........   Passed    0.00 sec
-    Start 3: DividerTest.17_DivideBy_19
-3/5 Test #3: DividerTest.17_DivideBy_19 .......   Passed    0.00 sec
-    Start 4: DividerTest.Long_DivideBy_Long
-4/5 Test #4: DividerTest.Long_DivideBy_Long ...   Passed    0.00 sec
-    Start 5: DividerTest.DivisionByZero
-5/5 Test #5: DividerTest.DivisionByZero .......   Passed    0.00 sec
-
-100% tests passed, 0 tests failed out of 5
-
-Total Test time (real) =   0.01 sec
-```
-
-Again, with Just it's a one-liner:
-
-```bash
-❯ just test
-```
-
-#### Running the CLI Executable
-
-Without arguments, it prints out its usage:
-
-```bash
-❯ bin/divider
-
-Divider © 2018 Monkey Claps Inc.
-
-Usage:
-    divider <numerator> <denominator>
-
-Description:
-    Computes the result of a fractional division,
-    and reports both the result and the remainder.
-```
-
-But with arguments, it computes as expected the denominator:
-
-```bash
-❯ bin/divider 112443477 12309324
-
-Divider © 2018 Monkey Claps Inc.
-
-Division : 112443477 / 12309324 = 9
-Remainder: 112443477 % 12309324 = 1659561
-```
-
-And lastly, with Just it's again as simple as:
-
-```bash
-❯ just run Debug 112443477 12309324
-```
-
-(Debug is the CMake build type, so it can be also Release, RelWithDebInfo or MinSizeRel.)
-
-### Using it as a C++ Library
-
-We build a static library that, given a simple fraction will return the integer
-result of the division, and the remainder.
-
-We can use it from C++ like so:
-
-```cpp
-#include <division/division.h>
-#include <iostream>
-
-const auto f = division::Fraction{25, 7};
-const auto r = division::Division(f).divide();
-
-std::cout << "Result of the division is " << r.division;
-std::cout << "Remainder of the division is " << r.remainder;
-```
-
-## File Locations
-
-- `src/*` — C++ code that ultimately compiles into a library
-- `test/external` — C++ libraries used for tests (e.g. Google Test)
-- `test/src` — C++ test suite
-- `bin/`, `lib`, `include` are all empty directories, until the `make install`
-  install the project artifacts there.
-
-Tests:
-
-- A `test` folder with the automated tests and fixtures that mimics
-  the directory structure of `src`.
-- For every C++ file in `src/A/B/<name>.cpp` there is a corresponding
-  test file `test/A/B/<name>_test.cpp`
-
-## License
-
-&copy; 2017-2019 Konstantin Gredeskoul. 2025-present Maneren
-
-Open sourced under MIT license, the terms of which can be read here — [MIT License](http://opensource.org/licenses/MIT).
-
-## Acknowledgements
-
-This project is a derivative of the [CMake Tutorial](https://cmake.org/cmake-tutorial/),
-and is aimed at saving time for starting new projects in C++ that use CMake and GoogleTest.
