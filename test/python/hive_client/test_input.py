@@ -5,9 +5,9 @@ from hive_client.domain.game import ORIGIN, GameSession
 from hive_client.domain.geometry import TilePointer
 from hive_client.domain.moves import make_placement
 from hive_client.domain.pieces import PieceKind, Player
-from hive_client.ui.geometry import hex_to_pixel
-from hive_client.ui.input import InputRouter, MouseEvent
-from hive_client.ui.layout import palette_tiles
+from hive_client.ui.geometry import hex_to_pixel, rect_center
+from hive_client.ui.input import MouseEvent, MouseRouter
+from hive_client.ui.layout import PALETTE_PIECES
 
 CENTER = (400.0, 300.0)
 
@@ -19,79 +19,125 @@ def _session_with_white_queen_and_black_ant() -> GameSession:
     return session
 
 
-def _click(router: InputRouter, point: tuple[float, float]) -> None:
+def _press(router: MouseRouter, point: tuple[float, float]) -> None:
     router.handle(MouseEvent(pressed=True, released=False, position=point), CENTER)
+
+
+def _release(router: MouseRouter, point: tuple[float, float]) -> None:
     router.handle(MouseEvent(pressed=False, released=True, position=point), CENTER)
 
 
-def test_click_places_opening_piece() -> None:
-    """A press/release on the centre hex performs the opening placement."""
-    controller = GameController()
-    router = InputRouter(controller)
+def _move(router: MouseRouter, point: tuple[float, float]) -> None:
+    router.handle(MouseEvent(pressed=False, released=False, position=point), CENTER)
 
-    _click(router, hex_to_pixel(ORIGIN, CENTER))
+
+def _drag(
+    router: MouseRouter,
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> None:
+    _press(router, start)
+    _release(router, end)
+
+
+def _palette_point(kind: PieceKind) -> tuple[float, float]:
+    rect = next(rect for palette_kind, rect in PALETTE_PIECES if palette_kind is kind)
+    return rect_center(rect)
+
+
+def test_palette_drag_places_opening_piece() -> None:
+    """Dragging a palette piece to the centre performs the opening placement."""
+    controller = GameController()
+    router = MouseRouter(controller)
+
+    _drag(router, _palette_point(PieceKind.Queen), hex_to_pixel(ORIGIN, CENTER))
 
     assert controller.session.board.get_top(ORIGIN).kind is PieceKind.Queen
     assert controller.session.current_player is Player.Black
+    assert controller.state.drag is None
 
 
-def test_click_selects_a_piece_and_then_moves_it() -> None:
-    """Clicking a piece selects it; clicking a target executes the move."""
-    controller = GameController(_session_with_white_queen_and_black_ant())
-    router = InputRouter(controller)
-
-    _click(router, hex_to_pixel(ORIGIN, CENTER))
-    assert controller.state.selected_tile == ORIGIN
-
-    target = next(iter(controller.view().move_targets))
-    _click(router, hex_to_pixel(target, CENTER))
-
-    assert controller.session.board.get_top(target).kind is PieceKind.Queen
-    assert controller.session.current_player is Player.Black
-
-
-def test_palette_click_selects_kind_without_placing() -> None:
-    """A click on the palette only changes the selected kind."""
+def test_click_without_drag_does_not_place_piece() -> None:
+    """A press/release without moving off the tile places nothing."""
     controller = GameController()
-    router = InputRouter(controller)
-    kind, rect = next(
-        (kind, rect) for kind, rect in palette_tiles() if kind is PieceKind.Ant
-    )
+    router = MouseRouter(controller)
 
-    _click(router, rect.center)
+    _drag(router, hex_to_pixel(ORIGIN, CENTER), hex_to_pixel(ORIGIN, CENTER))
 
-    assert controller.state.selected_kind is PieceKind.Ant
     assert controller.session.board.is_empty_all()
     assert controller.state.drag is None
 
 
-def test_palette_drag_to_board_places_piece() -> None:
-    """Pressing the palette and releasing on a target places the piece."""
-    controller = GameController()
-    router = InputRouter(controller)
-    _kind, rect = next(
-        (kind, rect) for kind, rect in palette_tiles() if kind is PieceKind.Ant
-    )
+def test_board_drag_moves_piece() -> None:
+    """Dragging a piece to a target executes the move."""
+    controller = GameController(_session_with_white_queen_and_black_ant())
+    router = MouseRouter(controller)
 
-    router.handle(
-        MouseEvent(pressed=True, released=False, position=rect.center),
-        CENTER,
-    )
-    router.handle(
-        MouseEvent(pressed=False, released=True, position=hex_to_pixel(ORIGIN, CENTER)),
-        CENTER,
-    )
+    _press(router, hex_to_pixel(ORIGIN, CENTER))
+    drag = controller.state.drag
+    assert drag is not None
+    target = next(iter(drag.targets))
+    _release(router, hex_to_pixel(target, CENTER))
 
-    assert controller.session.board.get_top(ORIGIN).kind is PieceKind.Ant
+    assert controller.session.current_player is Player.Black
+    assert controller.session.board.get_top(target).kind is PieceKind.Queen
     assert controller.state.drag is None
 
 
-def test_click_far_from_hive_is_ignored() -> None:
-    """Clicks outside the playable area neither place nor select anything."""
+def test_hover_over_own_piece_exposes_targets() -> None:
+    """Hovering an own piece previews its legal moves without clicking."""
     controller = GameController(_session_with_white_queen_and_black_ant())
-    router = InputRouter(controller)
+    router = MouseRouter(controller)
 
-    _click(router, hex_to_pixel(TilePointer(20, -10), CENTER))
+    _move(router, hex_to_pixel(ORIGIN, CENTER))
 
-    assert controller.state.selected_tile is None
+    assert controller.state.hovered_tile == ORIGIN
+    assert controller.view().hover_targets
+
+
+def test_hover_before_queen_shows_hint() -> None:
+    """Hovering a movable piece without a Queen explains why it is blocked."""
+    session = GameSession()
+    session.apply(make_placement(ORIGIN, PieceKind.Ant))
+    session.apply(make_placement(TilePointer(1, 0), PieceKind.Ant))
+    controller = GameController(session)
+    router = MouseRouter(controller)
+
+    _move(router, hex_to_pixel(ORIGIN, CENTER))
+
+    assert controller.view().hint is not None
+    assert not controller.view().hover_targets
+
+
+def test_hover_over_palette_exposes_placement_targets() -> None:
+    """Hovering a palette piece previews its placement tiles."""
+    controller = GameController()
+    router = MouseRouter(controller)
+
+    _move(router, _palette_point(PieceKind.Ant))
+
+    assert controller.state.hovered_kind is PieceKind.Ant
+    assert controller.view().hover_targets == frozenset({ORIGIN})
+
+
+def test_hover_in_palette_gap_is_ignored() -> None:
+    """Hovering the gap between palette tiles must not crash."""
+    controller = GameController()
+    router = MouseRouter(controller)
+    _kind, first = PALETTE_PIECES[0]
+    gap_point = (first.x + 4, first.y + first.height + 2)
+
+    _move(router, gap_point)
+
+    assert not controller.view().hover_targets
+
+
+def test_hover_far_from_hive_is_ignored() -> None:
+    """Hovering outside the playable area neither previews nor changes anything."""
+    controller = GameController(_session_with_white_queen_and_black_ant())
+    router = MouseRouter(controller)
+
+    _move(router, hex_to_pixel(TilePointer(20, -10), CENTER))
+
+    assert not controller.view().hover_targets
     assert controller.session.current_player is Player.White

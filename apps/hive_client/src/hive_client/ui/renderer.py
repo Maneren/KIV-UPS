@@ -11,6 +11,7 @@ from pyray import (
     DARKGRAY,
     GREEN,
     RAYWHITE,
+    RED,
     WHITE,
     Color,
     Vector2,
@@ -88,6 +89,7 @@ class HexRenderer:
         if context.tutorial_visible:
             self._draw_tutorial(context.width, context.height)
         self._draw_turn_label(view.current_player, context.center[0])
+        self._draw_hint(view.hint, context.center[0])
         self._draw_tiles(view, context.center)
         self._draw_palette(view)
         self._draw_drag(view, context.center, context.mouse)
@@ -131,6 +133,13 @@ class HexRenderer:
         label_x = center_x - label_width / 2.0
         draw_text(turn_text, int(label_x), 10, TEXT_FONT_SIZE, DARKGRAY)
 
+    def _draw_hint(self, hint: str | None, center_x: float) -> None:
+        if hint is None:
+            return
+
+        width = measure_text(hint, TEXT_FONT_SIZE)
+        draw_text(hint, int(center_x - width / 2.0), 40, TEXT_FONT_SIZE, DARKGRAY)
+
     # -- board ------------------------------------------------------------
 
     def _draw_tiles(self, view: GameView, center: Point) -> None:
@@ -149,7 +158,7 @@ class HexRenderer:
                     font_size=TEXT_FONT_SIZE,
                 )
 
-        for ptr in view.move_targets:
+        for ptr in view.hover_targets:
             _draw_hex_outline(
                 hex_to_pixel(ptr, center),
                 GREEN,
@@ -163,10 +172,10 @@ class HexRenderer:
                 OUTLINE_THICKNESS_SPECIAL,
             )
 
-        if view.selected_tile is not None:
+        if view.hint is not None and view.hovered_tile is not None:
             _draw_hex_outline(
-                hex_to_pixel(view.selected_tile, center),
-                BLACK,
+                hex_to_pixel(view.hovered_tile, center),
+                RED,
                 OUTLINE_THICKNESS_SPECIAL,
             )
 

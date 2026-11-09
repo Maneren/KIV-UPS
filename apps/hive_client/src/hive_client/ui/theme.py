@@ -11,14 +11,13 @@ from pyray import (
     Color,
 )
 
-from hive_client.domain.pieces import Piece, PieceKind, Player
+from hive_client.domain.pieces import Piece, Player
 
 __all__ = [
     "OUTLINE_THICKNESS",
     "OUTLINE_THICKNESS_SPECIAL",
     "PIECE_COLORS",
     "PIECE_LETTERS",
-    "PIECE_SELECT_KEYS",
     "TEXT_FONT_SIZE",
     "TUTORIAL_FONT_SIZE",
     "TUTORIAL_LINES",
@@ -32,14 +31,6 @@ OUTLINE_THICKNESS_SPECIAL = 3.0
 TEXT_FONT_SIZE = 24
 TUTORIAL_FONT_SIZE = 16
 TUTORIAL_TOGGLE_KEY = 72  # 'H'
-
-PIECE_SELECT_KEYS: dict[int, PieceKind] = {
-    81: PieceKind.Queen,  # 'Q'
-    83: PieceKind.Spider,  # 'S'
-    66: PieceKind.Beetle,  # 'B'
-    71: PieceKind.Grasshopper,  # 'G'
-    65: PieceKind.Ant,  # 'A'
-}
 
 PIECE_COLORS: dict[str, Color] = {
     "Queen": GOLD,
@@ -60,17 +51,18 @@ PIECE_LETTERS: dict[str, str] = {
 TUTORIAL_LINES: list[str] = [
     "Hive — how to play",
     "",
-    "• Click an empty hex to place",
-    "  your selected piece.",
+    "• Drag a piece from the left",
+    "  palette onto the board.",
     "  The first piece must go at",
     "  the board center (0, 0).",
     "",
-    "• Click your own piece to",
-    "  select it and show its valid",
-    "  moves (green rings).",
+    "• Drag your own piece to a",
+    "  green ring to move it.",
+    "  Hover a piece to preview",
+    "  its legal moves.",
     "",
-    "• Click a green ring to move",
-    "  the piece there.",
+    "• Place your Queen before",
+    "  moving any piece.",
     "",
     "• Queen moves 1 step.",
     "• Spider moves exactly 3 steps.",

@@ -44,9 +44,9 @@ class GameView:
     current_player: Player
     result: GameResult
     remaining: tuple[tuple[PieceKind, int], ...]
-    selected_kind: PieceKind
-    selected_tile: TilePointer | None
-    move_targets: frozenset[TilePointer]
+    hovered_tile: TilePointer | None
+    hover_targets: frozenset[TilePointer]
+    hint: str | None
     drag: DragView | None
 
     @property

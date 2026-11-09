@@ -1,9 +1,9 @@
 """
 UI-agnostic game interaction controller.
 
-The controller translates high-level user intents (``click_tile``,
-``begin_palette_drag``, ``drop_on_tile``, …) into legal moves submitted to a
-:class:`~hive_client.domain.game.GameSession`.  It contains no raylib, pixel,
+The controller translates high-level user intents (``begin_palette_drag``,
+``begin_board_drag``, ``drop_on_tile``, ``hover``) into legal moves submitted to
+a :class:`~hive_client.domain.game.GameSession`.  It contains no raylib, pixel,
 or windowing code, so the complete interaction model is testable headlessly.
 """
 
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from hive_client.app.view import DragView, GameView, StackView
 from hive_client.domain.game import ORIGIN, GameSession
 from hive_client.domain.geometry import TilePointer
-from hive_client.domain.moves import Move, MovePiece, make_placement
+from hive_client.domain.moves import MovePiece, make_placement
 from hive_client.domain.pieces import PIECE_KINDS, PieceKind, Player
 
 __all__ = ["DragState", "GameController", "InteractionState"]
@@ -32,11 +32,11 @@ class DragState:
 
 @dataclass
 class InteractionState:
-    """Transient selection and drag state owned by the controller."""
+    """Transient hover and drag state owned by the controller."""
 
-    selected_kind: PieceKind = PieceKind.Queen
-    selected_tile: TilePointer | None = None
-    valid_moves: tuple[Move, ...] = field(default_factory=tuple)
+    hovered_tile: TilePointer | None = None
+    hovered_kind: PieceKind | None = None
+    hover_targets: frozenset[TilePointer] = field(default_factory=frozenset)
     drag: DragState | None = None
 
 
@@ -48,67 +48,66 @@ class GameController:
         self.session = session or GameSession()
         self.state = InteractionState()
 
-    # -- selection / turn -------------------------------------------------
-
-    def select_kind(self, kind: PieceKind) -> None:
-        """Choose which piece kind to place on the next tile click."""
-        self.state.selected_kind = kind
+    # -- turn -------------------------------------------------------------
 
     def advance(self) -> None:
         """Advance the game by handling a forced pass, if one is needed."""
         if self.session.pass_if_stuck():
-            self._clear_selection()
+            self._clear_hover()
             self.cancel_drag()
 
-    # -- click interaction ------------------------------------------------
+    # -- hover interaction ------------------------------------------------
 
-    def click_tile(self, tile: TilePointer) -> bool:
-        """Handle a click on ``tile`` and return whether anything changed."""
-        if self.session.is_over():
-            return False
+    def hover(
+        self,
+        *,
+        tile: TilePointer | None = None,
+        kind: PieceKind | None = None,
+    ) -> None:
+        """Preview legal targets for the piece under the cursor."""
+        if (tile, kind) == (self.state.hovered_tile, self.state.hovered_kind):
+            return
 
-        # Opening: the first piece always goes at the centre.
-        if self.session.board.is_empty_all():
-            return self.session.submit(make_placement(tile, self.state.selected_kind))
+        self.state.hovered_tile = tile
+        self.state.hovered_kind = kind
+        self.state.hover_targets = self._targets_for(tile, kind)
 
-        if self._execute_highlighted_move(tile):
-            return True
+    def _targets_for(
+        self,
+        tile: TilePointer | None,
+        kind: PieceKind | None,
+    ) -> frozenset[TilePointer]:
+        if kind is not None:
+            if not self.session.can_place(kind):
+                return frozenset()
+            return frozenset(self.session.placement_targets())
 
-        if self.session.board.is_empty(tile):
-            return self._try_place_piece(tile)
+        if tile is None:
+            return frozenset()
 
-        return self._select_or_deselect_tile(tile)
+        return frozenset(
+            move.to
+            for move in self.session.moves_from(tile)
+            if isinstance(move, MovePiece)
+        )
 
-    def _execute_highlighted_move(self, tile: TilePointer) -> bool:
-        if self.state.selected_tile == tile:
-            self._clear_selection()
-            return True
+    def _clear_hover(self) -> None:
+        self.state.hovered_tile = None
+        self.state.hovered_kind = None
+        self.state.hover_targets = frozenset()
 
-        for move in self.state.valid_moves:
-            if isinstance(move, MovePiece) and move.to == tile:
-                if self.session.submit(move):
-                    self._clear_selection()
-                return True
-        return False
+    def _hover_hint(self, tile: TilePointer | None) -> str | None:
+        if tile is None:
+            return None
 
-    def _try_place_piece(self, tile: TilePointer) -> bool:
-        move = make_placement(tile, self.state.selected_kind)
-        if not self.session.submit(move):
-            return False
-        self._clear_selection()
-        return True
-
-    def _select_or_deselect_tile(self, tile: TilePointer) -> bool:
-        if self.state.selected_tile == tile:
-            self._clear_selection()
-            return True
-
-        if not self.session.can_move_from(tile):
-            return False
-
-        self.state.selected_tile = tile
-        self.state.valid_moves = self.session.moves_from(tile)
-        return True
+        board = self.session.board
+        if board.is_empty(tile):
+            return None
+        if board.get_top(tile).owner is not self.session.current_player:
+            return None
+        if not board.has_placed_queen(self.session.current_player):
+            return "Place your Queen before moving pieces."
+        return None
 
     # -- drag interaction -------------------------------------------------
 
@@ -164,7 +163,7 @@ class GameController:
 
         self.cancel_drag()
         if applied:
-            self._clear_selection()
+            self._clear_hover()
         return applied
 
     def cancel_drag(self) -> None:
@@ -197,10 +196,9 @@ class GameController:
                 targets=drag.targets,
             )
         )
-
-        move_targets = frozenset(
-            move.to for move in self.state.valid_moves if isinstance(move, MovePiece)
-        )
+        # A drag already shows its own targets; suppress the hover preview.
+        hovered_tile = None if drag is not None else self.state.hovered_tile
+        hover_targets = frozenset() if drag is not None else self.state.hover_targets
         remaining = board.remaining(self.session.current_player)
 
         return GameView(
@@ -209,12 +207,8 @@ class GameController:
             current_player=self.session.current_player,
             result=self.session.result,
             remaining=tuple((kind, remaining[kind]) for kind in PIECE_KINDS),
-            selected_kind=self.state.selected_kind,
-            selected_tile=self.state.selected_tile,
-            move_targets=move_targets,
+            hovered_tile=hovered_tile,
+            hover_targets=hover_targets,
+            hint=self._hover_hint(hovered_tile),
             drag=drag_view,
         )
-
-    def _clear_selection(self) -> None:
-        self.state.selected_tile = None
-        self.state.valid_moves = ()

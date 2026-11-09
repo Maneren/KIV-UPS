@@ -19,13 +19,9 @@ from pyray import (
 )
 
 from hive_client.app.controller import GameController
-from hive_client.domain.game import GameSession
-from hive_client.ui.input import MouseRouter, MouseEvent
+from hive_client.ui.input import MouseEvent, MouseRouter
 from hive_client.ui.renderer import HexRenderer, RenderContext
-from hive_client.ui.theme import (
-    PIECE_SELECT_KEYS,
-    TUTORIAL_TOGGLE_KEY,
-)
+from hive_client.ui.theme import TUTORIAL_TOGGLE_KEY
 
 __all__ = ["HiveGUI", "run"]
 
@@ -61,10 +57,6 @@ class HiveGUI:
             width = float(get_screen_width())
             height = float(get_screen_height())
             center = (width * 0.5, height * 0.5)
-
-            for key, kind in PIECE_SELECT_KEYS.items():
-                if is_key_pressed(key):
-                    self.controller.select_kind(kind)
 
             if is_key_pressed(TUTORIAL_TOGGLE_KEY):
                 self.tutorial_visible = not self.tutorial_visible

@@ -24,38 +24,61 @@ def test_opening_placement_only_at_origin() -> None:
     """The opening piece is only accepted at the board centre."""
     controller = GameController()
 
-    assert not controller.click_tile(TilePointer(1, 0))
+    assert controller.begin_palette_drag(PieceKind.Queen)
+    assert not controller.drop_on_tile(TilePointer(1, 0))
     assert controller.session.board.is_empty_all()
 
-    assert controller.click_tile(ORIGIN)
-    assert not controller.session.board.is_empty_all()
+    assert controller.begin_palette_drag(PieceKind.Queen)
+    assert controller.drop_on_tile(ORIGIN)
     assert controller.session.current_player is Player.Black
 
 
-def test_click_own_piece_selects_it_and_exposes_moves() -> None:
-    """Clicking an own movable piece selects it and shows its moves."""
+def test_hover_own_piece_exposes_moves() -> None:
+    """Hovering an own movable piece previews its moves."""
     controller = GameController(_session_with_white_queen_and_black_ant())
 
-    assert controller.click_tile(ORIGIN)
-    assert controller.state.selected_tile == ORIGIN
-    assert controller.state.valid_moves
+    controller.hover(tile=ORIGIN)
+
+    assert controller.state.hovered_tile == ORIGIN
+    assert controller.state.hover_targets
+    view = controller.view()
+    assert view.hovered_tile == ORIGIN
+    assert view.hover_targets
+    assert view.hint is None
+
+
+def test_hover_own_piece_before_queen_shows_hint() -> None:
+    """A piece cannot move before the Queen is placed, so show a hint."""
+    session = GameSession()
+    session.apply(make_placement(ORIGIN, PieceKind.Ant))
+    session.apply(make_placement(TilePointer(1, 0), PieceKind.Ant))
+    controller = GameController(session)
+
+    controller.hover(tile=ORIGIN)
 
     view = controller.view()
-    assert view.selected_tile == ORIGIN
-    assert view.move_targets
+    assert not view.hover_targets
+    assert view.hint == "Place your Queen before moving pieces."
 
 
-def test_clicking_a_move_target_moves_the_piece() -> None:
-    """Clicking a highlighted target executes the move."""
+def test_hover_opponent_piece_exposes_no_moves() -> None:
+    """Hovering a piece that is not the current player's shows no targets."""
     controller = GameController(_session_with_white_queen_and_black_ant())
-    controller.click_tile(ORIGIN)
 
-    target = next(iter(controller.view().move_targets))
-    assert controller.click_tile(target)
+    controller.hover(tile=TilePointer(1, 0))
 
-    assert controller.session.current_player is Player.Black
-    assert controller.session.board.get_top(target).kind is PieceKind.Queen
-    assert controller.state.selected_tile is None
+    assert not controller.state.hover_targets
+    assert not controller.view().hover_targets
+
+
+def test_hover_palette_exposes_placement_targets() -> None:
+    """Hovering a palette piece previews where it could be placed."""
+    controller = GameController()
+
+    controller.hover(kind=PieceKind.Ant)
+
+    assert controller.state.hovered_kind == PieceKind.Ant
+    assert controller.view().hover_targets == frozenset({ORIGIN})
 
 
 def test_palette_drag_places_first_piece() -> None:
