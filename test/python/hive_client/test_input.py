@@ -5,9 +5,9 @@ from hive_client.domain.game import ORIGIN, GameSession
 from hive_client.domain.geometry import TilePointer
 from hive_client.domain.moves import make_placement
 from hive_client.domain.pieces import PieceKind, Player
-from hive_client.ui.geometry import hex_to_pixel, rect_center
+from hive_client.ui.geometry import hex_to_pixel
 from hive_client.ui.input import MouseEvent, MouseRouter
-from hive_client.ui.layout import PALETTE_PIECES
+from hive_client.ui.layout import PALETTE_PIECES, rect_center
 
 CENTER = (400.0, 300.0)
 

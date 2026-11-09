@@ -21,9 +21,9 @@ from hive_client.domain.pieces import (
     make_initial_supply,
 )
 
-__all__ = ["MAX_STACK_IGNORE", "Board"]
+__all__ = ["Board"]
 
-MAX_STACK_IGNORE = 2
+_MAX_STACK_IGNORE = 2
 
 
 class Board:
@@ -38,14 +38,6 @@ class Board:
         }
 
     # -- access ---------------------------------------------------------
-
-    def get(self, ptr: TilePointer) -> list[Piece]:
-        """Return the full (mutable) stack of pieces at ``ptr``."""
-        return self._data[ptr]
-
-    def stack_at(self, ptr: TilePointer) -> tuple[Piece, ...]:
-        """Return an immutable snapshot of the stack at ``ptr``."""
-        return tuple(self._data.get(ptr, ()))
 
     def stacks(self) -> Iterator[tuple[TilePointer, tuple[Piece, ...]]]:
         """Yield ``(tile, pieces)`` snapshots for every occupied tile."""
@@ -277,7 +269,7 @@ class Board:
 
     def moving_breaks_hive(self, ptr: TilePointer) -> bool:
         """Return True if lifting the piece at ``ptr`` splits the hive."""
-        if len(self._data) <= MAX_STACK_IGNORE:
+        if len(self._data) <= _MAX_STACK_IGNORE:
             return False
 
         stack = self._data.get(ptr)
@@ -286,9 +278,9 @@ class Board:
         if len(stack) > 1:
             return False
 
-        # Seed the BFS from a single neighbor only. If we seeded from all
-        # neighbors simultaneously, pieces adjacent to ``ptr`` would always be
-        # marked reachable even when they're only connected through ``ptr``.
+        # Seed the BFS from one neighbour: seeding from all of them would mark
+        # pieces adjacent to ``ptr`` as reachable even if they only connect
+        # through it.
         first_neighbor = next(self.neighbors(ptr, ptr), None)
         assert first_neighbor is not None, (
             "There should be at least one neighbor, unless the hive is already split."
@@ -374,35 +366,10 @@ class Board:
         ignored: TilePointer | None = None,
     ) -> bool:
         """Return True if ``cell`` has at least one occupied neighbor."""
-        if len(self._data) == MAX_STACK_IGNORE:
+        if len(self._data) == _MAX_STACK_IGNORE:
             return True
         return any(not self.is_empty(ptr, ignored) for ptr in neighboring_cells(cell))
 
     def surrounding_count(self, ptr: TilePointer) -> int:
         """Return how many of the six neighbours of ``ptr`` are occupied."""
         return sum(1 for _ in self.neighbors(ptr))
-
-    # -- per-piece move generators -------------------------------------
-
-    def grasshopper_moves(
-        self,
-        grasshopper: TilePointer,
-    ) -> Generator[Move, None, None]:
-        """Yield grasshopper moves: jump over a line of pieces."""
-        yield from movement.grasshopper_moves(self, grasshopper)
-
-    def queens_moves(self, queen: TilePointer) -> Generator[Move, None, None]:
-        """Yield queen moves: one step to any adjacent empty cell."""
-        yield from movement.queen_moves(self, queen)
-
-    def beetle_moves(self, beetle: TilePointer) -> Generator[Move, None, None]:
-        """Yield beetle moves: onto any neighboring occupied cell."""
-        yield from movement.beetle_moves(self, beetle)
-
-    def spider_moves(self, spider: TilePointer) -> Generator[Move, None, None]:
-        """Yield spider moves: exactly 3 steps without backtracking."""
-        yield from movement.spider_moves(self, spider)
-
-    def ant_moves(self, ant: TilePointer) -> Generator[Move, None, None]:
-        """Yield ant moves: any number of steps around the hive."""
-        yield from movement.ant_moves(self, ant)

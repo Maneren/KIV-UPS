@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from enum import Enum
 
 from hive_client.domain.board import Board
@@ -10,7 +9,7 @@ from hive_client.domain.geometry import HEX_SIDES, TilePointer
 from hive_client.domain.moves import Move, PlacePiece
 from hive_client.domain.pieces import PieceKind, Player
 
-__all__ = ["ORIGIN", "GameResult", "GameSession", "GameState"]
+__all__ = ["ORIGIN", "GameResult", "GameSession"]
 
 #: The first piece of the game is always placed at the board centre.
 ORIGIN = TilePointer(0, 0)
@@ -120,13 +119,6 @@ class GameSession:
         top = self.board.get_top(ptr)
         return tuple(self.board.moves_for_piece(ptr, top))
 
-    def legal_moves_for_current(self) -> Iterator[Move]:
-        """Yield legal moves lazily (prefer :meth:`has_legal_move` for checks)."""
-        yield from self.board.moves_for_player(
-            self.current_player,
-            self.board.remaining(self.current_player),
-        )
-
     def is_legal(self, move: Move) -> bool:
         """Check ``move`` against the current turn, supply, and movement rules."""
         if self.is_over():
@@ -185,21 +177,9 @@ class GameSession:
                 )
                 return
 
-    def _check_win(self) -> None:
-        """Backward-compatible alias for :meth:`check_win`."""
-        self.check_win()
-
     def queen_position(self, player: Player) -> TilePointer | None:
         """Return the tile of ``player``'s queen, or None if not placed."""
         for ptr, piece in self.board.pieces():
             if piece.owner is player and piece.kind is PieceKind.Queen:
                 return ptr
         return None
-
-    def _find_queen(self, player: Player) -> TilePointer | None:
-        """Backward-compatible alias for :meth:`queen_position`."""
-        return self.queen_position(player)
-
-
-#: Historical name kept as an alias for callers and tests.
-GameState = GameSession

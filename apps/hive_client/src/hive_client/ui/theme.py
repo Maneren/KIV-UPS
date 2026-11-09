@@ -6,9 +6,11 @@ from pyray import (
     BLUE,
     DARKGREEN,
     GOLD,
+    GRAY,
     PURPLE,
     RED,
     Color,
+    color_tint,
 )
 
 from hive_client.domain.pieces import Piece, Player
@@ -89,15 +91,6 @@ def piece_letter(piece: Piece) -> str:
 def piece_color(piece: Piece) -> Color:
     """Return the piece color: kind colour, darkened for Black."""
     base = PIECE_COLORS[piece.kind.name]
-    if hasattr(base, "r"):
-        r, g, b, a = base.r, base.g, base.b, base.a
-    else:  # pragma: no cover - older raylib bindings expose tuples
-        r, g, b, a = base
     if piece.owner is Player.Black:
-        return Color(
-            max(0, int(r * 0.5)),
-            max(0, int(g * 0.5)),
-            max(0, int(b * 0.5)),
-            a,
-        )
-    return Color(r, g, b, a)
+        return color_tint(base, GRAY)
+    return base

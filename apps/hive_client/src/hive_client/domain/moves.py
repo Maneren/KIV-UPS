@@ -11,7 +11,6 @@ __all__ = [
     "Move",
     "MovePiece",
     "PlacePiece",
-    "make_move",
     "make_placement",
 ]
 
@@ -34,11 +33,6 @@ class MovePiece:
 
 
 Move = PlacePiece | MovePiece
-
-
-def make_move(from_: TilePointer, to: TilePointer, piece_kind: PieceKind) -> Move:
-    """Create a ``MovePiece`` move."""
-    return MovePiece(from_=from_, to=to, piece_kind=piece_kind)
 
 
 def make_placement(pos: TilePointer, piece_kind: PieceKind) -> Move:

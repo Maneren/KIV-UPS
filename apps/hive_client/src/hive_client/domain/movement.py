@@ -1,10 +1,9 @@
 """
 Per-piece movement rules.
 
-The functions here are pure with respect to board mutation: they only *read* a
-:class:`~hive_client.domain.board.Board` and yield legal moves.  Keeping them
-outside ``Board`` separates the mutable game state from the movement
-algorithms and makes each rule independently testable.
+These functions only read a :class:`~hive_client.domain.board.Board` and yield
+legal moves; keeping them outside ``Board`` separates mutable state from the
+movement algorithms.
 """
 
 from __future__ import annotations

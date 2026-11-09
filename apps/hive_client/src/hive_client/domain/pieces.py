@@ -7,7 +7,6 @@ from enum import Enum
 
 __all__ = [
     "DEFAULT_PIECES_PER_PLAYER",
-    "NUMBER_OF_PIECES",
     "PIECE_KINDS",
     "Piece",
     "PieceKind",
@@ -36,8 +35,6 @@ class PieceKind(Enum):
     Grasshopper = 3
     Ant = 4
 
-
-NUMBER_OF_PIECES = 5
 
 #: Stable display/iteration order used by palettes and UI lists.
 PIECE_KINDS: tuple[PieceKind, ...] = (

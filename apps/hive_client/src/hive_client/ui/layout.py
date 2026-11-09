@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pyray import Rectangle
 
-from hive_client.domain.pieces import PIECE_KINDS, PieceKind
+from hive_client.domain.pieces import PIECE_KINDS
 
 __all__ = [
     "AVAILABLE_X_OFFSET",
@@ -16,6 +16,7 @@ __all__ = [
     "TUTORIAL_PANEL_WIDTH",
     "TUTORIAL_X_OFFSET",
     "TUTORIAL_Y_OFFSET",
+    "rect_center",
 ]
 
 AVAILABLE_X_OFFSET = 20.0
@@ -27,9 +28,6 @@ PALETTE_ROW_HEIGHT = 56.0
 TUTORIAL_PANEL_WIDTH = 320.0
 TUTORIAL_X_OFFSET = 16.0
 TUTORIAL_Y_OFFSET = 100.0
-
-
-type Palette = tuple[tuple[PieceKind, Rectangle], ...]
 
 
 PALETTE_BOUNDS = Rectangle(
@@ -52,3 +50,8 @@ PALETTE_PIECES = tuple(
     )
     for index, kind in enumerate(PIECE_KINDS)
 )
+
+
+def rect_center(rect: Rectangle) -> tuple[float, float]:
+    """Return the centre of ``rect``."""
+    return (rect.x + rect.width / 2, rect.y + rect.height / 2)

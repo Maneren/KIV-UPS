@@ -1,8 +1,7 @@
 """
 Exceptions raised by the Hive domain layer.
 
-All game-rule errors derive from :class:`RuntimeError` so existing callers
-that catch ``RuntimeError`` keep working.
+All game-rule errors derive from :class:`RuntimeError`.
 """
 
 from __future__ import annotations

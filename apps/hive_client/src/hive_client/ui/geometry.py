@@ -1,25 +1,22 @@
 """
 Screen-space hex geometry.
 
-Pure math only: no raylib imports, so this module can be tested on headless
-machines.  Callers deal in plain ``(x, y)`` tuples and domain ``TilePointer``
-values; the renderer adapts them to raylib vectors.
+Pure math only, so this module can be tested on headless machines.  Callers
+deal in plain ``(x, y)`` tuples and domain ``TilePointer`` values; the renderer
+adapts them to raylib vectors.
 """
 
 from __future__ import annotations
-from pyray import Rectangle
 
 import math
 
-from hive_client.domain.geometry import HEX_SIDES, TilePointer
+from hive_client.domain.geometry import TilePointer
 
 __all__ = [
-    "HEX_ANGLE_STEP",
     "HEX_SIZE",
     "HEX_X_FACTOR",
     "HEX_Y_FACTOR",
     "Point",
-    "hex_corners",
     "hex_to_pixel",
     "pixel_to_tile",
     "snap_to_pixel",
@@ -28,7 +25,6 @@ __all__ = [
 Point = tuple[float, float]
 
 HEX_SIZE = 40.0
-HEX_ANGLE_STEP = math.pi / 3.0
 HEX_X_FACTOR = 1.5
 HEX_Y_FACTOR = math.sqrt(3.0)
 
@@ -90,19 +86,3 @@ def snap_to_pixel(
 ) -> Point:
     """Snap a screen point to the centre of its nearest hex tile."""
     return hex_to_pixel(pixel_to_tile(point, center, size), center, size)
-
-
-def hex_corners(center: Point, size: float = HEX_SIZE) -> tuple[Point, ...]:
-    """Return the six corner points of a pointy-top hexagon."""
-    return tuple(
-        (
-            center[0] + size * math.cos(i * HEX_ANGLE_STEP),
-            center[1] + size * math.sin(i * HEX_ANGLE_STEP),
-        )
-        for i in range(HEX_SIDES)
-    )
-
-
-def rect_center(rect: Rectangle) -> Point:
-    """Return the center of the rectangle."""
-    return (rect.x + rect.width / 2, rect.y + rect.height / 2)

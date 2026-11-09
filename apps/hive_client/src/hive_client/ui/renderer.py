@@ -19,6 +19,7 @@ from pyray import (
     clear_background,
     draw_line_ex,
     draw_poly,
+    draw_poly_lines_ex,
     draw_rectangle,
     draw_text,
     end_drawing,
@@ -31,9 +32,7 @@ from hive_client.domain.pieces import Piece, Player
 from hive_client.ui.geometry import (
     HEX_SIZE,
     Point,
-    hex_corners,
     hex_to_pixel,
-    rect_center,
     snap_to_pixel,
 )
 from hive_client.ui.layout import (
@@ -42,6 +41,7 @@ from hive_client.ui.layout import (
     TUTORIAL_PANEL_WIDTH,
     TUTORIAL_X_OFFSET,
     TUTORIAL_Y_OFFSET,
+    rect_center,
 )
 from hive_client.ui.theme import (
     OUTLINE_THICKNESS,
@@ -274,6 +274,4 @@ def _draw_hex_outline(
     thickness: float,
     size: float = HEX_SIZE,
 ) -> None:
-    corners = hex_corners(center, size)
-    for start, end in zip(corners, (*corners[1:], corners[0]), strict=True):
-        draw_line_ex(_vec(start), _vec(end), thickness, color)
+    draw_poly_lines_ex(_vec(center), HEX_SIDES, size, 0.0, thickness, color)

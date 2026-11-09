@@ -1,10 +1,10 @@
-"""Tests for the Hive Python client: game engine, network protocol, and GUI."""
+"""Tests for the Hive game engine and wire protocol."""
 
-from hive_client.game import (
+from hive_client.domain import (
     Board,
     Direction,
     GameResult,
-    GameState,
+    GameSession,
     MovePiece,
     Piece,
     PieceKind,
@@ -14,7 +14,7 @@ from hive_client.game import (
     rotate_left,
     rotate_right,
 )
-from hive_client.network import (
+from hive_client.wire import (
     Leave,
     ListRequest,
     Login,
@@ -234,23 +234,23 @@ def test_tile_pointer_hash() -> None:
     assert hash(TilePointer(1, 2)) == hash(TilePointer(1, 2))
 
 
-def test_game_state_initial_state() -> None:
-    state = GameState()
+def test_game_session_initial_state() -> None:
+    state = GameSession()
     assert state.result is GameResult.ONGOING
     assert state.current_player is Player.White
     assert state.board.is_empty_all()
 
 
-def test_game_state_apply_move_switches_player() -> None:
-    state = GameState()
+def test_game_session_apply_move_switches_player() -> None:
+    state = GameSession()
     state.apply(make_placement(TilePointer(0, 0), PieceKind.Queen))
     assert state.current_player is Player.Black
     assert state.result is GameResult.ONGOING
 
 
-def test_game_state_queen_surrounded_black_wins() -> None:
+def test_game_session_queen_surrounded_black_wins() -> None:
     # White queen at (0,0) surrounded by 6 black pieces -> black wins.
-    state = GameState()
+    state = GameSession()
     state.apply(make_placement(TilePointer(0, 0), PieceKind.Queen))  # White Q
     # Surround with black pieces at all 6 neighbors (direct board placement).
     neighbors = [
@@ -271,12 +271,12 @@ def test_game_state_queen_surrounded_black_wins() -> None:
     ]
     for ptr, kind in zip(neighbors, kinds):
         state.board.apply_move(make_placement(ptr, kind), Player.Black)
-    state._check_win()
+    state.check_win()
     assert state.result is GameResult.BLACK_WINS
 
 
-def test_game_state_legal_moves_empty_board() -> None:
-    state = GameState()
+def test_game_session_legal_moves_empty_board() -> None:
+    state = GameSession()
     assert state.legal_moves() == []
 
 

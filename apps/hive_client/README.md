@@ -24,8 +24,6 @@ GUI, the terminal, and the network:
 | `hive_client.ui` | raylib only: pixel geometry, layout, theme, input hit-testing, renderer, window loop. | app, domain |
 | `hive_client.wire` | Wire protocol: message dataclasses, pure codec, TCP transport. | domain |
 
-`hive_client.game`, `hive_client.gui`, `hive_client.protocol`, and
-`hive_client.network` are thin compatibility facades over the new packages.
 Importing `hive_client` itself does not import raylib; the GUI is loaded
 lazily from `hive_client.cli`.
 
