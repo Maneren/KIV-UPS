@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pyray import (
     ConfigFlags,
+    MouseButton,
     close_window,
     get_mouse_position,
     get_screen_height,
@@ -16,12 +17,10 @@ from pyray import (
     set_target_fps,
     window_should_close,
 )
-from raylib import MOUSE_BUTTON_LEFT
 
 from hive_client.app.controller import GameController
 from hive_client.domain.game import GameSession
-from hive_client.ui.input import InputRouter, MouseEvent
-from hive_client.ui.layout import palette_tiles
+from hive_client.ui.input import MouseRouter, MouseEvent
 from hive_client.ui.renderer import HexRenderer, RenderContext
 from hive_client.ui.theme import (
     PIECE_SELECT_KEYS,
@@ -45,13 +44,8 @@ class HiveGUI:
         self.height = height
         self.controller = controller or GameController()
         self.renderer = HexRenderer()
-        self.router = InputRouter(self.controller)
+        self.mouse_router = MouseRouter(self.controller)
         self.tutorial_visible = True
-
-    @property
-    def game(self) -> GameSession:
-        """Return the session (kept for callers that used ``HiveGUI.game``)."""
-        return self.controller.session
 
     def run(self) -> None:
         """Open the client window and run the render loop."""
@@ -77,11 +71,11 @@ class HiveGUI:
 
             mouse = get_mouse_position()
             event = MouseEvent(
-                pressed=is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
-                released=is_mouse_button_released(MOUSE_BUTTON_LEFT),
+                pressed=is_mouse_button_pressed(MouseButton.MOUSE_BUTTON_LEFT),
+                released=is_mouse_button_released(MouseButton.MOUSE_BUTTON_LEFT),
                 position=(mouse.x, mouse.y),
             )
-            self.router.handle(event, center, palette_tiles())
+            self.mouse_router.handle(event, center)
 
             self.renderer.draw(
                 RenderContext(

@@ -32,14 +32,15 @@ from hive_client.ui.geometry import (
     Point,
     hex_corners,
     hex_to_pixel,
+    rect_center,
     snap_to_pixel,
 )
 from hive_client.ui.layout import (
+    PALETTE_PIECES,
     PALETTE_TILE_SIZE,
     TUTORIAL_PANEL_WIDTH,
     TUTORIAL_X_OFFSET,
     TUTORIAL_Y_OFFSET,
-    palette_tiles,
 )
 from hive_client.ui.theme import (
     OUTLINE_THICKNESS,
@@ -172,8 +173,8 @@ class HexRenderer:
     def _draw_palette(self, view: GameView) -> None:
         """Draw draggable piece tiles with remaining counts."""
         remaining = view.remaining_map
-        for kind, rect in palette_tiles():
-            center_x, center_y = rect.center
+        for kind, rect in PALETTE_PIECES:
+            center_x, center_y = rect_center(rect)
             is_dragging = (
                 view.drag is not None
                 and view.drag.from_tile is None

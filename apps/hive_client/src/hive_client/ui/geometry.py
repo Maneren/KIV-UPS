@@ -7,6 +7,7 @@ values; the renderer adapts them to raylib vectors.
 """
 
 from __future__ import annotations
+from pyray import Rectangle
 
 import math
 
@@ -100,3 +101,8 @@ def hex_corners(center: Point, size: float = HEX_SIZE) -> tuple[Point, ...]:
         )
         for i in range(HEX_SIDES)
     )
+
+
+def rect_center(rect: Rectangle) -> Point:
+    """Return the center of the rectangle."""
+    return (rect.x + rect.width / 2, rect.y + rect.height / 2)

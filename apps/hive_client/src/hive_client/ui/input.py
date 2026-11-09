@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pyray import check_collision_point_rec
+
 from hive_client.app.controller import DragState, GameController
 from hive_client.domain.geometry import TilePointer
 from hive_client.domain.pieces import PieceKind
 from hive_client.ui.geometry import Point, pixel_to_tile
-from hive_client.ui.layout import Rect, palette_tiles
+from hive_client.ui.layout import PALETTE_BOUNDS, PALETTE_PIECES
 
-__all__ = ["InputRouter", "MouseEvent"]
+__all__ = ["MouseEvent", "MouseRouter"]
 
 
 @dataclass
@@ -27,7 +29,7 @@ class MouseEvent:
     position: Point
 
 
-class InputRouter:
+class MouseRouter:
     """Route mouse input to a :class:`GameController`."""
 
     def __init__(self, controller: GameController) -> None:
@@ -38,58 +40,48 @@ class InputRouter:
         self,
         event: MouseEvent,
         center: Point,
-        palette: tuple[tuple[PieceKind, Rect], ...] | None = None,
     ) -> None:
         """Process one frame of mouse input."""
-        palette = palette if palette is not None else palette_tiles()
-
         if event.pressed:
-            self._on_press(event.position, center, palette)
+            self._on_press(event.position, center)
         if event.released:
-            self._on_release(event.position, center, palette)
+            self._on_release(event.position, center)
 
     def _on_press(
         self,
         point: Point,
         center: Point,
-        palette: tuple[tuple[PieceKind, Rect], ...],
     ) -> None:
-        kind = _palette_kind_at(point, palette)
-        if kind is not None:
+        if (kind := _palette_kind_at(point)) is not None:
             # Selecting on press means a simple click also picks the kind,
             # while holding and dragging starts a placement drag.
             self.controller.select_kind(kind)
             self.controller.begin_palette_drag(kind)
             return
 
-        tile = self._tile_at(point, center)
-        if tile is not None:
+        if (tile := self._tile_at(point, center)) is not None:
             self.controller.begin_board_drag(tile)
 
     def _on_release(
         self,
         point: Point,
         center: Point,
-        palette: tuple[tuple[PieceKind, Rect], ...],
     ) -> None:
-        drag = self.controller.state.drag
-        if drag is not None:
-            self._release_drag(point, center, palette, drag)
+        if (drag := self.controller.state.drag) is not None:
+            self._release_drag(point, center, drag)
             return
 
-        tile = self._tile_at(point, center)
-        if tile is not None:
+        if (tile := self._tile_at(point, center)) is not None:
             self.controller.click_tile(tile)
 
     def _release_drag(
         self,
         point: Point,
         center: Point,
-        palette: tuple[tuple[PieceKind, Rect], ...],
         drag: DragState,
     ) -> None:
         # A click on the palette without dragging just selects the kind.
-        if drag.from_tile is None and _palette_kind_at(point, palette) is drag.kind:
+        if drag.from_tile is None and _palette_kind_at(point) is drag.kind:
             self.controller.cancel_drag()
             return
 
@@ -112,11 +104,10 @@ class InputRouter:
         return tile if tile in view.clickable_tiles else None
 
 
-def _palette_kind_at(
-    point: Point,
-    palette: tuple[tuple[PieceKind, Rect], ...],
-) -> PieceKind | None:
-    for kind, rect in palette:
-        if rect.contains(point):
-            return kind
-    return None
+def _palette_kind_at(point: Point) -> PieceKind | None:
+    if not check_collision_point_rec(point, PALETTE_BOUNDS):
+        return None
+
+    return next(
+        kind for kind, rect in PALETTE_PIECES if check_collision_point_rec(point, rect)
+    )

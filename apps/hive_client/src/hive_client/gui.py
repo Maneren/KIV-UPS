@@ -7,10 +7,7 @@ The implementation is split across :mod:`hive_client.ui` and
 
 from __future__ import annotations
 
-from pyray import Rectangle, Vector2
-
-from hive_client.domain.geometry import HEX_SIDES, TilePointer
-from hive_client.domain.pieces import PieceKind
+from hive_client.domain.geometry import HEX_SIDES
 from hive_client.ui.app import HiveGUI, run
 from hive_client.ui.geometry import (
     HEX_ANGLE_STEP,
@@ -18,8 +15,6 @@ from hive_client.ui.geometry import (
     HEX_X_FACTOR,
     HEX_Y_FACTOR,
 )
-from hive_client.ui.geometry import hex_to_pixel as _hex_to_pixel
-from hive_client.ui.geometry import snap_to_pixel as _snap_to_pixel
 from hive_client.ui.input import MouseEvent
 from hive_client.ui.layout import (
     AVAILABLE_X_OFFSET,
@@ -31,7 +26,6 @@ from hive_client.ui.layout import (
     TUTORIAL_PANEL_WIDTH,
     TUTORIAL_X_OFFSET,
     TUTORIAL_Y_OFFSET,
-    palette_tiles,
 )
 from hive_client.ui.renderer import HexRenderer
 from hive_client.ui.theme import (
@@ -74,28 +68,6 @@ __all__ = [
     "HexRenderer",
     "HiveGUI",
     "MouseEvent",
-    "hex_to_pixel",
     "piece_letter",
     "run",
-    "snap_to_hex",
 ]
-
-
-def hex_to_pixel(ptr: TilePointer, center: Vector2) -> Vector2:
-    """Convert axial coordinates to a raylib ``Vector2`` (legacy helper)."""
-    x, y = _hex_to_pixel(ptr, (center.x, center.y))
-    return Vector2(x, y)
-
-
-def snap_to_hex(mouse: Vector2, center: Vector2) -> Vector2:
-    """Snap a raylib position to the nearest hex centre (legacy helper)."""
-    x, y = _snap_to_pixel((mouse.x, mouse.y), (center.x, center.y))
-    return Vector2(x, y)
-
-
-def _palette_tiles() -> list[tuple[PieceKind, Rectangle]]:
-    """Return legacy ``Rectangle`` palette entries."""
-    return [
-        (kind, Rectangle(rect.x, rect.y, rect.width, rect.height))
-        for kind, rect in palette_tiles()
-    ]
