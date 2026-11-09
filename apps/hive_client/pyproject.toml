@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Hive game client"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["raylib~=6.0"]
+dependencies = ["raylib~=6.2"]
 
 [project.scripts]
 hive_client = "hive_client.__main__:main"
