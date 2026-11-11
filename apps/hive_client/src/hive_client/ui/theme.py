@@ -1,6 +1,7 @@
 """Colors, typography, and key bindings for the raylib UI."""
 
 from __future__ import annotations
+from pathlib import Path
 
 from pyray import (
     BLUE,
@@ -22,7 +23,7 @@ __all__ = [
     "PIECE_LETTERS",
     "TEXT_FONT_SIZE",
     "TUTORIAL_FONT_SIZE",
-    "TUTORIAL_LINES",
+    "TUTORIAL_PARAGRAPHS",
     "TUTORIAL_TOGGLE_KEY",
     "piece_color",
     "piece_letter",
@@ -31,7 +32,7 @@ __all__ = [
 OUTLINE_THICKNESS = 2.0
 OUTLINE_THICKNESS_SPECIAL = 3.0
 TEXT_FONT_SIZE = 24
-TUTORIAL_FONT_SIZE = 16
+TUTORIAL_FONT_SIZE = 20
 TUTORIAL_TOGGLE_KEY = 72  # 'H'
 
 PIECE_COLORS: dict[str, Color] = {
@@ -50,34 +51,10 @@ PIECE_LETTERS: dict[str, str] = {
     "Grasshopper": "G",
 }
 
-TUTORIAL_LINES: list[str] = [
-    "Hive - how to play",
-    "",
-    "* Drag a piece from the left",
-    "  palette onto the board.",
-    "  The first piece must go at",
-    "  the board center (0, 0).",
-    "",
-    "* Drag your own piece to a",
-    "  green ring to move it.",
-    "  Hover a piece to preview",
-    "  its legal moves.",
-    "",
-    "* Place your Queen before",
-    "  moving any piece.",
-    "",
-    "* Queen moves 1 step.",
-    "* Spider moves exactly 3 steps.",
-    "* Beetle moves onto any",
-    "  neighbouring occupied cell.",
-    "* Grasshopper jumps over a line",
-    "  of pieces.",
-    "* Ant moves any number of steps",
-    "  around the hive.",
-    "",
-    "Goal: surround the enemy queen",
-    "with pieces (any colour).",
-]
+_TUTORIAL_TEXT_PATH = Path(__file__).parent / "assets" / "tutorial.txt"
+
+with _TUTORIAL_TEXT_PATH.open() as f:
+    TUTORIAL_PARAGRAPHS: list[str] = f.readlines()
 
 
 def piece_letter(piece: Piece) -> str:

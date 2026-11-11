@@ -43,6 +43,7 @@ from hive_client.ui.layout import (
     TUTORIAL_Y_OFFSET,
     rect_center,
 )
+from hive_client.ui.text import wrap_text
 from hive_client.ui.theme import (
     OUTLINE_THICKNESS,
     OUTLINE_THICKNESS_SPECIAL,
@@ -116,16 +117,17 @@ class HexRenderer:
             DARKGRAY,
         )
 
+        text_width = panel_width - 2 * TUTORIAL_X_OFFSET
+        text_x = int(panel_x + TUTORIAL_X_OFFSET)
+        line_height = TUTORIAL_FONT_SIZE + 4
+
         y = TUTORIAL_Y_OFFSET
         for line in TUTORIAL_LINES:
-            draw_text(
-                line,
-                int(panel_x + TUTORIAL_X_OFFSET),
-                int(y),
-                TUTORIAL_FONT_SIZE,
-                DARKGRAY,
-            )
-            y += TUTORIAL_FONT_SIZE + 4
+            for wrapped in wrap_text(line, text_width, TUTORIAL_FONT_SIZE):
+                if wrapped:
+                    draw_text(wrapped, text_x, int(y), TUTORIAL_FONT_SIZE, DARKGRAY)
+
+                y += line_height
 
     def _draw_turn_label(self, current_player: Player, center_x: float) -> None:
         turn_text = f"{current_player.name}'s turn"
