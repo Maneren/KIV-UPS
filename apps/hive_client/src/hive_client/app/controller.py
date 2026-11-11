@@ -85,6 +85,9 @@ class GameController:
         if tile is None:
             return frozenset()
 
+        return self._move_targets(tile)
+
+    def _move_targets(self, tile: TilePointer) -> frozenset[TilePointer]:
         return frozenset(
             move.to
             for move in self.session.moves_from(tile)
@@ -134,11 +137,7 @@ class GameController:
             kind=top.kind,
             owner=top.owner,
             from_tile=tile,
-            targets=frozenset(
-                move.to
-                for move in self.session.moves_from(tile)
-                if isinstance(move, MovePiece)
-            ),
+            targets=self._move_targets(tile),
         )
         return True
 

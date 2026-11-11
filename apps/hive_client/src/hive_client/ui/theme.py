@@ -1,6 +1,7 @@
 """Colors, typography, and key bindings for the raylib UI."""
 
 from __future__ import annotations
+
 from pathlib import Path
 
 from pyray import (
@@ -23,7 +24,7 @@ __all__ = [
     "PIECE_LETTERS",
     "TEXT_FONT_SIZE",
     "TUTORIAL_FONT_SIZE",
-    "TUTORIAL_PARAGRAPHS",
+    "TUTORIAL_LINES",
     "TUTORIAL_TOGGLE_KEY",
     "piece_color",
     "piece_letter",
@@ -54,7 +55,7 @@ PIECE_LETTERS: dict[str, str] = {
 _TUTORIAL_TEXT_PATH = Path(__file__).parent / "assets" / "tutorial.txt"
 
 with _TUTORIAL_TEXT_PATH.open() as f:
-    TUTORIAL_PARAGRAPHS: list[str] = f.readlines()
+    TUTORIAL_LINES: list[str] = f.readlines()
 
 
 def piece_letter(piece: Piece) -> str:

@@ -23,11 +23,10 @@ from pyray import (
     draw_rectangle,
     draw_text,
     end_drawing,
-    measure_text,
 )
 
 from hive_client.app.view import GameView
-from hive_client.domain.geometry import HEX_SIDES
+from hive_client.domain.geometry import HEX_SIDES, TilePointer
 from hive_client.domain.pieces import Piece, Player
 from hive_client.ui.geometry import (
     HEX_SIZE,
@@ -43,7 +42,12 @@ from hive_client.ui.layout import (
     TUTORIAL_Y_OFFSET,
     rect_center,
 )
-from hive_client.ui.text import wrap_text
+from hive_client.ui.text import (
+    draw_text_centered,
+    draw_text_centered_x,
+    draw_text_centered_y,
+    wrap_text,
+)
 from hive_client.ui.theme import (
     OUTLINE_THICKNESS,
     OUTLINE_THICKNESS_SPECIAL,
@@ -131,16 +135,11 @@ class HexRenderer:
 
     def _draw_turn_label(self, current_player: Player, center_x: float) -> None:
         turn_text = f"{current_player.name}'s turn"
-        label_width = len(turn_text) * TEXT_FONT_SIZE * 0.55
-        label_x = center_x - label_width / 2.0
-        draw_text(turn_text, int(label_x), 10, TEXT_FONT_SIZE, DARKGRAY)
+        draw_text_centered_x(turn_text, center_x, 10, TEXT_FONT_SIZE, DARKGRAY)
 
     def _draw_hint(self, hint: str | None, center_x: float) -> None:
-        if hint is None:
-            return
-
-        width = measure_text(hint, TEXT_FONT_SIZE)
-        draw_text(hint, int(center_x - width / 2.0), 40, TEXT_FONT_SIZE, DARKGRAY)
+        if hint is not None:
+            draw_text_centered_x(hint, center_x, 40, TEXT_FONT_SIZE, DARKGRAY)
 
     # -- board ------------------------------------------------------------
 
@@ -161,25 +160,13 @@ class HexRenderer:
                 )
 
         for ptr in view.hover_targets:
-            _draw_hex_outline(
-                hex_to_pixel(ptr, center),
-                GREEN,
-                OUTLINE_THICKNESS_SPECIAL,
-            )
+            _draw_tile_outline(ptr, center, GREEN)
 
         if drag_from is not None:
-            _draw_hex_outline(
-                hex_to_pixel(drag_from, center),
-                BLUE,
-                OUTLINE_THICKNESS_SPECIAL,
-            )
+            _draw_tile_outline(drag_from, center, BLUE)
 
         if view.hint is not None and view.hovered_tile is not None:
-            _draw_hex_outline(
-                hex_to_pixel(view.hovered_tile, center),
-                RED,
-                OUTLINE_THICKNESS_SPECIAL,
-            )
+            _draw_tile_outline(view.hovered_tile, center, RED)
 
     def _draw_palette(self, view: GameView) -> None:
         """Draw draggable piece tiles with remaining counts."""
@@ -199,10 +186,10 @@ class HexRenderer:
                 letter=PIECE_LETTERS[kind.name],
             )
 
-            draw_text(
+            draw_text_centered_y(
                 f": {remaining.get(kind, 0)}",
-                int(rect.x + PALETTE_TILE_SIZE + 6),
-                int(center_y - 8),
+                rect.x + PALETTE_TILE_SIZE + 6,
+                center_y,
                 TEXT_FONT_SIZE,
                 DARKGRAY,
             )
@@ -222,11 +209,7 @@ class HexRenderer:
             return
 
         for ptr in view.drag.targets:
-            _draw_hex_outline(
-                hex_to_pixel(ptr, center),
-                GREEN,
-                OUTLINE_THICKNESS_SPECIAL,
-            )
+            _draw_tile_outline(ptr, center, GREEN)
 
         snapped = snap_to_pixel(mouse, center)
         _draw_piece_tile(
@@ -259,15 +242,21 @@ def _draw_piece_tile(  # noqa: PLR0913 - visual style knobs shared by callers
     glyph = piece_letter(piece) if letter is None else letter
     if text_color is None:
         text_color = WHITE if piece.owner is Player.White else BLACK
-    draw_text(
-        glyph,
-        int(position[0] - measure_text(glyph, font_size) / 2.0),
-        int(position[1] - font_size / 2.0),
-        font_size,
-        text_color,
-    )
+    draw_text_centered(glyph, position, font_size, text_color)
 
     _draw_hex_outline(position, DARKGRAY, OUTLINE_THICKNESS, size)
+
+
+def _draw_tile_outline(
+    tile: TilePointer,
+    center: Point,
+    color: Color,
+) -> None:
+    _draw_hex_outline(
+        hex_to_pixel(tile, center),
+        color,
+        OUTLINE_THICKNESS_SPECIAL,
+    )
 
 
 def _draw_hex_outline(
