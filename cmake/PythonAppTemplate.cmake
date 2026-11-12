@@ -55,6 +55,7 @@ function(create_python_app TARGET)
 export UV_PROJECT_ENVIRONMENT=\"${_venv}\"
 export PYTHONPYCACHEPREFIX=\"${_pycache}\"
 export RUFF_CACHE_DIR=\"${_ruff_cache}\"
+export PYTHONPATH=\"${CMAKE_BINARY_DIR}/python/$<CONFIG>\${PYTHONPATH:+:\$PYTHONPATH}\"
 exec \"${UV}\" run --project \"${PYAPP_PROJECT_DIR}\" \
     --no-sync ${PYAPP_RUN_ARGS} ${PYAPP_SCRIPT} \"$@\"
 "
@@ -127,16 +128,20 @@ PYTHONPYCACHEPREFIX=${CMAKE_BINARY_DIR}/pycache"
     add_test(
         NAME "${TARGET}.import"
         COMMAND
-            "${UV}" run --project "${PYTEST_PROJECT_DIR}" --no-sync python -c
+            "${CMAKE_COMMAND}" -E env
+            "PYTHONPATH=${CMAKE_BINARY_DIR}/python/$<CONFIG>" "${UV}" run
+            --project "${PYTEST_PROJECT_DIR}" --no-sync python -c
             "import ${PYTEST_MODULE}"
         WORKING_DIRECTORY "${PYTEST_PROJECT_DIR}"
     )
     add_test(
         NAME "${TARGET}.pytest"
         COMMAND
-            "${UV}" run --project "${PYTEST_PROJECT_DIR}" --no-sync
-            ${PYTEST_PYTEST_ARGS} pytest -o
-            "cache_dir=${CMAKE_BINARY_DIR}/pytest-cache" "${PYTEST_TEST_DIR}"
+            "${CMAKE_COMMAND}" -E env
+            "PYTHONPATH=${CMAKE_BINARY_DIR}/python/$<CONFIG>" "${UV}" run
+            --project "${PYTEST_PROJECT_DIR}" --no-sync ${PYTEST_PYTEST_ARGS}
+            pytest -o "cache_dir=${CMAKE_BINARY_DIR}/pytest-cache"
+            "${PYTEST_TEST_DIR}"
         WORKING_DIRECTORY "${PYTEST_PROJECT_DIR}"
     )
     set_tests_properties(

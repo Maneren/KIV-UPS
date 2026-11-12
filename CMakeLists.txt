@@ -26,6 +26,7 @@ include(cmake/CommonUtils.cmake)
 include(cmake/ExecutableTemplate.cmake)
 include(cmake/LibraryTemplate.cmake)
 include(cmake/PythonAppTemplate.cmake)
+include(cmake/PythonNative.cmake)
 
 # Libraries
 add_subdirectory(src)

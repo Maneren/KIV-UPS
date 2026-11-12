@@ -38,9 +38,9 @@ lint: lint-cpp lint-py
 lint-cpp:
     clang-tidy -p {{ builddir }} --quiet $(find src apps test -type f \( -name "*.cpp" -or -name "*.h" -or -name "*.hpp" \) -not -path "**/external/*")
 
-lint-py:
+lint-py: (build "Debug" "hive_native_stub")
     uv run --project apps/hive_client --group dev ruff check apps test/python
-    uv run --project apps/hive_client --group dev ty check apps test/python
+    uv run --project apps/hive_client --group dev ty check --extra-search-path {{ builddir }}/python/Debug apps test/python
 
 format: format-cpp format-py
 
