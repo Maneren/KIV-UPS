@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <generator>
 #include <hive/types.h>
 #include <optional>
@@ -14,6 +15,11 @@ namespace hive {
 Direction rotate_left(Direction dir);
 Direction rotate_right(Direction dir);
 
+struct StackView {
+  TilePointer ptr;
+  std::vector<Piece> pieces;
+};
+
 class Board {
 public:
   [[nodiscard]] const std::vector<Piece> &get(TilePointer ptr) const;
@@ -22,11 +28,18 @@ public:
   get_top(TilePointer ptr, std::optional<TilePointer> ignored = {}) const;
 
   [[nodiscard]] bool is_empty() const;
+  [[nodiscard]] bool is_empty_all() const;
   [[nodiscard]] bool
   is_empty(TilePointer ptr, std::optional<TilePointer> ignored = {}) const;
 
+  [[nodiscard]] std::vector<StackView> stacks() const;
+  [[nodiscard]] std::vector<TilePointer> occupied_tiles() const;
+
   [[nodiscard]] bool has_placed(Player player) const;
   [[nodiscard]] bool has_placed_queen(Player player) const;
+  [[nodiscard]] PlayerPiecesMap remaining(Player player) const;
+
+  [[nodiscard]] std::size_t surrounding_count(TilePointer ptr) const;
 
   [[nodiscard]] std::generator<std::pair<TilePointer, Piece>>
   pieces(std::optional<TilePointer> ignored = {}) const;

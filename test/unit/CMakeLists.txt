@@ -33,6 +33,13 @@ create_test_executable(
     CXX_STD 23
 )
 
+create_test_executable(
+    hive_tests
+    SOURCES hive/board_tests.cpp hive/game_tests.cpp
+    DEPENDS hive utils
+    CXX_STD 23
+)
+
 add_dependencies(
     all_tests
     proto_tests
@@ -40,4 +47,5 @@ add_dependencies(
     threadpool_tests
     utils_tests
     cli_tests
+    hive_tests
 )

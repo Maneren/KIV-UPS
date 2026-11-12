@@ -1,13 +1,20 @@
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <format>
 #include <generator>
 #include <hive/board.h>
+#include <hive/errors.h>
+#include <hive/types.h>
+#include <map>
+#include <optional>
 #include <queue>
 #include <ranges>
 #include <stack>
-#include <stdexcept>
 #include <unordered_set>
 #include <utility>
 #include <utils/match.h>
+#include <vector>
 
 namespace hive {
 
@@ -72,13 +79,20 @@ Board::tiles_around_hive(std::optional<TilePointer> ignored) const {
 }
 
 bool Board::can_player_place_at(Player player, TilePointer ptr) const {
-  return is_empty(ptr) &&
+  const auto adjacent_to_hive =
+      std::ranges::any_of(neighboring_cells(ptr), [this](TilePointer neighbor) {
+        return !is_empty(neighbor);
+      });
+
+  return is_empty(ptr) && adjacent_to_hive &&
          (!has_placed(player) || neighbors_only_players(ptr, player));
 }
 
 std::generator<TilePointer> Board::valid_placements(Player player) const {
+  const auto first_placement = !has_placed(player);
+
   for (const auto &ptr : tiles_around_hive()) {
-    if (neighbors_only_players(ptr, player)) {
+    if (first_placement || neighbors_only_players(ptr, player)) {
       co_yield ptr;
     }
   }
@@ -162,7 +176,11 @@ Direction rotate_right(Direction dir) {
 }
 
 const std::vector<Piece> &Board::get(TilePointer ptr) const {
-  return data.at(ptr);
+  const auto it = data.find(ptr);
+  if (it == data.end()) {
+    throw EmptyTileError(std::format("No pieces at position {}", ptr));
+  }
+  return it->second;
 }
 
 Piece Board::get_top(
@@ -172,17 +190,50 @@ Piece Board::get_top(
   if (ignored == ptr) {
     // Top piece is treated as absent; reveal the covered one.
     if (stack.size() <= 1) {
-      throw std::runtime_error("No pieces at position");
+      throw EmptyTileError(std::format("No pieces below top at {}", ptr));
     }
     return stack.at(stack.size() - 2);
   }
   if (stack.empty()) {
-    throw std::runtime_error("No pieces at position");
+    throw EmptyTileError(std::format("No pieces at position {}", ptr));
   }
   return stack.back();
 }
 
 bool Board::is_empty() const { return data.empty(); }
+
+bool Board::is_empty_all() const { return is_empty(); }
+
+std::vector<StackView> Board::stacks() const {
+  std::vector<StackView> result;
+  result.reserve(data.size());
+
+  for (const auto &[ptr, pieces] : data) {
+    result.push_back({.ptr = ptr, .pieces = pieces});
+  }
+
+  std::ranges::sort(result, {}, [](const StackView &stack) {
+    return std::pair{stack.ptr.p, stack.ptr.q};
+  });
+
+  return result;
+}
+
+std::vector<TilePointer> Board::occupied_tiles() const {
+  auto tiles = data | std::views::keys | std::ranges::to<std::vector>();
+  std::ranges::sort(tiles, [](TilePointer lhs, TilePointer rhs) {
+    return std::pair{lhs.p, lhs.q} < std::pair{rhs.p, rhs.q};
+  });
+  return tiles;
+}
+
+PlayerPiecesMap Board::remaining(Player player) const {
+  return player_pieces.at(player);
+}
+
+std::size_t Board::surrounding_count(TilePointer ptr) const {
+  return static_cast<std::size_t>(std::ranges::distance(neighbors(ptr)));
+}
 
 bool Board::is_empty(
     TilePointer ptr, std::optional<TilePointer> ignored
@@ -207,11 +258,18 @@ void Board::apply_move(Move move, Player player) {
   match::match(
       move,
       [this](MovePiece movement) {
-        const auto piece = remove_piece(movement.from);
-        if (piece.kind != movement.piece_kind) {
-          throw std::runtime_error("Tried to move piece of different kind");
+        const auto stack = data.find(movement.from);
+        if (stack == data.end() || stack->second.empty()) {
+          throw IllegalMoveError(
+              std::format("No piece to move at {}", movement.from)
+          );
         }
-        add_piece(movement.to, piece);
+
+        if (stack->second.back().kind != movement.piece_kind) {
+          throw IllegalMoveError("Tried to move piece of different kind");
+        }
+
+        add_piece(movement.to, remove_piece(movement.from));
       },
       [this, player](PlacePiece placement) {
         const auto [pos, kind] = placement;
@@ -219,9 +277,7 @@ void Board::apply_move(Move move, Player player) {
         auto &available = player_pieces.at(player).at(kind);
 
         if (available == 0) {
-          throw std::runtime_error(
-              "Attempted to add piece when no pieces left"
-          );
+          throw IllegalMoveError("Attempted to add piece when no pieces left");
         }
 
         const auto piece = Piece{.kind = kind, .owner = player};
@@ -243,7 +299,7 @@ void Board::add_piece(TilePointer ptr, Piece piece) {
 Piece Board::remove_piece(TilePointer ptr) {
   const auto it = data.find(ptr);
   if (it == data.end() || it->second.empty()) {
-    throw std::runtime_error("Tried to remove piece from empty tile");
+    throw EmptyTileError("Tried to remove piece from empty tile");
   }
 
   auto &[_, pieces] = *it;
@@ -258,7 +314,7 @@ Piece Board::remove_piece(TilePointer ptr) {
 }
 
 bool Board::moving_breaks_hive(TilePointer ptr) const {
-  if (data.size() <= 2) {
+  if (data.size() <= MAX_STACK_IGNORE) {
     return false;
   }
 
@@ -368,7 +424,7 @@ bool Board::has_neighbor_in_direction(
 bool Board::has_neighbor(
     TilePointer cell, std::optional<TilePointer> ignored
 ) const {
-  return data.size() == 2 ||
+  return data.size() == MAX_STACK_IGNORE ||
          std::ranges::any_of(
              neighboring_cells(cell), [ignored, this](TilePointer ptr) {
                return !is_empty(ptr, ignored);
