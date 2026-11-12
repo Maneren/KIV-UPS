@@ -20,6 +20,21 @@ def _session_with_white_queen_and_black_ant() -> GameSession:
     return session
 
 
+_PIECES = tuple(
+    kind for kind, count in DEFAULT_PIECES_PER_PLAYER.items() for _ in range(count)
+)
+
+
+def _session_with_no_white_action() -> GameSession:
+    """Exhaust White's supply and cover every white piece with a black one."""
+    session = GameSession()
+    for index, (white_kind, black_kind) in enumerate(zip(_PIECES, _PIECES)):
+        tile = TilePointer(index * 2, 0)
+        session.apply(make_placement(tile, white_kind))
+        session.apply(make_placement(tile, black_kind))
+    return session
+
+
 def test_opening_placement_only_at_origin() -> None:
     """The opening piece is only accepted at the board centre."""
     controller = GameController()
@@ -96,8 +111,7 @@ def test_palette_drag_places_first_piece() -> None:
 
 def test_palette_drag_rejects_exhausted_piece_kind() -> None:
     """A kind with no supply left cannot start a palette drag."""
-    controller = GameController()
-    controller.session.board._player_pieces[Player.White][PieceKind.Queen] = 0
+    controller = GameController(_session_with_white_queen_and_black_ant())
 
     assert not controller.begin_palette_drag(PieceKind.Queen)
 
@@ -126,11 +140,11 @@ def test_board_drag_moves_piece() -> None:
 
 def test_advance_passes_when_player_has_no_legal_action() -> None:
     """A player with no legal action automatically passes."""
-    session = GameSession()
-    # Only a Black piece is on the board; White cannot place next to it and
-    # has no queen to move.
-    session.board.apply_move(make_placement(ORIGIN, PieceKind.Ant), Player.Black)
+    session = _session_with_no_white_action()
     controller = GameController(session)
+
+    assert session.current_player is Player.White
+    assert not session.has_legal_move()
 
     controller.advance()
 

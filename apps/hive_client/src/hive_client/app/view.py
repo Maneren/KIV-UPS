@@ -1,7 +1,7 @@
 """
 Immutable, render-ready snapshots of a game session.
 
-The UI layer consumes :class:`GameView` and never touches ``Board`` or
+The UI layer consumes :class:`GameView` and never touches ``BoardView`` or
 ``GameSession`` directly.  This keeps rule queries out of the renderer and
 makes the view model easy to test.
 """

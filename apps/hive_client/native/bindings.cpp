@@ -176,7 +176,8 @@ nb::object encode_winner(const std::optional<Player> &winner) {
 } // namespace
 
 NB_MODULE(hive_native, m) {
-  auto hive_error = nb::exception<hive::HiveError>(m, "HiveError");
+  auto hive_error =
+      nb::exception<hive::HiveError>(m, "HiveError", PyExc_RuntimeError);
   nb::exception<hive::IllegalMoveError>(m, "IllegalMoveError", hive_error);
   nb::exception<hive::EmptyTileError>(m, "EmptyTileError", hive_error);
 

@@ -1,11 +1,13 @@
 """
-Pure Hive game domain: rules, board state, and game sessions.
+Hive game domain: a Python adapter over the native engine.
 
-Nothing in this package imports a GUI, networking, or the wire protocol, so it
-can be exercised headlessly.
+Value objects, board views, and game sessions live here; the rules themselves
+are implemented in ``src/hive`` and exposed by :mod:`hive_native`.  Nothing in
+this package imports a GUI, networking, or the wire protocol, so it can be
+exercised headlessly.
 """
 
-from hive_client.domain.board import Board
+from hive_client.domain.board import BoardView
 from hive_client.domain.errors import EmptyTileError, HiveError, IllegalMoveError
 from hive_client.domain.game import ORIGIN, GameResult, GameSession
 from hive_client.domain.geometry import (
@@ -38,7 +40,7 @@ __all__ = [
     "HEX_SIDES",
     "ORIGIN",
     "PIECE_KINDS",
-    "Board",
+    "BoardView",
     "Direction",
     "EmptyTileError",
     "GameResult",

@@ -5,21 +5,23 @@ GUI via the [`raylib`](https://pypi.org/project/raylib/) package (Python
 bindings for raylib 6, incl. raygui) — `from pyray import ...`.
 
 ```bash
-just build                   # runs `uv sync` for the client
+just build                   # runs `uv sync` for the client, builds the native engine
 just run Debug hive_client   # runs the generated launcher
-uv run --project apps/hive_client --group dev pytest test/python  # direct test run
+PYTHONPATH=build/python/Debug uv run --project apps/hive_client --group dev pytest test/python
 ```
 
 `hive_client` opens the game window (needs a display).
 
 ## Architecture
 
-The package is split into layers so that game rules stay independent of the
-GUI, the terminal, and the network:
+Game rules live in C++ (`src/hive`) and are exposed to Python through the
+`hive_native` extension module. The Python package is split into layers so that
+the GUI, the terminal, and the network stay independent of the engine:
 
 | Package | Responsibility | Depends on |
 | --- | --- | --- |
-| `hive_client.domain` | Pure game rules: hex geometry, pieces, moves, board state, turn/win logic (`GameSession`). | — |
+| `hive_native` | Canonical Hive engine: board state, legal moves, turn/win logic. | — |
+| `hive_client.domain` | Thin adapter: value objects and `GameSession`/`BoardView`, which delegate every rule and query to the native engine. | `hive_native` |
 | `hive_client.app` | UI-agnostic interaction: `GameController` turns intents into validated moves; `GameView` is the immutable render model. | domain |
 | `hive_client.ui` | raylib only: pixel geometry, layout, theme, input hit-testing, renderer, window loop. | app, domain |
 | `hive_client.wire` | Wire protocol: message dataclasses, pure codec, TCP transport. | domain |
@@ -29,4 +31,4 @@ lazily from `hive_client.cli`.
 
 All game-rule mutations go through `GameSession.submit()`. In particular, the
 GUI never sets `current_player`, computes forced passes, or checks move
-legality itself.
+legality itself; those queries are answered by the native engine.

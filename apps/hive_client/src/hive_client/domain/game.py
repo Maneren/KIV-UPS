@@ -1,12 +1,16 @@
-"""Game session: turn handling, legality checks, and win detection."""
+"""Game session backed by the native Hive engine."""
 
 from __future__ import annotations
 
 from enum import Enum
+from typing import cast
 
-from hive_client.domain.board import Board
-from hive_client.domain.geometry import HEX_SIDES, TilePointer
-from hive_client.domain.moves import Move, PlacePiece
+import hive_native
+
+from hive_client.domain._convert import move_from_record, move_to_record
+from hive_client.domain.board import BoardView
+from hive_client.domain.geometry import TilePointer
+from hive_client.domain.moves import Move
 from hive_client.domain.pieces import PieceKind, Player
 
 __all__ = ["ORIGIN", "GameResult", "GameSession"]
@@ -28,115 +32,77 @@ class GameSession:
     """
     A Hive game: board, current player, opening rule, and outcome.
 
-    The session owns *all* rules that depend on whose turn it is.  Renderers and
-    input handlers should never mutate ``board`` or ``current_player`` directly;
-    they submit :class:`Move` objects through :meth:`submit` instead.
+    Every rule and query is delegated to :class:`hive_native.Game`.  Renderers
+    and input handlers should never mutate state directly; they submit
+    :class:`Move` objects through :meth:`submit` instead.
     """
 
     def __init__(self) -> None:
         """Start a new game with White to move."""
-        self.board = Board()
-        self.current_player = Player.White
-        self.result = GameResult.ONGOING
+        self._game = hive_native.Game()
+        self.board = BoardView(self._game)
 
     # -- queries --------------------------------------------------------
 
-    def is_over(self) -> bool:
-        """Return True once the game has a result."""
-        return self.result is not GameResult.ONGOING
+    @property
+    def current_player(self) -> Player:
+        """Return the player whose turn it is."""
+        return Player(self._game.current_player)
+
+    @property
+    def result(self) -> GameResult:
+        """Return the current outcome of the game."""
+        return GameResult(self._game.result)
 
     @property
     def winner(self) -> Player | None:
         """Return the winning player, or None while the game is ongoing/drawn."""
-        if self.result is GameResult.WHITE_WINS:
-            return Player.White
-        if self.result is GameResult.BLACK_WINS:
-            return Player.Black
-        return None
+        winner = self._game.winner
+        return None if winner is None else Player(winner)
+
+    def is_over(self) -> bool:
+        """Return True once the game has a result."""
+        return self._game.is_over()
 
     def legal_moves(self) -> list[Move]:
-        """
-        Return all legal moves for the current player.
-
-        On an empty board the only legal action is the opening placement, which
-        is exposed through :meth:`placement_targets` instead.  This mirrors the
-        board engine, which needs an existing hive to generate moves.
-        """
-        return list(
-            self.board.moves_for_player(
-                self.current_player,
-                self.board.remaining(self.current_player),
-            )
-        )
+        """Return all legal moves for the current player."""
+        return [move_from_record(record) for record in self._game.legal_moves()]
 
     def has_legal_move(self) -> bool:
         """Return True if the current player has any legal move or placement."""
-        moves = self.board.moves_for_player(
-            self.current_player,
-            self.board.remaining(self.current_player),
-        )
-        return next(moves, None) is not None
+        return self._game.has_legal_move()
 
     def can_place(self, kind: PieceKind) -> bool:
         """Return True if the current player may still place ``kind``."""
-        return not self.is_over() and self.board.can_player_place(
-            self.current_player, kind
-        )
+        return self._game.can_place(kind.value)
 
     def can_place_at(self, ptr: TilePointer) -> bool:
         """Return True if the current player may place a piece at ``ptr``."""
-        if self.is_over():
-            return False
-        if self.board.is_empty_all():
-            return ptr == ORIGIN
-        return self.board.can_player_place_at(self.current_player, ptr)
+        return self._game.can_place_at(ptr.p, ptr.q)
 
     def placement_targets(self) -> tuple[TilePointer, ...]:
         """Return every tile where the current player may place a piece."""
-        if self.is_over():
-            return ()
-        if self.board.is_empty_all():
-            return (
-                (ORIGIN,)
-                if any(self.board.remaining(self.current_player).values())
-                else ()
-            )
-        return tuple(self.board.valid_placements(self.current_player))
+        return tuple(TilePointer(p, q) for p, q in self._game.placement_targets())
 
     def can_move_from(self, ptr: TilePointer) -> bool:
         """Return True if the current player may move the piece at ``ptr``."""
-        return (
-            not self.is_over()
-            and not self.board.is_empty(ptr)
-            and self.board.get_top(ptr).owner is self.current_player
-            and self.board.can_player_move(self.current_player, ptr)
-        )
+        return self._game.can_move_from(ptr.p, ptr.q)
 
     def moves_from(self, ptr: TilePointer) -> tuple[Move, ...]:
         """Return every legal move for the piece at ``ptr``, if it is ours."""
-        if not self.can_move_from(ptr):
-            return ()
-        top = self.board.get_top(ptr)
-        return tuple(self.board.moves_for_piece(ptr, top))
+        return tuple(
+            move_from_record(record) for record in self._game.moves_from(ptr.p, ptr.q)
+        )
 
     def is_legal(self, move: Move) -> bool:
         """Check ``move`` against the current turn, supply, and movement rules."""
-        if self.is_over():
-            return False
-
-        if isinstance(move, PlacePiece):
-            return self.can_place(move.piece_kind) and self.can_place_at(move.pos)
-
-        return any(candidate == move for candidate in self.moves_from(move.from_))
+        return self._game.is_legal(move_to_record(move))
 
     # -- mutation -------------------------------------------------------
 
     def submit(self, move: Move) -> bool:
         """Apply ``move`` if legal and return whether it was accepted."""
-        if not self.is_legal(move):
-            return False
-        self.apply(move)
-        return True
+        return self._game.submit(move_to_record(move))
 
     def apply(self, move: Move) -> None:
         """
@@ -145,41 +111,18 @@ class GameSession:
         This is the low-level transition used after validation; prefer
         :meth:`submit` in UI/input code.
         """
-        self.board.apply_move(move, self.current_player)
-        self.current_player = self.current_player.other()
-        self.check_win()
+        self._game.apply(move_to_record(move))
 
     def pass_if_stuck(self) -> bool:
-        """
-        Pass the turn if the current player has no legal action.
-
-        Returns True if the turn was passed.  The opening placement is handled
-        separately, so an empty board never triggers a pass.
-        """
-        if self.is_over() or self.board.is_empty_all() or self.has_legal_move():
-            return False
-        self.current_player = self.current_player.other()
-        return True
+        """Pass the turn if the current player has no legal action."""
+        return self._game.pass_if_stuck()
 
     # -- outcome --------------------------------------------------------
 
-    def check_win(self) -> None:
-        """Set ``result`` if either queen is surrounded."""
-        for player in (Player.White, Player.Black):
-            queen_pos = self.queen_position(player)
-            if queen_pos is None:
-                continue
-            if self.board.surrounding_count(queen_pos) == HEX_SIDES:
-                self.result = (
-                    GameResult.BLACK_WINS
-                    if player is Player.White
-                    else GameResult.WHITE_WINS
-                )
-                return
-
     def queen_position(self, player: Player) -> TilePointer | None:
         """Return the tile of ``player``'s queen, or None if not placed."""
-        for ptr, piece in self.board.pieces():
-            if piece.owner is player and piece.kind is PieceKind.Queen:
-                return ptr
-        return None
+        position = self._game.queen_position(player.value)
+        if position is None:
+            return None
+        p, q = cast("tuple[int, int]", position)
+        return TilePointer(p, q)
