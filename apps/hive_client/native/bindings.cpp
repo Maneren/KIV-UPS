@@ -111,6 +111,16 @@ Move read_move(const nb::tuple &record) {
 
   throw nb::value_error("move type must be 0 (place) or 1 (move)");
 }
+template <typename Projection = std::identity>
+nb::list make_list(
+    const std::ranges::input_range auto &rng, const Projection &projection = {}
+) {
+  nb::list result;
+  for (const auto &value : rng) {
+    result.append(projection(value));
+  }
+  return result;
+}
 
 struct PyTypes {
   PyTypes()
@@ -179,22 +189,14 @@ struct PyTypes {
 
   [[nodiscard]] nb::list make_tile_list(std::vector<TilePointer> tiles) const {
     std::ranges::sort(tiles, [](TilePointer lhs, TilePointer rhs) {
-      return std::pair{lhs.p, lhs.q} < std::pair{rhs.p, rhs.q};
+      return lhs < rhs;
     });
 
-    nb::list result;
-    for (const auto tile : tiles) {
-      result.append(make_tile(tile));
-    }
-    return result;
+    return make_list(tiles, [this](auto tile) { return make_tile(tile); });
   }
 
   [[nodiscard]] nb::list make_moves(const std::vector<Move> &moves) const {
-    nb::list result;
-    for (const auto &move : moves) {
-      result.append(make_move(move));
-    }
-    return result;
+    return make_list(moves, [this](auto tile) { return make_move(tile); });
   }
 
 private:
@@ -241,15 +243,12 @@ NB_MODULE(hive_native, m) {
       .def(
           "stacks",
           [types](const Game &game) {
-            nb::list result;
-            for (const auto &stack : game.board().stacks()) {
-              nb::list pieces;
-              for (const auto &piece : stack.pieces) {
-                pieces.append(types.make_piece(piece));
-              }
-              result.append(nb::make_tuple(types.make_tile(stack.ptr), pieces));
-            }
-            return result;
+            return make_list(game.board().stacks(), [types](const auto &stack) {
+              auto pieces = make_list(stack.pieces, [types](const auto &piece) {
+                return types.make_piece(piece);
+              });
+              return nb::make_tuple(types.make_tile(stack.ptr), pieces);
+            });
           }
       )
       .def(

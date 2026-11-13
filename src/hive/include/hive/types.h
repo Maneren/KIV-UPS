@@ -37,7 +37,7 @@ struct TilePointer {
   Coordinate p;
   Coordinate q;
 
-  bool operator==(const TilePointer &other) const = default;
+  std::strong_ordering operator<=>(const TilePointer &other) const = default;
 };
 
 struct MovePiece {
