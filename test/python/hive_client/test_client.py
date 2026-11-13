@@ -1,14 +1,6 @@
 """Tests for Hive value objects and the wire protocol."""
 
-from hive_client.domain import (
-    Direction,
-    Piece,
-    PieceKind,
-    Player,
-    TilePointer,
-    rotate_left,
-    rotate_right,
-)
+from hive_client.domain import PieceKind, TilePointer
 from hive_client.wire import (
     Leave,
     ListRequest,
@@ -93,13 +85,6 @@ def test_roundtrip_place() -> None:
     assert cmd == original
 
 
-def test_piece_display() -> None:
-    white_queen = Piece(kind=PieceKind.Queen, owner=Player.White)
-    black_queen = Piece(kind=PieceKind.Queen, owner=Player.Black)
-    assert white_queen.display() == "QUEEN"
-    assert black_queen.display() == "queen"
-
-
 def test_tile_pointer_str() -> None:
     ptr = TilePointer(3, -1)
     assert str(ptr) == "(3, -1)"
@@ -120,25 +105,6 @@ from hypothesis import strategies as st
 @st.composite
 def tile_pointer(draw: st.DrawFn) -> TilePointer:
     return TilePointer(draw(st.integers(-5, 5)), draw(st.integers(-5, 5)))
-
-
-@given(
-    st.sampled_from(
-        [
-            Direction(0, 1),
-            Direction(1, 0),
-            Direction(-1, 1),
-            Direction(-1, 0),
-            Direction(0, -1),
-            Direction(1, -1),
-        ]
-    )
-)
-@settings(max_examples=100)
-def test_prop_rotate_inverse(direction: Direction) -> None:
-    """rotate_right(rotate_left(d)) == d and vice versa."""
-    assert rotate_right(rotate_left(direction)) == direction
-    assert rotate_left(rotate_right(direction)) == direction
 
 
 @given(tile_pointer())

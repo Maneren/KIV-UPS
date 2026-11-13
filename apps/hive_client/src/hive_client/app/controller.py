@@ -3,19 +3,22 @@ UI-agnostic game interaction controller.
 
 The controller translates high-level user intents (``begin_palette_drag``,
 ``begin_board_drag``, ``drop_on_tile``, ``hover``) into legal moves submitted to
-a :class:`~hive_client.domain.game.GameSession`.  It contains no raylib, pixel,
-or windowing code, so the complete interaction model is testable headlessly.
+the native :class:`hive_native.Game`.  It contains no raylib, pixel, or windowing
+code, so the complete interaction model is testable headlessly.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import hive_native
+
 from hive_client.app.view import DragView, GameView, StackView
-from hive_client.domain.game import ORIGIN, GameSession
+from hive_client.domain.errors import EmptyTileError
+from hive_client.domain.game import ORIGIN, GameResult
 from hive_client.domain.geometry import TilePointer
-from hive_client.domain.moves import MovePiece, make_placement
-from hive_client.domain.pieces import PIECE_KINDS, PieceKind, Player
+from hive_client.domain.moves import Move
+from hive_client.domain.pieces import PIECE_KINDS, Piece, PieceKind, Player
 
 __all__ = ["DragState", "GameController", "InteractionState"]
 
@@ -41,18 +44,23 @@ class InteractionState:
 
 
 class GameController:
-    """Turn UI intents into validated game-session mutations."""
+    """Turn UI intents into validated native game mutations."""
 
-    def __init__(self, session: GameSession | None = None) -> None:
-        """Wrap ``session`` (or start a fresh game)."""
-        self.session = session or GameSession()
+    def __init__(self, game: hive_native.Game | None = None) -> None:
+        """Wrap ``game`` (or start a fresh game)."""
+        self.game = game or hive_native.Game()
         self.state = InteractionState()
+
+    @property
+    def current_player(self) -> Player:
+        """Return the player whose turn it is."""
+        return Player(self.game.current_player)
 
     # -- turn -------------------------------------------------------------
 
     def advance(self) -> None:
         """Advance the game by handling a forced pass, if one is needed."""
-        if self.session.pass_if_stuck():
+        if self.game.pass_if_stuck():
             self._clear_hover()
             self.cancel_drag()
 
@@ -78,21 +86,31 @@ class GameController:
         kind: PieceKind | None,
     ) -> frozenset[TilePointer]:
         if kind is not None:
-            if not self.session.can_place(kind):
+            if not self.game.can_place(kind.value):
                 return frozenset()
-            return frozenset(self.session.placement_targets())
+            return frozenset(self._placement_targets())
 
         if tile is None:
             return frozenset()
 
         return self._move_targets(tile)
 
+    def _placement_targets(self) -> tuple[TilePointer, ...]:
+        return tuple(TilePointer(*record) for record in self.game.placement_targets())
+
+    def _moves_from(self, tile: TilePointer) -> tuple[Move, ...]:
+        return tuple(Move(*record) for record in self.game.moves_from(tile.p, tile.q))
+
     def _move_targets(self, tile: TilePointer) -> frozenset[TilePointer]:
         return frozenset(
-            move.to
-            for move in self.session.moves_from(tile)
-            if isinstance(move, MovePiece)
+            move.to_tile for move in self._moves_from(tile) if not move.is_placement
         )
+
+    def _top(self, tile: TilePointer) -> Piece:
+        if (record := self.game.top(tile.p, tile.q)) is not None:
+            return Piece(*record)
+
+        raise EmptyTileError(f"No pieces at position {tile}")
 
     def _clear_hover(self) -> None:
         self.state.hovered_tile = None
@@ -103,12 +121,11 @@ class GameController:
         if tile is None:
             return None
 
-        board = self.session.board
-        if board.is_empty(tile):
+        if self.game.is_empty(tile.p, tile.q):
             return None
-        if board.get_top(tile).owner is not self.session.current_player:
+        if self._top(tile).owner is not self.current_player:
             return None
-        if not board.has_placed_queen(self.session.current_player):
+        if not self.game.has_placed_queen(self.current_player.value):
             return "Place your Queen before moving pieces."
         return None
 
@@ -116,23 +133,23 @@ class GameController:
 
     def begin_palette_drag(self, kind: PieceKind) -> bool:
         """Start dragging a fresh ``kind`` piece from the palette."""
-        if not self.session.can_place(kind):
+        if not self.game.can_place(kind.value):
             return False
 
         self.state.drag = DragState(
             kind=kind,
-            owner=self.session.current_player,
+            owner=self.current_player,
             from_tile=None,
-            targets=frozenset(self.session.placement_targets()),
+            targets=frozenset(self._placement_targets()),
         )
         return True
 
     def begin_board_drag(self, tile: TilePointer) -> bool:
         """Start dragging an existing piece from ``tile``."""
-        if not self.session.can_move_from(tile):
+        if not self.game.can_move_from(tile.p, tile.q):
             return False
 
-        top = self.session.board.get_top(tile)
+        top = self._top(tile)
         self.state.drag = DragState(
             kind=top.kind,
             owner=top.owner,
@@ -149,16 +166,12 @@ class GameController:
 
         applied = False
         if tile in drag.targets:
-            if drag.from_tile is None:
-                applied = self.session.submit(make_placement(tile, drag.kind))
-            else:
-                applied = self.session.submit(
-                    MovePiece(
-                        from_=drag.from_tile,
-                        to=tile,
-                        piece_kind=drag.kind,
-                    ),
-                )
+            move = (
+                Move.place(tile, drag.kind)
+                if drag.from_tile is None
+                else Move.move(drag.from_tile, tile, drag.kind)
+            )
+            applied = self.game.submit(move)
 
         self.cancel_drag()
         if applied:
@@ -173,16 +186,21 @@ class GameController:
 
     def view(self) -> GameView:
         """Build an immutable snapshot for the renderer."""
-        board = self.session.board
         stacks = tuple(
-            StackView(tile=tile, pieces=pieces) for tile, pieces in board.stacks()
+            StackView(
+                tile=TilePointer(p, q),
+                pieces=tuple(piece for piece in pieces),
+            )
+            for p, q, pieces in self.game.stacks()
         )
-        if board.is_empty_all():
+        if self.game.is_empty_all():
             # The opening placement has no neighbouring hive yet, so expose the
             # centre tile as the only clickable target.
             clickable = {ORIGIN}
         else:
-            clickable = board.occupied_tiles() | board.tiles_around_hive()
+            clickable = {
+                TilePointer(*record) for record in self.game.occupied_tiles()
+            } | {TilePointer(*record) for record in self.game.tiles_around_hive()}
 
         drag = self.state.drag
         drag_view = (
@@ -198,14 +216,14 @@ class GameController:
         # A drag already shows its own targets; suppress the hover preview.
         hovered_tile = None if drag is not None else self.state.hovered_tile
         hover_targets = frozenset() if drag is not None else self.state.hover_targets
-        remaining = board.remaining(self.session.current_player)
+        remaining = self.game.remaining(self.current_player.value)
 
         return GameView(
             stacks=stacks,
             clickable_tiles=frozenset(clickable),
-            current_player=self.session.current_player,
-            result=self.session.result,
-            remaining=tuple((kind, remaining[kind]) for kind in PIECE_KINDS),
+            current_player=self.current_player,
+            result=GameResult(self.game.result),
+            remaining=tuple((kind, remaining[kind.value]) for kind in PIECE_KINDS),
             hovered_tile=hovered_tile,
             hover_targets=hover_targets,
             hint=self._hover_hint(hovered_tile),

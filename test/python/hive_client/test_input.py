@@ -1,10 +1,11 @@
 """Headless tests for mouse-to-intent routing (raylib is not imported)."""
 
+import hive_native
 from hive_client.app.controller import GameController
-from hive_client.domain.game import ORIGIN, GameSession
+from hive_client.domain.game import ORIGIN
 from hive_client.domain.geometry import TilePointer
-from hive_client.domain.moves import make_placement
-from hive_client.domain.pieces import PieceKind, Player
+from hive_client.domain.moves import Move
+from hive_client.domain.pieces import Piece, PieceKind, Player
 from hive_client.ui.geometry import hex_to_pixel
 from hive_client.ui.input import MouseEvent, MouseRouter
 from hive_client.ui.layout import PALETTE_PIECES, rect_center
@@ -12,11 +13,17 @@ from hive_client.ui.layout import PALETTE_PIECES, rect_center
 CENTER = (400.0, 300.0)
 
 
-def _session_with_white_queen_and_black_ant() -> GameSession:
-    session = GameSession()
-    session.apply(make_placement(ORIGIN, PieceKind.Queen))
-    session.apply(make_placement(TilePointer(1, 0), PieceKind.Ant))
-    return session
+def _top(game: hive_native.Game, tile: TilePointer) -> Piece:
+    record = game.top(tile.p, tile.q)
+    assert record is not None
+    return Piece.from_record(record)
+
+
+def _game_with_white_queen_and_black_ant() -> hive_native.Game:
+    game = hive_native.Game()
+    game.apply(Move.place(ORIGIN, PieceKind.Queen))
+    game.apply(Move.place(TilePointer(1, 0), PieceKind.Ant))
+    return game
 
 
 def _press(router: MouseRouter, point: tuple[float, float]) -> None:
@@ -52,8 +59,8 @@ def test_palette_drag_places_opening_piece() -> None:
 
     _drag(router, _palette_point(PieceKind.Queen), hex_to_pixel(ORIGIN, CENTER))
 
-    assert controller.session.board.get_top(ORIGIN).kind is PieceKind.Queen
-    assert controller.session.current_player is Player.Black
+    assert _top(controller.game, ORIGIN).kind is PieceKind.Queen
+    assert controller.current_player is Player.Black
     assert controller.state.drag is None
 
 
@@ -64,13 +71,13 @@ def test_click_without_drag_does_not_place_piece() -> None:
 
     _drag(router, hex_to_pixel(ORIGIN, CENTER), hex_to_pixel(ORIGIN, CENTER))
 
-    assert controller.session.board.is_empty_all()
+    assert controller.game.is_empty_all()
     assert controller.state.drag is None
 
 
 def test_board_drag_moves_piece() -> None:
     """Dragging a piece to a target executes the move."""
-    controller = GameController(_session_with_white_queen_and_black_ant())
+    controller = GameController(_game_with_white_queen_and_black_ant())
     router = MouseRouter(controller)
 
     _press(router, hex_to_pixel(ORIGIN, CENTER))
@@ -79,14 +86,14 @@ def test_board_drag_moves_piece() -> None:
     target = next(iter(drag.targets))
     _release(router, hex_to_pixel(target, CENTER))
 
-    assert controller.session.current_player is Player.Black
-    assert controller.session.board.get_top(target).kind is PieceKind.Queen
+    assert controller.current_player is Player.Black
+    assert _top(controller.game, target).kind is PieceKind.Queen
     assert controller.state.drag is None
 
 
 def test_hover_over_own_piece_exposes_targets() -> None:
     """Hovering an own piece previews its legal moves without clicking."""
-    controller = GameController(_session_with_white_queen_and_black_ant())
+    controller = GameController(_game_with_white_queen_and_black_ant())
     router = MouseRouter(controller)
 
     _move(router, hex_to_pixel(ORIGIN, CENTER))
@@ -97,10 +104,10 @@ def test_hover_over_own_piece_exposes_targets() -> None:
 
 def test_hover_before_queen_shows_hint() -> None:
     """Hovering a movable piece without a Queen explains why it is blocked."""
-    session = GameSession()
-    session.apply(make_placement(ORIGIN, PieceKind.Ant))
-    session.apply(make_placement(TilePointer(1, 0), PieceKind.Ant))
-    controller = GameController(session)
+    game = hive_native.Game()
+    game.apply(Move.place(ORIGIN, PieceKind.Ant))
+    game.apply(Move.place(TilePointer(1, 0), PieceKind.Ant))
+    controller = GameController(game)
     router = MouseRouter(controller)
 
     _move(router, hex_to_pixel(ORIGIN, CENTER))
@@ -134,10 +141,10 @@ def test_hover_in_palette_gap_is_ignored() -> None:
 
 def test_hover_far_from_hive_is_ignored() -> None:
     """Hovering outside the playable area neither previews nor changes anything."""
-    controller = GameController(_session_with_white_queen_and_black_ant())
+    controller = GameController(_game_with_white_queen_and_black_ant())
     router = MouseRouter(controller)
 
     _move(router, hex_to_pixel(TilePointer(20, -10), CENTER))
 
     assert not controller.view().hover_targets
-    assert controller.session.current_player is Player.White
+    assert controller.current_player is Player.White

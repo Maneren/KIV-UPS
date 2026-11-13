@@ -8,7 +8,7 @@ back.  It does not perform any I/O.
 from __future__ import annotations
 
 from hive_client.domain.geometry import TilePointer
-from hive_client.domain.moves import MovePiece, PlacePiece
+from hive_client.domain.moves import Move as MoveRecord
 from hive_client.domain.pieces import PieceKind
 from hive_client.wire.messages import (
     MAGIC,
@@ -71,21 +71,18 @@ def piece_letter_from_kind(kind: PieceKind) -> str:
         raise ValueError(f"unknown piece kind: {kind!r}") from exc
 
 
-def place_from_wire(p: int, q: int, piece_letter: str) -> PlacePiece:
-    """Create a PlacePiece from wire-protocol coordinates and piece letter."""
-    return PlacePiece(
-        pos=TilePointer(p, q),
-        piece_kind=piece_kind_from_letter(piece_letter),
+def place_from_wire(p: int, q: int, piece_letter: str) -> MoveRecord:
+    """Create a placement record from wire coordinates and piece letter."""
+    return MoveRecord.place(
+        TilePointer(p, q),
+        piece_kind_from_letter(piece_letter),
     )
 
 
-def place_to_wire(place: PlacePiece) -> tuple[int, int, str]:
-    """Convert a PlacePiece to wire-protocol coordinates and piece letter."""
-    return (
-        place.pos.p,
-        place.pos.q,
-        piece_letter_from_kind(place.piece_kind),
-    )
+def place_to_wire(place: MoveRecord) -> tuple[int, int, str]:
+    """Convert a placement record to wire coordinates and piece letter."""
+    pos = place.to_tile
+    return (pos.p, pos.q, piece_letter_from_kind(place.kind))
 
 
 def move_from_wire(
@@ -94,23 +91,25 @@ def move_from_wire(
     to_p: int,
     to_q: int,
     piece_letter: str,
-) -> MovePiece:
-    """Create a MovePiece from wire-protocol coordinates and piece letter."""
-    return MovePiece(
-        from_=TilePointer(from_p, from_q),
-        to=TilePointer(to_p, to_q),
-        piece_kind=piece_kind_from_letter(piece_letter),
+) -> MoveRecord:
+    """Create a movement record from wire coordinates and piece letter."""
+    return MoveRecord.move(
+        TilePointer(from_p, from_q),
+        TilePointer(to_p, to_q),
+        piece_kind_from_letter(piece_letter),
     )
 
 
-def move_to_wire(move: MovePiece) -> tuple[int, int, int, int, str]:
-    """Convert a MovePiece to wire-protocol coordinates and piece letter."""
+def move_to_wire(move: MoveRecord) -> tuple[int, int, int, int, str]:
+    """Convert a movement record to wire coordinates and piece letter."""
+    from_ = move.from_tile
+    to = move.to_tile
     return (
-        move.from_.p,
-        move.from_.q,
-        move.to.p,
-        move.to.q,
-        piece_letter_from_kind(move.piece_kind),
+        from_.p,
+        from_.q,
+        to.p,
+        to.q,
+        piece_letter_from_kind(move.kind),
     )
 
 

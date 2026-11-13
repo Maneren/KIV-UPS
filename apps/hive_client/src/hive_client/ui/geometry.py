@@ -13,6 +13,7 @@ import math
 from hive_client.domain.geometry import TilePointer
 
 __all__ = [
+    "HEX_SIDES",
     "HEX_SIZE",
     "HEX_X_FACTOR",
     "HEX_Y_FACTOR",
@@ -24,6 +25,7 @@ __all__ = [
 
 Point = tuple[float, float]
 
+HEX_SIDES = 6
 HEX_SIZE = 40.0
 HEX_X_FACTOR = 1.5
 HEX_Y_FACTOR = math.sqrt(3.0)

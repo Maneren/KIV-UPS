@@ -1,9 +1,9 @@
 """
 Immutable, render-ready snapshots of a game session.
 
-The UI layer consumes :class:`GameView` and never touches ``BoardView`` or
-``GameSession`` directly.  This keeps rule queries out of the renderer and
-makes the view model easy to test.
+The UI layer consumes :class:`GameView` and never touches the native game
+directly.  This keeps rule queries out of the renderer and makes the view model
+easy to test.
 """
 
 from __future__ import annotations

@@ -26,9 +26,10 @@ from pyray import (
 )
 
 from hive_client.app.view import GameView
-from hive_client.domain.geometry import HEX_SIDES, TilePointer
+from hive_client.domain.geometry import TilePointer
 from hive_client.domain.pieces import Piece, Player
 from hive_client.ui.geometry import (
+    HEX_SIDES,
     HEX_SIZE,
     Point,
     hex_to_pixel,

@@ -20,10 +20,15 @@ set_target_properties(
         RUNTIME_OUTPUT_DIRECTORY "${_output_dir}"
 )
 
-nanobind_add_stub(
+add_custom_target(
     hive_native_stub
-    MODULE hive_native
-    OUTPUT "${_output_dir}/hive_native.pyi"
-    PYTHON_PATH "${_output_dir}"
-    DEPENDS hive_native
+    ALL
+    COMMAND
+        "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/hive_native.pyi"
+        "${_output_dir}/hive_native.pyi"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/hive_native.pyi"
+    COMMENT "Copying hive_native type stub"
+    VERBATIM
 )
+add_dependencies(hive_native_stub hive_native)

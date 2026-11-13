@@ -6,7 +6,6 @@
 #include <hive/types.h>
 #include <limits>
 #include <nanobind/nanobind.h>
-#include <optional>
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -159,20 +158,6 @@ nb::list encode_tiles(const std::unordered_set<TilePointer> &tiles) {
   return encode_tiles(std::vector<TilePointer>(tiles.begin(), tiles.end()));
 }
 
-nb::object encode_optional_tile(const std::optional<TilePointer> &ptr) {
-  if (!ptr.has_value()) {
-    return nb::none();
-  }
-  return encode_tile(*ptr);
-}
-
-nb::object encode_winner(const std::optional<Player> &winner) {
-  if (!winner.has_value()) {
-    return nb::none();
-  }
-  return nb::cast(static_cast<int>(*winner));
-}
-
 } // namespace
 
 // NOLINTNEXTLINE(performance-unnecessary-value-param)
@@ -199,11 +184,6 @@ NB_MODULE(hive_native, m) {
           "result",
           [](const Game &game) { return static_cast<int>(game.result()); }
       )
-      .def_prop_ro(
-          "winner",
-          [](const Game &game) { return encode_winner(game.winner()); }
-      )
-      .def("is_over", &Game::is_over)
       .def(
           "is_empty_all",
           [](const Game &game) { return game.board().is_empty_all(); }
@@ -266,12 +246,6 @@ NB_MODULE(hive_native, m) {
           }
       )
       .def(
-          "has_placed",
-          [](const Game &game, int player) {
-            return game.board().has_placed(read_player(player));
-          }
-      )
-      .def(
           "has_placed_queen",
           [](const Game &game, int player) {
             return game.board().has_placed_queen(read_player(player));
@@ -281,12 +255,6 @@ NB_MODULE(hive_native, m) {
           "can_place",
           [](const Game &game, int kind) {
             return game.can_place(read_piece_kind(kind));
-          }
-      )
-      .def(
-          "can_place_at",
-          [](const Game &game, int p, int q) {
-            return game.can_place_at(read_tile(p, q));
           }
       )
       .def(
@@ -308,17 +276,6 @@ NB_MODULE(hive_native, m) {
           }
       )
       .def(
-          "legal_moves",
-          [](const Game &game) { return encode_moves(game.legal_moves()); }
-      )
-      .def("has_legal_move", &Game::has_legal_move)
-      .def(
-          "is_legal",
-          [](const Game &game, const nb::tuple &record) {
-            return game.is_legal(read_move(record));
-          }
-      )
-      .def(
           "submit",
           [](Game &game, const nb::tuple &record) {
             return game.submit(read_move(record));
@@ -330,8 +287,5 @@ NB_MODULE(hive_native, m) {
             game.apply(read_move(record));
           }
       )
-      .def("pass_if_stuck", &Game::pass_if_stuck)
-      .def("queen_position", [](const Game &game, int player) {
-        return encode_optional_tile(game.queen_position(read_player(player)));
-      });
+      .def("pass_if_stuck", &Game::pass_if_stuck);
 }
