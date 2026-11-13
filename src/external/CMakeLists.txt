@@ -25,4 +25,4 @@ foreach(CMAKE_FILE ${EXTERNAL_CMAKE_FILES})
     endif()
 endforeach()
 
-FetchContent_MakeAvailable(GTest)
+FetchContent_MakeAvailable(GTest nanobind)

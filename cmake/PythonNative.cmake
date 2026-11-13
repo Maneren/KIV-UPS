@@ -1,7 +1,5 @@
 include_guard(GLOBAL)
 
-include(FetchContent)
-
 execute_process(
     COMMAND "${UV}" python find
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/apps/hive_client"
@@ -21,13 +19,3 @@ set(Python_EXECUTABLE
     FORCE
 )
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
-
-FetchContent_Declare(
-    nanobind
-    GIT_REPOSITORY https://github.com/wjakob/nanobind
-    GIT_TAG v3.1.0
-    GIT_SHALLOW ON
-    GIT_SUBMODULES "ext/robin_map"
-    GIT_SUBMODULES_RECURSE TRUE
-)
-FetchContent_MakeAvailable(nanobind)
