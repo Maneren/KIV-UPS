@@ -9,6 +9,7 @@ import pytest
 from hive_client.domain import (
     GameResult,
     Move,
+    Piece,
     PieceKind,
     Player,
     TilePointer,
@@ -20,38 +21,38 @@ WHITE = 1
 BLACK = 0
 
 ORIGIN = TilePointer(0, 0)
+WHITE_QUEEN = Piece(PieceKind.Queen, Player.White)
 
 
 def test_opening_placement() -> None:
     game = hive_native.Game()
 
-    assert game.current_player == WHITE
-    assert game.result == 0
+    assert game.current_player is Player.White
+    assert game.result is GameResult.ONGOING
     assert game.is_empty_all()
-    assert game.placement_targets() == [(0, 0)]
+    assert game.placement_targets() == [ORIGIN]
 
     assert game.submit(Move.place(ORIGIN, PieceKind.Queen))
 
-    assert game.current_player == BLACK
+    assert game.current_player is Player.Black
     assert not game.is_empty_all()
-    assert game.stacks() == [(0, 0, [(QUEEN, WHITE)])]
-    assert game.top(0, 0) == (QUEEN, WHITE)
-    assert game.top(4, 4) is None
-    assert game.remaining(WHITE)[QUEEN] == 0
-    assert game.has_placed_queen(WHITE)
-    assert not game.has_placed_queen(BLACK)
+    assert game.stacks() == [(ORIGIN, [WHITE_QUEEN])]
+    assert game.top(ORIGIN) == WHITE_QUEEN
+    assert game.remaining(Player.White)[PieceKind.Queen] == 0
+    assert game.has_placed_queen(Player.White)
+    assert not game.has_placed_queen(Player.Black)
 
 
 def test_follow_up_placement_and_illegal_move() -> None:
     game = hive_native.Game()
     game.apply(Move.place(ORIGIN, PieceKind.Queen))
 
-    assert (1, 0) in game.placement_targets()
+    assert TilePointer(1, 0) in game.placement_targets()
     assert game.submit(Move.place(TilePointer(1, 0), PieceKind.Queen))
-    assert game.current_player == WHITE
+    assert game.current_player is Player.White
 
     assert not game.submit(Move.place(TilePointer(10, 10), PieceKind.Queen))
-    assert game.current_player == WHITE
+    assert game.current_player is Player.White
 
 
 def test_invalid_records_raise_value_error() -> None:
@@ -60,13 +61,16 @@ def test_invalid_records_raise_value_error() -> None:
     with pytest.raises(ValueError):
         game.submit(cast(Move, (PLACE, 0, 0)))
     with pytest.raises(ValueError):
-        game.submit((2, 0, 0, 0, 0, QUEEN))
+        game.submit(cast(Move, (2, 0, 0, 0, 0, QUEEN)))
     with pytest.raises(ValueError):
-        game.remaining(2)
+        game.remaining(cast(Player, 2))
 
 
 def test_board_errors_propagate() -> None:
     game = hive_native.Game()
+
+    with pytest.raises(hive_native.EmptyTileError):
+        game.top(TilePointer(4, 4))
 
     with pytest.raises(hive_native.IllegalMoveError):
         game.apply(Move.move(TilePointer(5, 5), ORIGIN, PieceKind.Queen))
@@ -94,25 +98,32 @@ def test_board_queries() -> None:
     game = hive_native.Game()
     assert game.submit(Move.place(ORIGIN, PieceKind.Queen))
 
-    assert game.occupied_tiles() == [(0, 0)]
+    assert game.occupied_tiles() == {ORIGIN}
     assert len(game.tiles_around_hive()) == 6
-    assert not game.is_empty(0, 0)
-    assert game.is_empty(1, 0)
-    assert game.remaining(WHITE) == [0, 2, 2, 2, 2]
-    assert game.can_place(PieceKind.Ant.value)
-    assert game.can_place(PieceKind.Queen.value)
+    assert not game.is_empty(ORIGIN)
+    assert game.is_empty(TilePointer(1, 0))
+    assert game.remaining(Player.White) == {
+        PieceKind.Queen: 0,
+        PieceKind.Spider: 2,
+        PieceKind.Beetle: 2,
+        PieceKind.Grasshopper: 2,
+        PieceKind.Ant: 2,
+    }
+    assert game.can_place(PieceKind.Ant)
+    assert game.can_place(PieceKind.Queen)
 
 
-def test_moves_from_converts_to_records() -> None:
+def test_moves_from_returns_moves() -> None:
     game = hive_native.Game()
     assert game.submit(Move.place(ORIGIN, PieceKind.Queen))
     assert game.submit(Move.place(TilePointer(1, 0), PieceKind.Queen))
 
-    moves = [Move(*record) for record in game.moves_from(0, 0)]
+    moves = game.moves_from(ORIGIN)
     assert moves
+    assert all(isinstance(move, Move) for move in moves)
     assert all(not move.is_placement for move in moves)
     assert game.submit(moves[0])
-    assert game.current_player == BLACK
+    assert game.current_player is Player.Black
 
 
 def test_enum_parity() -> None:

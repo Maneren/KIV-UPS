@@ -26,9 +26,7 @@ _PIECES = (
 
 
 def _top(game: hive_native.Game, tile: TilePointer) -> Piece:
-    record = game.top(tile.p, tile.q)
-    assert record is not None
-    return Piece.from_record(record)
+    return game.top(tile)
 
 
 def _game_with_white_queen_and_black_ant() -> hive_native.Game:

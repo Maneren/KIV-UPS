@@ -21,7 +21,7 @@ the GUI, the terminal, and the network stay independent of the engine:
 | Package | Responsibility | Depends on |
 | --- | --- | --- |
 | `hive_native` | Canonical Hive engine: board state, legal moves, turn/win logic. | — |
-| `hive_client.domain` | Value objects shared by the app, UI, and wire layers. | `hive_native` |
+| `hive_client.domain` | Value objects shared by the app, UI, and wire layers; the native engine returns and accepts these directly. | — |
 | `hive_client.app` | UI-agnostic interaction: `GameController` calls `hive_native.Game` directly; `GameView` is the immutable render model. | domain, `hive_native` |
 | `hive_client.ui` | raylib only: pixel geometry, layout, theme, input hit-testing, renderer, window loop. | app, domain |
 | `hive_client.wire` | Wire protocol: message dataclasses, pure codec, TCP transport. | domain |

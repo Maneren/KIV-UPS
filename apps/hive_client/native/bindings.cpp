@@ -1,12 +1,12 @@
 #include <algorithm>
 #include <cstddef>
+#include <exception>
 #include <format>
 #include <hive/errors.h>
 #include <hive/game.h>
 #include <hive/types.h>
 #include <limits>
 #include <nanobind/nanobind.h>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -17,6 +17,7 @@ namespace {
 
 using hive::Coordinate;
 using hive::Game;
+using hive::GameResult;
 using hive::Move;
 using hive::Piece;
 using hive::PieceKind;
@@ -35,21 +36,33 @@ int read_int(const nb::tuple &record, std::size_t index, const char *what) {
   }
 }
 
-Coordinate
-read_coordinate(const nb::tuple &record, std::size_t index, const char *what) {
-  long long value = 0;
+Coordinate read_coordinate(const nb::object &value, const char *what) {
+  long long coordinate = 0;
   try {
-    value = nb::cast<long long>(record[index]);
+    coordinate = nb::cast<long long>(value);
   } catch (const nb::cast_error &) {
-    throw nb::value_error(std::format("{} must be an integer", what).c_str());
+    throw nb::type_error(std::format("{} must be an integer", what).c_str());
   }
 
-  if (value < std::numeric_limits<Coordinate>::min() ||
-      value > std::numeric_limits<Coordinate>::max()) {
+  if (coordinate < std::numeric_limits<Coordinate>::min() ||
+      coordinate > std::numeric_limits<Coordinate>::max()) {
     throw nb::value_error(std::format("{} is out of range", what).c_str());
   }
 
-  return static_cast<Coordinate>(value);
+  return static_cast<Coordinate>(coordinate);
+}
+
+int read_enum_value(const nb::object &value, const char *what) {
+  try {
+    if (nb::isinstance<nb::int_>(value)) {
+      return nb::cast<int>(value);
+    }
+    return nb::cast<int>(value.attr("value"));
+  } catch (const std::exception &) {
+    throw nb::type_error(
+        std::format("{} must be an enum or integer", what).c_str()
+    );
+  }
 }
 
 void check_range(int value, int min, int max, const char *what) {
@@ -60,22 +73,24 @@ void check_range(int value, int min, int max, const char *what) {
   }
 }
 
-Player read_player(int value) {
-  check_range(value, 0, 1, "player");
-  return static_cast<Player>(value);
+Player read_player(const nb::object &value) {
+  const int player = read_enum_value(value, "player");
+  check_range(player, 0, 1, "player");
+  return static_cast<Player>(player);
 }
 
-PieceKind read_piece_kind(int value) {
+PieceKind read_piece_kind(const nb::object &value) {
+  const int kind = read_enum_value(value, "piece_kind");
   check_range(
-      value, 0, static_cast<int>(hive::NUMBER_OF_PIECES) - 1, "piece_kind"
+      kind, 0, static_cast<int>(hive::NUMBER_OF_PIECES) - 1, "piece_kind"
   );
-  return static_cast<PieceKind>(value);
+  return static_cast<PieceKind>(kind);
 }
 
-TilePointer read_tile(int p, int q) {
+TilePointer read_tile(const nb::object &value) {
   return {
-      .p = static_cast<Coordinate>(p),
-      .q = static_cast<Coordinate>(q),
+      .p = read_coordinate(value.attr("p"), "p"),
+      .q = read_coordinate(value.attr("q"), "q"),
   };
 }
 
@@ -85,11 +100,11 @@ Move read_move(const nb::tuple &record) {
   }
 
   const int type = read_int(record, 0, "move type");
-  const auto from_p = read_coordinate(record, 1, "from_p");
-  const auto from_q = read_coordinate(record, 2, "from_q");
-  const auto to_p = read_coordinate(record, 3, "to_p");
-  const auto to_q = read_coordinate(record, 4, "to_q");
-  const auto kind = read_piece_kind(read_int(record, 5, "piece_kind"));
+  const auto from_p = read_coordinate(record[1], "from_p");
+  const auto from_q = read_coordinate(record[2], "from_q");
+  const auto to_p = read_coordinate(record[3], "to_p");
+  const auto to_q = read_coordinate(record[4], "to_q");
+  const auto kind = read_piece_kind(record[5]);
 
   const auto to = TilePointer{.p = to_p, .q = to_q};
 
@@ -103,65 +118,106 @@ Move read_move(const nb::tuple &record) {
   throw nb::value_error("move type must be 0 (place) or 1 (move)");
 }
 
-nb::tuple encode_tile(TilePointer ptr) { return nb::make_tuple(ptr.p, ptr.q); }
+struct PyTypes {
+  PyTypes()
+      : tile_pointer(import_attr("hive_client.domain.geometry", "TilePointer")),
+        move(import_attr("hive_client.domain.moves", "Move")),
+        piece(import_attr("hive_client.domain.pieces", "Piece")),
+        piece_kind(import_attr("hive_client.domain.pieces", "PieceKind")),
+        player(import_attr("hive_client.domain.pieces", "Player")),
+        game_result(import_attr("hive_client.domain.game", "GameResult")) {}
 
-nb::tuple encode_piece(const Piece &piece) {
-  return nb::make_tuple(
-      static_cast<int>(piece.kind), static_cast<int>(piece.owner)
-  );
-}
+  static nb::object import_attr(const char *module, const char *name) {
+    return nb::module_::import_(module).attr(name);
+  }
 
-nb::tuple encode_move(const Move &move) {
-  if (const auto *placement = std::get_if<hive::PlacePiece>(&move)) {
-    return nb::make_tuple(
-        PLACE,
-        0,
-        0,
-        placement->pos.p,
-        placement->pos.q,
-        static_cast<int>(placement->piece_kind)
+  [[nodiscard]] nb::object make_tile(TilePointer ptr) const {
+    return tile_pointer(ptr.p, ptr.q);
+  }
+
+  [[nodiscard]] nb::object make_player(Player value) const {
+    return player(static_cast<int>(value));
+  }
+
+  [[nodiscard]] nb::object make_piece_kind(PieceKind value) const {
+    return piece_kind(static_cast<int>(value));
+  }
+
+  [[nodiscard]] nb::object make_piece(const Piece &value) const {
+    return piece(make_piece_kind(value.kind), make_player(value.owner));
+  }
+
+  [[nodiscard]] nb::object make_result(GameResult value) const {
+    return game_result(static_cast<int>(value));
+  }
+
+  [[nodiscard]] nb::object make_move(const Move &value) const {
+    if (const auto *placement = std::get_if<hive::PlacePiece>(&value)) {
+      return move(
+          PLACE,
+          0,
+          0,
+          placement->pos.p,
+          placement->pos.q,
+          static_cast<int>(placement->piece_kind)
+      );
+    }
+
+    const auto &movement = std::get<hive::MovePiece>(value);
+    return move(
+        MOVE,
+        movement.from.p,
+        movement.from.q,
+        movement.to.p,
+        movement.to.q,
+        static_cast<int>(movement.piece_kind)
     );
   }
 
-  const auto &movement = std::get<hive::MovePiece>(move);
-  return nb::make_tuple(
-      MOVE,
-      movement.from.p,
-      movement.from.q,
-      movement.to.p,
-      movement.to.q,
-      static_cast<int>(movement.piece_kind)
-  );
-}
-
-nb::list encode_moves(const std::vector<Move> &moves) {
-  nb::list result;
-  for (const auto &move : moves) {
-    result.append(encode_move(move));
+  template <typename Range>
+  [[nodiscard]] nb::set make_tile_set(const Range &tiles) const {
+    nb::set result;
+    for (const auto tile : tiles) {
+      result.add(make_tile(tile));
+    }
+    return result;
   }
-  return result;
-}
 
-nb::list encode_tiles(std::vector<TilePointer> tiles) {
-  std::ranges::sort(tiles, [](TilePointer lhs, TilePointer rhs) {
-    return std::pair{lhs.p, lhs.q} < std::pair{rhs.p, rhs.q};
-  });
+  [[nodiscard]] nb::list make_tile_list(std::vector<TilePointer> tiles) const {
+    std::ranges::sort(tiles, [](TilePointer lhs, TilePointer rhs) {
+      return std::pair{lhs.p, lhs.q} < std::pair{rhs.p, rhs.q};
+    });
 
-  nb::list result;
-  for (const auto tile : tiles) {
-    result.append(encode_tile(tile));
+    nb::list result;
+    for (const auto tile : tiles) {
+      result.append(make_tile(tile));
+    }
+    return result;
   }
-  return result;
-}
 
-nb::list encode_tiles(const std::unordered_set<TilePointer> &tiles) {
-  return encode_tiles(std::vector<TilePointer>(tiles.begin(), tiles.end()));
-}
+  [[nodiscard]] nb::list make_moves(const std::vector<Move> &moves) const {
+    nb::list result;
+    for (const auto &move : moves) {
+      result.append(make_move(move));
+    }
+    return result;
+  }
+
+private:
+  nb::object tile_pointer;
+  nb::object move;
+  nb::object piece;
+  nb::object piece_kind;
+  nb::object player;
+  nb::object game_result;
+};
 
 } // namespace
 
 // NOLINTNEXTLINE(performance-unnecessary-value-param)
 NB_MODULE(hive_native, m) {
+  const PyTypes types;
+
   const auto hive_error =
       // NOLINTNEXTLINE(misc-include-cleaner)
       nb::exception<hive::HiveError>(m, "HiveError", PyExc_RuntimeError);
@@ -176,13 +232,13 @@ NB_MODULE(hive_native, m) {
       .def(nb::init<>())
       .def_prop_ro(
           "current_player",
-          [](const Game &game) {
-            return static_cast<int>(game.current_player());
+          [types](const Game &game) {
+            return types.make_player(game.current_player());
           }
       )
       .def_prop_ro(
           "result",
-          [](const Game &game) { return static_cast<int>(game.result()); }
+          [types](const Game &game) { return types.make_result(game.result()); }
       )
       .def(
           "is_empty_all",
@@ -190,89 +246,84 @@ NB_MODULE(hive_native, m) {
       )
       .def(
           "stacks",
-          [](const Game &game) {
+          [types](const Game &game) {
             nb::list result;
             for (const auto &stack : game.board().stacks()) {
               nb::list pieces;
               for (const auto &piece : stack.pieces) {
-                pieces.append(encode_piece(piece));
+                pieces.append(types.make_piece(piece));
               }
-              result.append(nb::make_tuple(stack.ptr.p, stack.ptr.q, pieces));
+              result.append(nb::make_tuple(types.make_tile(stack.ptr), pieces));
             }
             return result;
           }
       )
       .def(
           "occupied_tiles",
-          [](const Game &game) {
-            return encode_tiles(game.board().occupied_tiles());
+          [types](const Game &game) {
+            return types.make_tile_set(game.board().occupied_tiles());
           }
       )
       .def(
           "tiles_around_hive",
-          [](const Game &game) {
-            return encode_tiles(game.board().tiles_around_hive());
+          [types](const Game &game) {
+            return types.make_tile_set(game.board().tiles_around_hive());
           }
       )
       .def(
           "top",
-          [](const Game &game, int p, int q) -> nb::object {
-            const auto ptr = read_tile(p, q);
-            if (game.board().is_empty(ptr)) {
-              return nb::none();
-            }
-            return encode_piece(game.board().get_top(ptr));
+          [types](const Game &game, const nb::object &tile) {
+            return types.make_piece(game.board().get_top(read_tile(tile)));
           }
       )
       .def(
           "is_empty",
-          [](const Game &game, int p, int q) {
-            return game.board().is_empty(read_tile(p, q));
+          [](const Game &game, const nb::object &tile) {
+            return game.board().is_empty(read_tile(tile));
           }
       )
       .def(
           "remaining",
-          [](const Game &game, int player) {
+          [types](const Game &game, const nb::object &player) {
             const auto remaining = game.board().remaining(read_player(player));
 
-            nb::list result;
+            nb::dict result;
             for (std::size_t kind = 0; kind < hive::NUMBER_OF_PIECES; ++kind) {
               const auto it = remaining.find(static_cast<PieceKind>(kind));
-              result.append(
-                  it == remaining.end() ? 0 : static_cast<int>(it->second)
-              );
+              result[types.make_piece_kind(static_cast<PieceKind>(kind))] =
+                  it == remaining.end() ? 0 : static_cast<int>(it->second);
             }
             return result;
           }
       )
       .def(
           "has_placed_queen",
-          [](const Game &game, int player) {
+          [](const Game &game, const nb::object &player) {
             return game.board().has_placed_queen(read_player(player));
           }
       )
       .def(
           "can_place",
-          [](const Game &game, int kind) {
+          [](const Game &game, const nb::object &kind) {
             return game.can_place(read_piece_kind(kind));
           }
       )
       .def(
           "can_move_from",
-          [](const Game &game, int p, int q) {
-            return game.can_move_from(read_tile(p, q));
+          [](const Game &game, const nb::object &tile) {
+            return game.can_move_from(read_tile(tile));
           }
       )
       .def(
           "placement_targets",
-          [](const Game &game) {
-            return encode_tiles(game.placement_targets());
+          [types](const Game &game) {
+            return types.make_tile_list(game.placement_targets());
           }
       )
       .def(
           "moves_from",
-          [](const Game &game, int p, int q) {
-            return encode_moves(game.moves_from(read_tile(p, q)));
+          [types](const Game &game, const nb::object &tile) {
+            return types.make_moves(game.moves_from(read_tile(tile)));
           }
       )
       .def(

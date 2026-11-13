@@ -14,8 +14,7 @@ from dataclasses import dataclass, field
 import hive_native
 
 from hive_client.app.view import DragView, GameView, StackView
-from hive_client.domain.errors import EmptyTileError
-from hive_client.domain.game import ORIGIN, GameResult
+from hive_client.domain.game import ORIGIN
 from hive_client.domain.geometry import TilePointer
 from hive_client.domain.moves import Move
 from hive_client.domain.pieces import PIECE_KINDS, Piece, PieceKind, Player
@@ -54,7 +53,7 @@ class GameController:
     @property
     def current_player(self) -> Player:
         """Return the player whose turn it is."""
-        return Player(self.game.current_player)
+        return self.game.current_player
 
     # -- turn -------------------------------------------------------------
 
@@ -86,7 +85,7 @@ class GameController:
         kind: PieceKind | None,
     ) -> frozenset[TilePointer]:
         if kind is not None:
-            if not self.game.can_place(kind.value):
+            if not self.game.can_place(kind):
                 return frozenset()
             return frozenset(self._placement_targets())
 
@@ -96,10 +95,10 @@ class GameController:
         return self._move_targets(tile)
 
     def _placement_targets(self) -> tuple[TilePointer, ...]:
-        return tuple(TilePointer(*record) for record in self.game.placement_targets())
+        return tuple(self.game.placement_targets())
 
     def _moves_from(self, tile: TilePointer) -> tuple[Move, ...]:
-        return tuple(Move(*record) for record in self.game.moves_from(tile.p, tile.q))
+        return tuple(self.game.moves_from(tile))
 
     def _move_targets(self, tile: TilePointer) -> frozenset[TilePointer]:
         return frozenset(
@@ -107,10 +106,7 @@ class GameController:
         )
 
     def _top(self, tile: TilePointer) -> Piece:
-        if (record := self.game.top(tile.p, tile.q)) is not None:
-            return Piece(*record)
-
-        raise EmptyTileError(f"No pieces at position {tile}")
+        return self.game.top(tile)
 
     def _clear_hover(self) -> None:
         self.state.hovered_tile = None
@@ -121,11 +117,11 @@ class GameController:
         if tile is None:
             return None
 
-        if self.game.is_empty(tile.p, tile.q):
+        if self.game.is_empty(tile):
             return None
         if self._top(tile).owner is not self.current_player:
             return None
-        if not self.game.has_placed_queen(self.current_player.value):
+        if not self.game.has_placed_queen(self.current_player):
             return "Place your Queen before moving pieces."
         return None
 
@@ -133,7 +129,7 @@ class GameController:
 
     def begin_palette_drag(self, kind: PieceKind) -> bool:
         """Start dragging a fresh ``kind`` piece from the palette."""
-        if not self.game.can_place(kind.value):
+        if not self.game.can_place(kind):
             return False
 
         self.state.drag = DragState(
@@ -146,7 +142,7 @@ class GameController:
 
     def begin_board_drag(self, tile: TilePointer) -> bool:
         """Start dragging an existing piece from ``tile``."""
-        if not self.game.can_move_from(tile.p, tile.q):
+        if not self.game.can_move_from(tile):
             return False
 
         top = self._top(tile)
@@ -187,20 +183,15 @@ class GameController:
     def view(self) -> GameView:
         """Build an immutable snapshot for the renderer."""
         stacks = tuple(
-            StackView(
-                tile=TilePointer(p, q),
-                pieces=tuple(piece for piece in pieces),
-            )
-            for p, q, pieces in self.game.stacks()
+            StackView(tile=tile, pieces=tuple(pieces))
+            for tile, pieces in self.game.stacks()
         )
         if self.game.is_empty_all():
             # The opening placement has no neighbouring hive yet, so expose the
             # centre tile as the only clickable target.
             clickable = {ORIGIN}
         else:
-            clickable = {
-                TilePointer(*record) for record in self.game.occupied_tiles()
-            } | {TilePointer(*record) for record in self.game.tiles_around_hive()}
+            clickable = self.game.occupied_tiles() | self.game.tiles_around_hive()
 
         drag = self.state.drag
         drag_view = (
@@ -216,14 +207,14 @@ class GameController:
         # A drag already shows its own targets; suppress the hover preview.
         hovered_tile = None if drag is not None else self.state.hovered_tile
         hover_targets = frozenset() if drag is not None else self.state.hover_targets
-        remaining = self.game.remaining(self.current_player.value)
+        remaining = self.game.remaining(self.current_player)
 
         return GameView(
             stacks=stacks,
             clickable_tiles=frozenset(clickable),
             current_player=self.current_player,
-            result=GameResult(self.game.result),
-            remaining=tuple((kind, remaining[kind.value]) for kind in PIECE_KINDS),
+            result=self.game.result,
+            remaining=tuple((kind, remaining[kind]) for kind in PIECE_KINDS),
             hovered_tile=hovered_tile,
             hover_targets=hover_targets,
             hint=self._hover_hint(hovered_tile),
