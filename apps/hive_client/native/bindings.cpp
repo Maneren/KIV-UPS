@@ -175,11 +175,17 @@ nb::object encode_winner(const std::optional<Player> &winner) {
 
 } // namespace
 
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 NB_MODULE(hive_native, m) {
-  auto hive_error =
+  const auto hive_error =
+      // NOLINTNEXTLINE(misc-include-cleaner)
       nb::exception<hive::HiveError>(m, "HiveError", PyExc_RuntimeError);
-  nb::exception<hive::IllegalMoveError>(m, "IllegalMoveError", hive_error);
-  nb::exception<hive::EmptyTileError>(m, "EmptyTileError", hive_error);
+  [[maybe_unused]] const auto illegal_move_error =
+      // NOLINTNEXTLINE(bugprone-unused-raii, bugprone-throw-keyword-missing)
+      nb::exception<hive::IllegalMoveError>(m, "IllegalMoveError", hive_error);
+  [[maybe_unused]] const auto empty_tile_error =
+      // NOLINTNEXTLINE(bugprone-unused-raii, bugprone-throw-keyword-missing)
+      nb::exception<hive::EmptyTileError>(m, "EmptyTileError", hive_error);
 
   nb::class_<Game>(m, "Game")
       .def(nb::init<>())
@@ -250,8 +256,7 @@ NB_MODULE(hive_native, m) {
             const auto remaining = game.board().remaining(read_player(player));
 
             nb::list result;
-            for (int kind = 0; kind < static_cast<int>(hive::NUMBER_OF_PIECES);
-                 ++kind) {
+            for (std::size_t kind = 0; kind < hive::NUMBER_OF_PIECES; ++kind) {
               const auto it = remaining.find(static_cast<PieceKind>(kind));
               result.append(
                   it == remaining.end() ? 0 : static_cast<int>(it->second)

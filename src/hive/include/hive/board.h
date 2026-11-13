@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <format>
 #include <generator>
 #include <hive/types.h>
+#include <map>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>

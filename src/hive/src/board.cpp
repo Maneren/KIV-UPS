@@ -1,11 +1,13 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <generator>
 #include <hive/board.h>
 #include <hive/errors.h>
 #include <hive/types.h>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <queue>
@@ -70,7 +72,7 @@ Board::tiles_around_hive(std::optional<TilePointer> ignored) const {
       continue;
     }
 
-    for (auto neighbor_ptr : empty_neighbors(entry.first, ignored)) {
+    for (const auto neighbor_ptr : empty_neighbors(entry.first, ignored)) {
       tiles.insert(neighbor_ptr);
     }
   }
@@ -367,7 +369,7 @@ Board::moveable_pieces_for(Player player) const {
 }
 
 bool Board::can_move_to(
-    TilePointer from,
+    TilePointer from, // NOLINT(bugprone-easily-swappable-parameters)
     TilePointer to,
     bool can_leave,
     std::optional<TilePointer> ignored
@@ -542,6 +544,7 @@ std::generator<Move> Board::ant_moves(TilePointer ant) const {
   }
 }
 
+// NOLINTNEXTLINE(bugprone-throwing-static-initialization)
 const PlayerPiecesMap Board::DEFAULT_PLAYER_PIECES = {
     {PieceKind::Queen, 1},
     {PieceKind::Grasshopper, 2},
