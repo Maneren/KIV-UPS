@@ -35,8 +35,10 @@ test config="Debug": (build config "all_tests")
 
 lint: lint-cpp lint-py
 
+cpp_files := shell('find src apps test -type f \( -name "*.cpp" -or -name "*.h" -or -name "*.hpp" \) -not -path "**/external/*" -not -path "**/.*/*" | tr "\n" " "')
+
 lint-cpp:
-    clang-tidy -p {{ builddir }} --quiet $(find src apps test -type f \( -name "*.cpp" -or -name "*.h" -or -name "*.hpp" \) -not -path "**/external/*")
+    clang-tidy -p {{ builddir }} --quiet {{ cpp_files }}
 
 lint-py: (build "Debug" "hive_native_stub")
     uv run --project apps/hive_client --group dev ruff check apps test/python
@@ -45,7 +47,7 @@ lint-py: (build "Debug" "hive_native_stub")
 format: format-cpp format-py
 
 format-cpp:
-    clang-format -i $(find src apps test -type f \( -name "*.cpp" -or -name "*.h" -or -name "*.hpp" \) -not -path "*/external/*")
+    clang-format -i {{ cpp_files }}
     gersemi -i . --definitions cmake --no-cache
 
 format-py:
