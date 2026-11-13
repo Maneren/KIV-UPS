@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import IntEnum
 
 from hive_client.domain.geometry import TilePointer
 
@@ -12,7 +12,7 @@ __all__ = ["ORIGIN", "GameResult"]
 ORIGIN = TilePointer(0, 0)
 
 
-class GameResult(Enum):
+class GameResult(IntEnum):
     """Outcome of a Hive game."""
 
     ONGOING = 0

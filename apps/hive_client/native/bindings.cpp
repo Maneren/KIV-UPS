@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cstddef>
-#include <exception>
 #include <format>
 #include <hive/errors.h>
 #include <hive/game.h>
@@ -54,14 +53,9 @@ Coordinate read_coordinate(const nb::object &value, const char *what) {
 
 int read_enum_value(const nb::object &value, const char *what) {
   try {
-    if (nb::isinstance<nb::int_>(value)) {
-      return nb::cast<int>(value);
-    }
-    return nb::cast<int>(value.attr("value"));
-  } catch (const std::exception &) {
-    throw nb::type_error(
-        std::format("{} must be an enum or integer", what).c_str()
-    );
+    return nb::cast<int>(value);
+  } catch (const nb::cast_error &) {
+    throw nb::type_error(std::format("{} must be an integer", what).c_str());
   }
 }
 

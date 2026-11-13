@@ -21,12 +21,12 @@ class Move(NamedTuple):
     from_q: int
     to_p: int
     to_q: int
-    piece_kind: int
+    piece_kind: PieceKind
 
     @classmethod
     def place(cls, pos: TilePointer, piece_kind: PieceKind) -> Move:
         """Create a placement record."""
-        return cls(PLACE, 0, 0, pos.p, pos.q, piece_kind.value)
+        return cls(PLACE, 0, 0, pos.p, pos.q, piece_kind)
 
     @classmethod
     def move(
@@ -36,7 +36,7 @@ class Move(NamedTuple):
         piece_kind: PieceKind,
     ) -> Move:
         """Create a movement record."""
-        return cls(MOVE, from_.p, from_.q, to.p, to.q, piece_kind.value)
+        return cls(MOVE, from_.p, from_.q, to.p, to.q, piece_kind)
 
     @property
     def is_placement(self) -> bool:

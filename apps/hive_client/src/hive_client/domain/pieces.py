@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import IntEnum
 from typing import NamedTuple
 
 __all__ = ["PIECE_KINDS", "Piece", "PieceKind", "Player"]
 
 
-class Player(Enum):
+class Player(IntEnum):
     """Player colour: White moves first, Black second."""
 
     Black = 0
     White = 1
 
 
-class PieceKind(Enum):
+class PieceKind(IntEnum):
     """Kind of Hive piece."""
 
     Queen = 0
